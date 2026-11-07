@@ -49,6 +49,18 @@ test('landing: tutorial & panduan berjalan otomatis, berhenti saat langkah dikli
   await shot(page, '11b-panduan-ig')
 })
 
+test('aturan: tanpa tombol setor, ada daftar sublink program', async ({ page }) => {
+  await page.goto('/aturan')
+  await expect(page.getByRole('link', { name: 'Setor konten Golden Ticket' })).toHaveCount(0)
+  await expect(page.getByText('halaman Riwayat')).toHaveCount(0)
+  const list = page.locator('section', { hasText: 'Halaman program' })
+  for (const href of ['/goldenticket', '/pelatihancontent', '/dutateladan', '/pantau', '/#tutorial']) {
+    await expect(list.locator(`a[href="${href}"]`)).toBeVisible()
+  }
+  await expect(list.locator('a[href="/goldenticket/setor"]')).toHaveCount(0)
+  await shot(page, '19-aturan-sublink')
+})
+
 test('latar: aset ikut bergeser saat scroll', async ({ page }) => {
   await page.setViewportSize({ width: 412, height: 700 })
   await page.goto('/aturan')

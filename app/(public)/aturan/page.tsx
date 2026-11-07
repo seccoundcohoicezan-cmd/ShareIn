@@ -6,6 +6,14 @@ import { formatNumber } from '@/lib/format'
 import { loadPublic } from '@/lib/public-data'
 
 export const revalidate = 60
+
+const SUBLINKS = [
+  { href: '/goldenticket', title: 'Golden Ticket', desc: 'Hadiah berjalan, target, dan ketentuan setor konten viral' },
+  { href: '/pelatihancontent', title: 'Pelatihan Content', desc: 'Kerjakan tugas, dapat kode, ikut spin wheel' },
+  { href: '/dutateladan', title: 'Duta Teladan', desc: 'Tugas wajib Duta Teladan, kode bonus spin wheel' },
+  { href: '/pantau', title: 'Pantau setoran', desc: 'Lihat status disetujui/ditolak dengan link unikmu' },
+  { href: '/#tutorial', title: 'Tutorial & panduan', desc: 'Cara kerja Sharein dan cara menyalin link' },
+]
 export const metadata: Metadata = { title: 'Aturan setoran' }
 
 export default async function AturanPage() {
@@ -79,11 +87,26 @@ export default async function AturanPage() {
           <li>Satu konten hanya boleh disetor satu kali di seluruh periode. Link yang sama akan ditolak sebagai duplikat.</li>
           <li>Setiap platform punya target jumlah (QTY) per periode. Setoran ditutup otomatis saat target terpenuhi.</li>
           {settings.require_screenshot && <li>Periode ini <b>wajib</b> melampirkan tangkapan layar konten saat muncul di FYP/Beranda.</li>}
-          <li>Admin memeriksa setiap setoran. Status bisa kamu pantau di halaman Riwayat.</li>
+          <li>Admin memeriksa setiap setoran. Status disetujui/ditolak bisa kamu pantau di link pantau unikmu (halaman Pantau).</li>
         </ol>
       </Panel>
 
-      <Link href="/goldenticket/setor" className="btn-primary w-full">Setor konten Golden Ticket</Link>
+      <Panel aria-labelledby="halaman">
+        <PillLabel id="halaman">Halaman program</PillLabel>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          {SUBLINKS.map((l) => (
+            <li key={l.href}>
+              <Link href={l.href} className="flex min-h-[56px] items-center gap-3 rounded-field border border-brand-purple/15 bg-white px-4 py-3 hover:border-brand-violet">
+                <span className="min-w-0 flex-1">
+                  <b className="block">{l.title}</b>
+                  <span className="muted block text-xs">{l.desc}</span>
+                </span>
+                <span className="font-mono text-xs font-bold text-brand-purple">{l.href}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Panel>
     </div>
   )
 }
