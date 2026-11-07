@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.data/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.env
+.env*.local
+.vercel
+.data-e2e/

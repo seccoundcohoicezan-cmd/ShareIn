@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-purple: #6c2bd9;
+  --brand-violet: #a855f7;
+  --brand-orange: #f97316;
+  --brand-amber: #fbbf24;
+  --brand-lavender: #f3f0ff;
+  --ink: #2a0f5c;
+  --ok: #16a34a;
+  --warn: #f59e0b;
+  --bad: #dc2626;
+  --line: rgb(108 43 217 / 0.08);
+  --muted: #45335f;
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 72px;
+}
+body {
+  background: var(--brand-lavender);
+  color: var(--ink);
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-panel border bg-white/80 p-5 sm:p-6;
+    border-color: var(--line);
+  }
+  .panel-solid {
+    @apply rounded-panel border bg-white p-5 sm:p-6;
+    border-color: var(--line);
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-brand-purple px-3.5 py-1.5 text-sm font-bold text-white;
+  }
+  .btn {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-field px-5 text-base font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-purple text-white hover:bg-brand-violet;
+  }
+  .btn-secondary {
+    @apply btn bg-brand-orange text-white hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply btn border bg-white text-brand-purple hover:border-brand-violet;
+    border-color: rgb(108 43 217 / 0.2);
+  }
+  .btn-sm {
+    @apply min-h-[44px] px-3.5 text-sm;
+  }
+  .field {
+    @apply block min-h-[48px] w-full rounded-field border bg-white px-4 text-base text-ink placeholder:text-[#8a7aa8];
+    border-color: rgb(108 43 217 / 0.22);
+  }
+  .field:focus {
+    @apply border-brand-violet outline-none;
+    box-shadow: 0 0 0 3px rgb(168 85 247 / 0.35);
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-bold text-ink;
+  }
+  .muted {
+    color: var(--muted);
+  }
+}
+
+/* ---- Scroll-driven background: 1 fixed layer + 3 blobs, transform/opacity only ---- */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--brand-lavender);
+  contain: strict;
+}
+.blob {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  filter: blur(60px);
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+.b1 { background: #a855f7; top: -25vmax; left: -20vmax; opacity: 0.45; --dx: 30vw; --dy: 40vh; }
+.b2 { background: #f97316; bottom: -30vmax; right: -25vmax; opacity: 0.3; --dx: -35vw; --dy: -30vh; }
+.b3 { background: #fbbf24; top: 40vh; left: 35vw; opacity: 0.25; --dx: -20vw; --dy: 50vh; }
+
+@supports (animation-timeline: scroll()) {
+  html:not([data-motion='off']) .blob {
+    animation: drift linear both;
+    animation-timeline: scroll(root block);
+  }
+  html:not([data-motion='off']) .b3 {
+    animation-name: drift, fade;
+  }
+  @keyframes drift {
+    to { transform: translate3d(var(--dx), var(--dy), 0); }
+  }
+  @keyframes fade {
+    50% { opacity: 0.4; }
+  }
+}
+/* JS fallback writes --p (0..1) on .bg when scroll timelines are unsupported. */
+.bg[data-fallback] .blob {
+  transform: translate3d(calc(var(--p, 0) * var(--dx)), calc(var(--p, 0) * var(--dy)), 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob { animation: none !important; transform: none !important; }
+}
+html[data-motion='off'] .blob { animation: none !important; }
+
+/* The only directed motion: the reward bounces once on success. */
+@keyframes bounce-once {
+  0% { transform: translateY(0) scale(0.9); }
+  30% { transform: translateY(-18px) scale(1.05); }
+  55% { transform: translateY(0) scale(1); }
+  75% { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+.bounce-once { animation: bounce-once 0.9s ease-out 1 both; }
+@media (prefers-reduced-motion: reduce) {
+  .bounce-once { animation: none; }
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--brand-purple), var(--brand-violet) 45%, var(--brand-orange));
+}
