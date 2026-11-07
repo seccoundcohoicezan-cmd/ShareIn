@@ -5,7 +5,9 @@ import { formatNumber, parseCount } from '@/lib/format'
 import type { Check, CheckId, Platform } from '@/lib/types'
 import { checkShareinUrl, detectPlatform, parseSourceUrl } from '@/lib/url'
 import { CheckIcon, CrossIcon, GiftSolid } from './icons'
+import { PantauCard } from './PantauCard'
 import { toast } from './Toast'
+import { localWa, useMe } from './useMe'
 import { PillLabel } from './ui'
 
 interface Rules {
@@ -20,6 +22,7 @@ interface Rules {
 
 const CHECK_LABEL: Record<CheckId, string> = {
   period_open: 'Periode setoran dibuka',
+  identity: 'Nomor WhatsApp valid',
   url_valid: 'Link konten valid',
   not_duplicate: 'Belum pernah disetor',
   min_like: 'Like memenuhi minimal',
@@ -57,6 +60,9 @@ export function SetorForm() {
   const [rules, setRules] = useState<Rules | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [name, setName] = useState('')
+  const [wa, setWa] = useState('')
+  const [token, setToken] = useState('')
+  const me = useMe()
   const [platform, setPlatform] = useState<Platform>('tiktok')
   const [sourceUrl, setSourceUrl] = useState('')
   const [likes, setLikes] = useState('')
@@ -74,6 +80,13 @@ export function SetorForm() {
   const [formError, setFormError] = useState('')
   const [done, setDone] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (me) {
+      setName(me.name)
+      setWa(localWa(me.whatsapp))
+    }
+  }, [me])
 
   useEffect(() => {
     setName(localStorage.getItem(NAME_KEY) ?? '')
@@ -97,14 +110,15 @@ export function SetorForm() {
   }, [detected])
 
   const formKey = useMemo(
-    () => JSON.stringify([name.trim(), platform, sourceUrl.trim(), likesN, commentsN, shareinUrl.trim(), organic, checked, file?.name ?? '', file?.size ?? 0]),
-    [name, platform, sourceUrl, likesN, commentsN, shareinUrl, organic, checked, file],
+    () => JSON.stringify([name.trim(), wa.trim(), platform, sourceUrl.trim(), likesN, commentsN, shareinUrl.trim(), organic, checked, file?.name ?? '', file?.size ?? 0]),
+    [name, wa, platform, sourceUrl, likesN, commentsN, shareinUrl, organic, checked, file],
   )
   const canSend = checks !== null && checks.every((c) => c.pass) && checkedKey === formKey
 
   function payload() {
     return {
       submitter_name: name,
+      whatsapp: wa,
       platform,
       source_url: sourceUrl,
       sharein_url: shareinUrl,
@@ -124,6 +138,11 @@ export function SetorForm() {
     if (name.trim().length < 2) {
       setFormError('Isi nama penyetor minimal 2 huruf.')
       document.getElementById('nama')?.focus()
+      return
+    }
+    if (wa.replace(/\D/g, '').length < 9) {
+      setFormError('Isi nomor WhatsApp aktif, contoh 081234567890.')
+      document.getElementById('wa')?.focus()
       return
     }
     setBusy('check')
@@ -161,6 +180,7 @@ export function SetorForm() {
       const data = await res.json()
       if (res.ok && data.ok) {
         localStorage.setItem(NAME_KEY, name.trim())
+        if (data.token) setToken(data.token)
         toast('Terkirim')
         setDone(true)
         window.scrollTo({ top: 0 })
@@ -230,6 +250,7 @@ export function SetorForm() {
     setChecks(null)
     setCheckedKey('')
     setDone(false)
+    setToken('')
     fetch('/api/rules').then((r) => r.json()).then(setRules).catch(() => {})
   }
 
@@ -240,10 +261,11 @@ export function SetorForm() {
           <GiftSolid className="h-24 w-24" />
         </div>
         <h2 className="mt-4 text-2xl font-extrabold">Setoran terkirim</h2>
-        <p className="muted mx-auto mt-2 max-w-sm">Admin akan memeriksa dalam 1×24 jam. Pantau statusnya di halaman riwayat.</p>
+        <p className="muted mx-auto mt-2 max-w-sm">Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.</p>
+        {token && <PantauCard token={token} />}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button type="button" className="btn-primary" onClick={reset}>Setor lagi</button>
-          <Link href={`/goldenticket/riwayat?nama=${encodeURIComponent(name.trim())}`} className="btn-ghost">Lihat riwayat</Link>
+          {!token && <Link href="/pantau" className="btn-ghost">Pantau setoranku</Link>}
         </div>
       </div>
     )
@@ -280,9 +302,21 @@ export function SetorForm() {
 
       <section className="panel-solid space-y-5" aria-labelledby="data-diri">
         <PillLabel id="data-diri">Penyetor</PillLabel>
-        <div>
-          <label htmlFor="nama" className="label">Nama penyetor</label>
-          <input id="nama" className="field" autoComplete="name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama yang dipakai untuk cek riwayat" />
+        {me && (
+          <p className="rounded-field bg-green-50 p-3 text-sm font-bold text-green-900">
+            Masuk sebagai {me.name}. <a href={`/pantau/${me.token}`} className="underline">Lihat halaman pantau</a>
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="nama" className="label">Nama penyetor</label>
+            <input id="nama" className="field" autoComplete="name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama lengkap" />
+          </div>
+          <div>
+            <label htmlFor="wa" className="label">Nomor WhatsApp</label>
+            <input id="wa" className="field" inputMode="tel" autoComplete="tel" maxLength={20} value={wa} onChange={(e) => setWa(e.target.value)} placeholder="081234567890" readOnly={Boolean(me)} />
+            <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>
+          </div>
         </div>
         <fieldset>
           <legend className="label">Platform asal</legend>

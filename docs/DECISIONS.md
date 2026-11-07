@@ -48,3 +48,13 @@ Dicatat saat build v1 (MRKT-52). Ubah bila tidak sesuai.
 | 27 | Tutorial & panduan salin link berputar otomatis (hanya saat terlihat di layar, tidak untuk reduced-motion); klik langkah/bar → mode manual + tombol "Putar otomatis". | "buat semua berjalan sendiri, berhenti ketika bar step-nya diklik". |
 | 28 | "Live preview" di admin = panel pratinjau memakai pemutar embed resmi TikTok (`/embed/v2/<id>`) dan Instagram (`/reel/<kode>/embed/`), plus tab link Sharein/bukti di iframe dengan cadangan "buka di tab baru"; Setujui/Tolak di panel yang sama. | Admin bisa memutuskan tanpa pindah tab. |
 | 29 | Produksi utama di Dokploy (KVM 8, domain sslip.io HTTPS). Vercel tetap bisa jalan paralel. | Pengguna menyediakan proyek Dokploy; server tetap (bukan serverless) membuat kunci tulis dalam proses lebih andal dan tangkapan layar bisa disimpan di volume. |
+
+## Putaran 5 (7 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 30 | Produksi hanya Dokploy. | Permintaan "fokus 1". |
+| 31 | Akun peserta = nomor WhatsApp; kode unik 12 karakter (alfabet tanpa 0/O/1/I/L, ±2^59 kombinasi, dibatasi 40 permintaan/menit/IP) sebagai link pantau sekaligus login (cookie httpOnly 180 hari). Golden Ticket kini wajib nomor WhatsApp. | "1 unik = 1 user, login juga bisa pakai link unik" ala pelacakan aduan. Tanpa sandi = paling mudah dipakai peserta. |
+| 32 | Pencarian riwayat berdasarkan nama dan cek kode berdasarkan nomor WA dihapus; diganti halaman pantau berkode. | Dulu siapa pun yang tahu nama/nomor bisa melihat setoran orang lain. |
+| 33 | Halaman pantau membaca spreadsheet tanpa cache dan polling 15 detik (berhenti saat tab disembunyikan). Status di sheet bisa diketik manual dalam bahasa Indonesia. | "preview datanya update live di spreadsheet". |
+| 34 | Lupa link → admin mengirim ulang dari `/admin/peserta` lewat WhatsApp (tidak ada pemulihan mandiri dengan nomor saja). | Pemulihan dengan nomor WA saja bisa disalahgunakan orang lain. |

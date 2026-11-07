@@ -6,7 +6,7 @@ export const TABLES = {
   submissions: [
     'id', 'created_at', 'period_id', 'submitter_name', 'platform', 'source_url', 'source_key', 'sharein_url',
     'likes', 'comments', 'metrics_source', 'organic_declared', 'screenshot_url', 'status', 'reject_reason',
-    'reviewed_by', 'reviewed_at', 'needs_review',
+    'reviewed_by', 'reviewed_at', 'needs_review', 'whatsapp',
   ],
   admins: ['email', 'password_hash', 'role', 'active'],
   audit_log: ['time', 'actor', 'action', 'target', 'before', 'after'],
@@ -16,6 +16,7 @@ export const TABLES = {
     'status', 'reject_reason', 'reviewed_by', 'reviewed_at',
   ],
   draws: ['id', 'time', 'program', 'code', 'submission_id', 'name', 'identity_key', 'prize', 'actor', 'status'],
+  participants: ['id', 'token', 'name', 'whatsapp', 'created_at', 'last_seen_at'],
 } as const
 
 export type TableName = keyof typeof TABLES

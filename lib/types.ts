@@ -27,6 +27,16 @@ export interface Settings {
   spin_unique_winner: boolean
 }
 
+export interface Participant {
+  id: string
+  /** Secret code in the personal monitoring link /pantau/<token>; doubles as login. */
+  token: string
+  name: string
+  whatsapp: string
+  created_at: string
+  last_seen_at: string
+}
+
 export type Program = 'pelatihan' | 'duta'
 export type TaskSubmissionStatus = 'pending' | 'approved' | 'rejected' | 'void'
 
@@ -96,6 +106,8 @@ export interface Submission {
   reviewed_by: string
   reviewed_at: string
   needs_review: boolean
+  /** Normalized WhatsApp (628…); empty for submissions made before identities existed. */
+  whatsapp: string
 }
 
 export interface Admin {
@@ -116,6 +128,7 @@ export interface AuditEntry {
 
 export type CheckId =
   | 'period_open'
+  | 'identity'
   | 'url_valid'
   | 'not_duplicate'
   | 'min_like'

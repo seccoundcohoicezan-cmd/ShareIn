@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429, readJson } from '@/lib/http'
 import { checkSubmission, createSubmission, submissionSchema } from '@/lib/service'
 import { MAX_SCREENSHOT_BYTES, saveScreenshot, sniffImage } from '@/lib/storage'
+import { ensureParticipant } from '@/lib/participant-service'
+import { setUserCookie } from '@/lib/user-session'
 
 export async function POST(req: NextRequest) {
   const limited = limitOr429(req, 'submit', 10)
@@ -54,5 +56,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) return NextResponse.json({ ok: false, checks: result.checks }, { status: 422 })
   revalidatePublic()
   const s = result.submission
-  return NextResponse.json({ ok: true, id: s.id, status: s.status, created_at: s.created_at }, { status: 201 })
+  const me = await ensureParticipant(s.submitter_name, s.whatsapp)
+  const res = NextResponse.json({ ok: true, id: s.id, status: s.status, created_at: s.created_at, token: me?.token }, { status: 201 })
+  return me ? setUserCookie(res, me.token) : res
 }

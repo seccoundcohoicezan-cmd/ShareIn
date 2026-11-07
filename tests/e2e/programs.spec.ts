@@ -98,12 +98,12 @@ test('pelatihan: admin buat tugas → peserta dapat kode → admin setujui → s
   await peserta.getByLabel('Nomor WhatsApp', { exact: true }).fill('0812 3456 7890')
   await peserta.getByLabel('Link bukti').fill('https://www.tiktok.com/@rina/video/1')
   await peserta.getByRole('button', { name: 'Kumpulkan & dapat kode' }).click()
-  const code = peserta.locator('p.font-mono')
+  const code = peserta.locator('#kode-hasil')
   await expect(code).toHaveText(/^PC-[A-Z2-9]{6}$/)
   const theCode = (await code.textContent())!
   await shot(peserta, '13-pelatihan-kode')
-  await expect(peserta.getByRole('list', { name: 'Daftar kode' })).toContainText(theCode)
-  await expect(peserta.getByRole('list', { name: 'Daftar kode' })).toContainText('Menunggu verifikasi')
+  const pantauHref = (await peserta.getByRole('link', { name: 'Buka halaman pantau' }).first().getAttribute('href'))!
+  expect(pantauHref).toMatch(/^\/pantau\/[A-HJ-NP-Z2-9]{12}$/)
 
   // Same task twice → refused with the existing code.
   await peserta.getByRole('button', { name: 'Kumpulkan tugas lain' }).click()
@@ -136,8 +136,13 @@ test('pelatihan: admin buat tugas → peserta dapat kode → admin setujui → s
   const winners = peserta.locator('section', { hasText: 'Pemenang spin wheel' })
   await expect(winners).toContainText('Rp150.000')
   await expect(winners).not.toContainText('Utami')
-  await expect(peserta.getByRole('list', { name: 'Daftar kode' })).toContainText('Menang!')
   await shot(peserta, '15-pelatihan-pemenang')
+  await peserta.goto(pantauHref)
+  const list = peserta.getByRole('list', { name: 'Daftar setoran' })
+  await expect(list).toContainText(theCode)
+  await expect(list).toContainText('Disetujui')
+  await expect(list).toContainText('Menang Rp150.000')
+  await shot(peserta, '15b-pantau-menang')
 })
 
 test('duta teladan: halaman kewajiban, kode DT-, pengumpulan bisa ditutup', async ({ page, browser }) => {
@@ -156,7 +161,7 @@ test('duta teladan: halaman kewajiban, kode DT-, pengumpulan bisa ditutup', asyn
   await duta.getByLabel('Nomor WhatsApp', { exact: true }).fill('081298765432')
   await duta.getByLabel('Link bukti').fill('https://sharein.id/c/budi1')
   await duta.getByRole('button', { name: 'Kumpulkan & dapat kode' }).click()
-  await expect(duta.locator('p.font-mono')).toHaveText(/^DT-/)
+  await expect(duta.locator('#kode-hasil')).toHaveText(/^DT-/)
   await shot(duta, '16-duta')
 
   await page.goto('/admin/pengaturan')
@@ -167,6 +172,15 @@ test('duta teladan: halaman kewajiban, kode DT-, pengumpulan bisa ditutup', asyn
     data: { task_id: 'x', name: 'Budi Santoso', whatsapp: '081298765432', proof_url: 'https://sharein.id/c/2' },
   })
   expect((await res.json()).message).toMatch(/ditutup/)
+})
+
+test('admin peserta: link unik per nomor WA bisa dikirim ulang', async ({ page }) => {
+  await login(page)
+  await page.goto('/admin/peserta')
+  const rina = page.locator('li', { hasText: 'Rina Utami' })
+  await expect(rina).toContainText('6281234567890')
+  await expect(rina.getByRole('link', { name: 'Kirim link via WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\/6281234567890\?text=.*pantau/)
+  await shot(page, '18-admin-peserta')
 })
 
 test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async ({ page }) => {

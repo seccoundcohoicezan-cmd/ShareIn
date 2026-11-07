@@ -17,6 +17,7 @@ function input(over: Partial<SubmissionInput> = {}): SubmissionInput {
   n++
   return {
     submitter_name: 'Rina',
+    whatsapp: '081234567890',
     platform: 'tiktok',
     source_url: `https://www.tiktok.com/@akun/video/73000000000000${String(n).padStart(5, '0')}?is_from_webapp=1`,
     sharein_url: 'https://sharein.id/c/abc123',
@@ -161,7 +162,7 @@ describe('sheets store details', () => {
     invalidate()
     const s = await getSettingsFresh()
     expect(s.min_like_tiktok).toBe(100000)
-    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'audit_log', 'draws', 'settings', 'submissions', 'task_submissions', 'tasks'])
+    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'audit_log', 'draws', 'participants', 'settings', 'submissions', 'task_submissions', 'tasks'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
     expect(fake.tabs.get('settings')!.length).toBe(1 + 20)
     const header = fake.tabs.get('submissions')![0] as string[]
@@ -177,7 +178,7 @@ describe('sheets store details', () => {
 
 describe('admin helpers', () => {
   it('filters and escapes CSV formulas', () => {
-    const base = { id: 'sub_1', created_at: '2026-11-05T00:00:00Z', period_id: 'p1', submitter_name: '=HYPERLINK("x")', platform: 'tiktok', source_url: 'https://a', source_key: 'tt:1', sharein_url: 'https://s', likes: 1, comments: 2, metrics_source: 'manual', organic_declared: true, screenshot_url: '', status: 'pending', reject_reason: '', reviewed_by: '', reviewed_at: '', needs_review: false } as const
+    const base = { id: 'sub_1', created_at: '2026-11-05T00:00:00Z', period_id: 'p1', submitter_name: '=HYPERLINK("x")', platform: 'tiktok', source_url: 'https://a', source_key: 'tt:1', sharein_url: 'https://s', likes: 1, comments: 2, metrics_source: 'manual', organic_declared: true, screenshot_url: '', status: 'pending', reject_reason: '', reviewed_by: '', reviewed_at: '', needs_review: false, whatsapp: '' } as const
     const items = [base, { ...base, id: 'sub_2', status: 'void' as const }, { ...base, id: 'sub_3', platform: 'reels' as const }]
     expect(applyFilters(items, { status: 'all', platform: 'tiktok', period: '', name: '' }).map((s) => s.id)).toEqual(['sub_1'])
     const csv = toCsv([base])

@@ -1,6 +1,7 @@
 import { cached, invalidate } from '../cache'
 import type { Platform, Submission, SubmissionStatus } from '../types'
 import { getStore } from './index'
+import { normalizeStatus } from '../status'
 import { recordToRow, rowToRecord, type Cell } from './store'
 
 export interface StoredSubmission extends Submission {
@@ -8,14 +9,13 @@ export interface StoredSubmission extends Submission {
   _index: number
 }
 
-const STATUSES: SubmissionStatus[] = ['pending', 'approved', 'rejected', 'void']
 
 function toBool(v: string) {
   return v.trim().toUpperCase() === 'TRUE'
 }
 
 function fromRecord(rec: Record<string, string>, index: number): StoredSubmission {
-  const status = (rec.status || 'pending').trim().toLowerCase() as SubmissionStatus
+  const status: SubmissionStatus = normalizeStatus(rec.status)
   return {
     _index: index,
     id: rec.id,
@@ -31,11 +31,12 @@ function fromRecord(rec: Record<string, string>, index: number): StoredSubmissio
     metrics_source: rec.metrics_source === 'api' ? 'api' : 'manual',
     organic_declared: toBool(rec.organic_declared),
     screenshot_url: rec.screenshot_url,
-    status: STATUSES.includes(status) ? status : 'pending',
+    status,
     reject_reason: rec.reject_reason,
     reviewed_by: rec.reviewed_by,
     reviewed_at: rec.reviewed_at,
     needs_review: toBool(rec.needs_review ?? ''),
+    whatsapp: rec.whatsapp ?? '',
   }
 }
 
@@ -59,6 +60,7 @@ function toRecord(s: Submission): Record<string, Cell> {
     reviewed_by: s.reviewed_by,
     reviewed_at: s.reviewed_at,
     needs_review: s.needs_review,
+    whatsapp: s.whatsapp,
   }
 }
 

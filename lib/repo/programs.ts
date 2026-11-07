@@ -1,9 +1,9 @@
-import type { Draw, Program, Task, TaskSubmission, TaskSubmissionStatus } from '../types'
+import type { Draw, Participant, Program, Task, TaskSubmission, TaskSubmissionStatus } from '../types'
+import { normalizeStatus } from '../status'
 import { recordTable } from './records'
 
 const bool = (v: string) => v.trim().toUpperCase() === 'TRUE'
 const program = (v: string): Program => (v.trim() === 'duta' ? 'duta' : 'pelatihan')
-const SUB_STATUS: TaskSubmissionStatus[] = ['pending', 'approved', 'rejected', 'void']
 
 export const tasksTable = recordTable<Task>(
   'tasks',
@@ -23,7 +23,7 @@ export const tasksTable = recordTable<Task>(
 export const taskSubmissionsTable = recordTable<TaskSubmission>(
   'task_submissions',
   (r) => {
-    const status = (r.status || 'pending').trim().toLowerCase() as TaskSubmissionStatus
+    const status: TaskSubmissionStatus = normalizeStatus(r.status)
     return {
       id: r.id,
       created_at: r.created_at ?? '',
@@ -35,7 +35,7 @@ export const taskSubmissionsTable = recordTable<TaskSubmission>(
       proof_url: r.proof_url ?? '',
       note: r.note ?? '',
       code: (r.code ?? '').toUpperCase(),
-      status: SUB_STATUS.includes(status) ? status : 'pending',
+      status,
       reject_reason: r.reject_reason ?? '',
       reviewed_by: r.reviewed_by ?? '',
       reviewed_at: r.reviewed_at ?? '',
@@ -59,4 +59,17 @@ export const drawsTable = recordTable<Draw>(
     status: r.status === 'void' ? 'void' : 'active',
   }),
   (d) => ({ ...d }),
+)
+
+export const participantsTable = recordTable<Participant>(
+  'participants',
+  (r) => ({
+    id: r.id,
+    token: (r.token ?? '').toUpperCase(),
+    name: r.name ?? '',
+    whatsapp: r.whatsapp ?? '',
+    created_at: r.created_at ?? '',
+    last_seen_at: r.last_seen_at ?? '',
+  }),
+  (p) => ({ ...p }),
 )

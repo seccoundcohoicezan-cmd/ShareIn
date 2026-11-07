@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429, readJson } from '@/lib/http'
 import { asProgram } from '@/lib/program-param'
 import { submitTask, taskSubmitSchema } from '@/lib/program-service'
+import { ensureParticipant } from '@/lib/participant-service'
+import { setUserCookie } from '@/lib/user-session'
 
 export async function POST(req: NextRequest, { params }: { params: { program: string } }) {
   const program = asProgram(params.program)
@@ -15,6 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: { program: st
     return NextResponse.json({ ok: false, field: issue?.path[0], message: issue?.message ?? 'Data belum lengkap.' }, { status: 400 })
   }
   const r = await submitTask(program, body.data)
-  if (r.ok) revalidatePublic()
-  return NextResponse.json(r, { status: r.ok ? 201 : 422 })
+  if (!r.ok) return NextResponse.json(r, { status: 422 })
+  revalidatePublic()
+  const me = await ensureParticipant(body.data.name, body.data.whatsapp)
+  const res = NextResponse.json({ ...r, token: me?.token }, { status: 201 })
+  return me ? setUserCookie(res, me.token) : res
 }

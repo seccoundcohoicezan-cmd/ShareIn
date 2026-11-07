@@ -30,10 +30,16 @@ class FakeRange {
   }
   setNumberFormat() { return this }
   setFontWeight() { return this }
+  getDataValidation() { return this.sh.validation }
+  setDataValidation(v: unknown) { this.sh.validation = v; return this }
 }
 
 class FakeSheet {
   grid: string[][] = []
+  validation: unknown = null
+  rules: unknown[] = []
+  getConditionalFormatRules() { return this.rules }
+  setConditionalFormatRules(r: unknown[]) { this.rules = r }
   constructor(public name: string) {}
   getLastRow() {
     for (let i = this.grid.length - 1; i >= 0; i--) if (this.grid[i]?.some((c) => c !== '' && c !== undefined)) return i + 1
@@ -56,7 +62,18 @@ export function createAppsScriptSim(secret: string) {
     insertSheet: (n: string) => { const s = new FakeSheet(n); sheets.set(n, s); return s },
   }
   const ctx = vm.createContext({
-    SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush: () => {} },
+    SpreadsheetApp: {
+      getActiveSpreadsheet: () => ss,
+      flush: () => {},
+      newDataValidation: () => {
+        const b = { requireValueInList: () => b, setAllowInvalid: () => b, build: () => ({ kind: 'list' }) }
+        return b
+      },
+      newConditionalFormatRule: () => {
+        const b = { whenTextEqualTo: () => b, setBackground: () => b, setRanges: () => b, build: () => ({ kind: 'rule' }) }
+        return b
+      },
+    },
     LockService: { getScriptLock: () => ({ waitLock: () => { if (lockHeld) throw new Error('lock busy'); lockHeld = true }, releaseLock: () => { lockHeld = false } }) },
     ContentService: {
       MimeType: { JSON: 'json' },

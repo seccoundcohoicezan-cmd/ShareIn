@@ -72,9 +72,30 @@ function ensure_(tables) {
       sh.getRange(1, 1, 1, merged.length).setValues([merged]).setFontWeight('bold');
       sh.setFrozenRows(1);
     }
+    rapikanStatus_(sh, merged);
     out[name] = merged;
   });
   return { headers: out };
+}
+
+// Status column: dropdown + colours, so admins can approve/reject straight in the sheet.
+// Indonesian values typed by hand (disetujui/ditolak/menunggu) are also accepted by the web.
+function rapikanStatus_(sh, header) {
+  var col = header.indexOf('status') + 1;
+  if (col < 1) return;
+  var rows = Math.max(sh.getMaxRows() - 1, 1);
+  var range = sh.getRange(2, col, rows, 1);
+  var values = ['pending', 'approved', 'rejected', 'void'];
+  var dv = range.getDataValidation();
+  if (!dv) {
+    range.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(true).build());
+  }
+  var rules = sh.getConditionalFormatRules();
+  if (rules.length) return;
+  var color = [['approved', '#DCFCE7'], ['disetujui', '#DCFCE7'], ['rejected', '#FEE2E2'], ['ditolak', '#FEE2E2'], ['pending', '#FEF3C7'], ['menunggu', '#FEF3C7']];
+  sh.setConditionalFormatRules(color.map(function (c) {
+    return SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo(c[0]).setBackground(c[1]).setRanges([range]).build();
+  }));
 }
 
 function read_(table) {

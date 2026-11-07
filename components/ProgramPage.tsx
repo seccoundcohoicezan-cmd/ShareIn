@@ -2,7 +2,6 @@ import { formatRupiah } from '@/lib/golden'
 import { formatDate } from '@/lib/format'
 import { programSummary } from '@/lib/program-service'
 import type { Program } from '@/lib/types'
-import { MyCodes } from './MyCodes'
 import { TaskForm } from './TaskForm'
 import { Toaster } from './Toast'
 import { EmptyState, Panel, PillLabel } from './ui'
@@ -79,7 +78,13 @@ export async function ProgramPage({ program, pill, title, intro }: { program: Pr
 
       {data && data.tasks.length > 0 && <TaskForm program={program} tasks={data.tasks} open={data.open} />}
 
-      <MyCodes program={program} />
+      <section className="panel-solid flex flex-wrap items-center gap-3" aria-labelledby="pantau-judul">
+        <div className="min-w-0 flex-1">
+          <h2 id="pantau-judul" className="font-extrabold">Pantau kode & status tugasmu</h2>
+          <p className="muted text-sm">Semua kode, status disetujui/ditolak, dan kemenangan ada di link pantau unikmu.</p>
+        </div>
+        <a href="/pantau" className="btn-primary btn-sm">Buka halaman pantau</a>
+      </section>
 
       <section aria-labelledby="pemenang" className="panel-solid">
         <PillLabel id="pemenang">Pemenang spin wheel</PillLabel>

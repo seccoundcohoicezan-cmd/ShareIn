@@ -217,3 +217,14 @@ html[data-motion='off'] .blob, html[data-motion='off'] .asset { animation: none 
   .tut-bar, .tut-pop, .tut-press, .tut-float, .tut-fill, .tut-confetti { animation: none !important; }
   .tut-bar { transform: scaleX(1); }
 }
+
+/* Live tracking page */
+@keyframes pantau-live { 50% { opacity: 0.35; } }
+.pantau-live { animation: pantau-live 1.6s ease-in-out infinite; }
+@keyframes pantau-now { 0% { box-shadow: 0 0 0 0 rgb(245 158 11 / 0.6); } 100% { box-shadow: 0 0 0 10px rgb(245 158 11 / 0); } }
+.pantau-now { animation: pantau-now 1.6s ease-out infinite; }
+@keyframes pantau-flash { from { background-color: #fef3c7; } to { background-color: #fff; } }
+.pantau-flash { animation: pantau-flash 2.5s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .pantau-live, .pantau-now, .pantau-flash { animation: none; }
+}

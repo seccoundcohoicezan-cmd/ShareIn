@@ -16,9 +16,11 @@ import { parseAndResolve, type Fetcher, type Resolver } from './resolve'
 import { qtyTarget } from './settings-schema'
 import type { CheckResult, Platform, Settings, Submission } from './types'
 import { runChecks } from './validate'
+import { normalizeWhatsapp } from './identity'
 
 export const submissionSchema = z.object({
   submitter_name: z.string().trim().min(2, 'Isi nama minimal 2 huruf.').max(60, 'Nama maksimal 60 karakter.'),
+  whatsapp: z.string().trim().max(20).default(''),
   platform: z.enum(['tiktok', 'reels']),
   source_url: z.string().trim().max(500),
   sharein_url: z.string().trim().max(500).default(''),
@@ -57,6 +59,11 @@ function evaluate(input: SubmissionInput, settings: Settings, all: Submission[],
     },
     { settings, link, duplicate, used: countUsed(all, settings.period_id, input.platform) },
   )
+  // One person = one WhatsApp number; it keys the personal monitoring link.
+  if (!normalizeWhatsapp(input.whatsapp)) {
+    result.checks.unshift({ id: 'identity', pass: false, message: 'Isi nomor WhatsApp aktif, contoh 081234567890. Nomor ini jadi akun & link pantauanmu.' })
+    result.ok = false
+  }
   return { result, likes, comments }
 }
 
@@ -117,6 +124,7 @@ export async function createSubmission(
       reviewed_by: '',
       reviewed_at: '',
       needs_review: input.metrics_source === 'api' ? false : apiDiffers(input, likes, comments),
+      whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
     }
     await appendSubmission(sub)
     const after = await listSubmissionsFresh()

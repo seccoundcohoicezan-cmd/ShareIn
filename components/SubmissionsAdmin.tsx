@@ -287,6 +287,7 @@ export function SubmissionsAdmin() {
           details={
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
               <dt className="muted">Status</dt><dd><StatusBadge status={previewing.status} /></dd>
+              <dt className="muted">WhatsApp</dt><dd>{previewing.whatsapp ? <a className="font-bold text-brand-purple underline" href={`https://wa.me/${previewing.whatsapp}`} target="_blank" rel="noopener noreferrer">{previewing.whatsapp}</a> : '-'}</dd>
               <dt className="muted">Like</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.likes)}</dd>
               <dt className="muted">Komentar</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.comments)}</dd>
               <dt className="muted">Sumber angka</dt><dd>{previewing.metrics_source === 'api' ? 'Adapter API' : 'Cek manual penyetor'}{previewing.needs_review ? ' · selisih dengan API' : ''}</dd>

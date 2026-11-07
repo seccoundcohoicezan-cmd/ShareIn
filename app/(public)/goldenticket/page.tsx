@@ -39,7 +39,7 @@ export default async function GoldenTicketPage() {
             {settings.period_open ? 'Target periode ini sudah penuh' : 'Setoran sedang ditutup'}
           </span>
         )}
-        <Link href="/goldenticket/riwayat" className="btn-ghost w-full sm:w-auto">Lihat riwayat</Link>
+        <Link href="/pantau" className="btn-ghost w-full sm:w-auto">Pantau setoranku</Link>
       </div>
 
       <Panel aria-labelledby="target">
