@@ -40,3 +40,11 @@ Dicatat saat build v1 (MRKT-52). Ubah bila tidak sesuai.
 | 24 | Tangkapan layar panduan dari pengguna dipakai apa adanya, tetapi foto profil & nama kontak orang lain di menu bagikan dan avatar kreator disamarkan (blur). Langkah "ketuk ikon Kirim" di Instagram memakai ilustrasi karena tidak ada tangkapan layarnya. | Privasi pihak ketiga. |
 | 25 | Latar: 3 blob + 6 aset brand (9 elemen), tetap hanya animasi transform & scroll-driven, mati saat reduced-motion/hemat data/RAM ≤ 4 GB. Posisi = di luar kolom baca 768 px (rumus `50vw − 408px − lebar`), dicek otomatis di 1280/1440/1920 px. Di HP aset mengintip dari tepi dengan opasitas 50%. | Permintaan "background bergerak + aset di titik paling optimal"; melonggarkan batas 4 node di rancangan awal. |
 | 26 | Akun owner awal dibuat langsung di sheet `admins` (bcrypt) untuk dutateladan@stekom.ac.id; sandi awal diberikan sekali dan wajib diganti lewat `/admin/akun`. Env `ADMIN_EMAIL/ADMIN_PASSWORD` tidak lagi diperlukan. | Permintaan email & sandi admin. |
+
+## Putaran 4 (7 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 27 | Tutorial & panduan salin link berputar otomatis (hanya saat terlihat di layar, tidak untuk reduced-motion); klik langkah/bar → mode manual + tombol "Putar otomatis". | "buat semua berjalan sendiri, berhenti ketika bar step-nya diklik". |
+| 28 | "Live preview" di admin = panel pratinjau memakai pemutar embed resmi TikTok (`/embed/v2/<id>`) dan Instagram (`/reel/<kode>/embed/`), plus tab link Sharein/bukti di iframe dengan cadangan "buka di tab baru"; Setujui/Tolak di panel yang sama. | Admin bisa memutuskan tanpa pindah tab. |
+| 29 | Produksi utama di Dokploy (KVM 8, domain sslip.io HTTPS). Vercel tetap bisa jalan paralel. | Pengguna menyediakan proyek Dokploy; server tetap (bukan serverless) membuat kunci tulis dalam proses lebih andal dan tangkapan layar bisa disimpan di volume. |

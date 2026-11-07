@@ -6,11 +6,11 @@ Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — 
 
 ## Fitur
 
-- **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; isinya hanya tutorial interaktif (upload → bagikan link → reward) dan panduan bergambar cara menyalin link TikTok / Instagram Reels (tangkapan layar asli, titik ketuk berdenyut). Halaman program dibagikan langsung lewat link-nya. Latar: gradasi + 6 aset brand yang bergeser beda kecepatan saat scroll, diparkir di area kosong kiri/kanan (desktop) dan mengintip di tepi (HP).
+- **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; isinya hanya tutorial interaktif yang berjalan otomatis (storyboard animasi, berhenti saat langkah diklik) (upload → bagikan link → reward) dan panduan bergambar cara menyalin link TikTok / Instagram Reels (tangkapan layar asli, titik ketuk berdenyut). Halaman program dibagikan langsung lewat link-nya. Latar: gradasi + 6 aset brand yang bergeser beda kecepatan saat scroll, diparkir di area kosong kiri/kanan (desktop) dan mengintip di tepi (HP).
 - **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), progres QTY, ketentuan. Setor di `/goldenticket/setor`, riwayat di `/goldenticket/riwayat`.
 - **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Kode yang disetujui admin masuk spin wheel. *Kode saya* (cek per nomor WA) dan daftar pemenang (nama disamarkan, mis. "Rina U.").
 - **`/aturan`** — aturan semua program.
-- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (setujui/tolak beralasan, massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/spin` (roda undian, pemenang dipilih acak di server, tercatat di sheet `draws`, bisa dibatalkan); `/admin/pengaturan` (periode/QTY/batas Golden Ticket, hadiah berjalan, buka/tutup program, hadiah spin bawaan, satu orang maks. menang sekali); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
+- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (tombol *Pratinjau & review*: pemutar resmi TikTok/Instagram + link Sharein di satu panel dengan Setujui/Tolak; massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/spin` (roda undian, pemenang dipilih acak di server, tercatat di sheet `draws`, bisa dibatalkan); `/admin/pengaturan` (periode/QTY/batas Golden Ticket, hadiah berjalan, buka/tutup program, hadiah spin bawaan, satu orang maks. menang sekali); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
 - **Validasi server** (diulang saat simpan): periode dibuka → format/domain URL (hanya https) → normalisasi & ikuti link pendek (HEAD, 3 dtk, hanya domain TikTok/Instagram, IP privat diblokir) → duplikat `source_key` di semua periode → minimal like/komentar (inklusif) → pernyataan organik (+ tangkapan layar bila wajib) → QTY belum penuh → simpan dengan penguncian.
 - **Latar bergerak ringan** — 1 lapisan fixed + 3 blob (4 node DOM), CSS `animation-timeline: scroll()` dengan fallback rAF; mati saat `prefers-reduced-motion`, Data Saver, atau RAM ≤ 4 GB. Admin polos.
 
@@ -59,7 +59,9 @@ ADMIN_NEW_PASSWORD='sandi-minimal-10' npm run admin:add -- reviewer@domain.id re
 
 **Vercel** — repo sudah terhubung (proyek `share-in`). Env minimal: `APPS_SCRIPT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (`SESSION_SECRET` opsional, diturunkan dari rahasia Apps Script). Tanpa env database, web berjalan dalam **mode demo** (data di /tmp, hilang saat server berganti) dan dasbor admin menampilkan peringatan.
 
-**Docker / Dokploy** — `docker build -t sharein .` lalu jalankan dengan env yang sama dan volume `/data` (dipakai mode lokal dan unggahan tangkapan layar). Port 3000.
+**Dokploy (produksi utama)** — proyek *ShareIn / production*, aplikasi *ShareIn Web* di server KVM 8, sumber GitHub `main` dengan auto-deploy setiap push, build `Dockerfile`, volume `sharein-data` → `/data`, domain HTTPS `https://sharein.194-238-23-221.sslip.io` (Let's Encrypt). Env: `APPS_SCRIPT_SECRET`, `NODE_ENV=production`, `DATA_DIR=/data`. Domain sendiri (mis. `sharein.domainanda.id`) cukup diarahkan (A record) ke `194.238.23.221` lalu ditambahkan di tab Domains.
+
+**Docker lain** — `docker build -t sharein .` lalu jalankan dengan env yang sama dan volume `/data`. Port 3000.
 
 ## Perintah
 
