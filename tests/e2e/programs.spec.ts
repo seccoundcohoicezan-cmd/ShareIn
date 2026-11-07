@@ -13,33 +13,37 @@ async function login(page: Page) {
 
 test.describe.configure({ mode: 'serial' })
 
-test('landing: menu Tutorial & Aturan, hanya tutorial interaktif + panduan salin link', async ({ page }) => {
+test('landing: tutorial & panduan berjalan otomatis, berhenti saat langkah diklik', async ({ page }) => {
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Navigasi utama' })
   await expect(nav.getByRole('link')).toHaveText(['Tutorial', 'Aturan'])
   await expect(page.locator('main a[href="/goldenticket"], main a[href="/pelatihancontent"], main a[href="/dutateladan"]')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Pilih video' }).click()
-  await expect(page.getByText('Upload selesai')).toBeVisible()
-  await page.getByRole('button', { name: 'Lanjut' }).first().click()
-  await page.getByRole('button', { name: 'Salin link' }).click()
-  await page.getByRole('button', { name: 'Lanjut' }).first().click()
-  await page.getByRole('button', { name: /penonton/ }).click()
-  await expect(page.getByText('Reward terbuka!')).toBeVisible()
-  await page.getByRole('button', { name: 'Selesai' }).click()
-  await expect(page.getByText('Tutorial selesai.')).toBeVisible()
 
-  // TikTok guide: tap the pulsing spots on the real screenshots.
+  const tut = page.getByRole('list', { name: 'Langkah tutorial' })
+  const current = () => tut.locator('[aria-current="step"] b').textContent()
+  await page.locator('#tutorial').scrollIntoViewIfNeeded()
+  await expect(page.getByText('Upload selesai')).toBeVisible({ timeout: 8000 })
+  await expect.poll(current, { timeout: 10_000 }).toBe('Bagikan link')
+  await expect(page.getByText('Terkirim ke grup WhatsApp!')).toBeVisible({ timeout: 8000 })
+  await shot(page, '11-landing')
+  // Click a step → autoplay stops on that step.
+  await tut.getByRole('button', { name: /Dapatkan reward/ }).click()
+  await expect(page.getByText('Reward terbuka!')).toBeVisible()
+  await expect(tut.getByRole('button', { name: '▶ Putar otomatis' })).toBeVisible()
+  await page.waitForTimeout(6000)
+  expect(await current()).toBe('Dapatkan reward')
+
+  // Link guide autoplays through the real screenshots, stops when a step is clicked.
   const guide = page.locator('#panduan')
   await guide.scrollIntoViewIfNeeded()
   await expect(guide.getByRole('img', { name: /Buka video di FYP/ })).toBeVisible()
-  await shot(page, '11-landing')
+  await expect(guide.getByRole('img', { name: /Salin Tautan/ })).toBeVisible({ timeout: 6000 })
+  await guide.getByRole('button', { name: /Buka video di FYP/ }).click()
+  await page.waitForTimeout(5000)
+  await expect(guide.getByRole('img', { name: /Buka video di FYP/ })).toBeVisible()
   await guide.getByRole('button', { name: /Ketuk di sini: Buka video di FYP/ }).click()
   await expect(guide.getByRole('img', { name: /Salin Tautan/ })).toBeVisible()
-  await guide.getByRole('button', { name: /Ketuk di sini/ }).click()
-  await expect(guide.getByRole('link', { name: 'Buka form setoran' })).toHaveAttribute('href', '/goldenticket/setor')
-  // Instagram guide.
   await guide.getByRole('tab', { name: 'Instagram Reels' }).click()
-  await expect(guide.getByRole('img', { name: /Buka Instagram/ })).toBeVisible()
   for (let i = 0; i < 3; i++) await guide.getByRole('button', { name: 'Lanjut' }).click()
   await expect(guide.getByRole('img', { name: /Disalin/ })).toBeVisible()
   await shot(page, '11b-panduan-ig')

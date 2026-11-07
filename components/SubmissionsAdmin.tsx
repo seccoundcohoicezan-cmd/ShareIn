@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { Submission } from '@/lib/types'
 import { ExternalIcon } from './icons'
+import { PreviewPanel } from './PreviewPanel'
 import { toast, Toaster } from './Toast'
 import { EmptyState, PlatformTag, StatusBadge } from './ui'
 
@@ -21,7 +22,7 @@ function RejectDialog({ target, onClose, onDone }: { target: Submission; onClose
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="tolak-judul" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="tolak-judul" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <div className="w-full max-w-md rounded-panel bg-white p-5">
         <h2 id="tolak-judul" className="text-lg font-extrabold">Tolak setoran {target.submitter_name}</h2>
         <p className="muted mt-1 text-sm">Alasan wajib diisi dan terlihat oleh penyetor.</p>
@@ -68,6 +69,7 @@ export function SubmissionsAdmin() {
   const [periods, setPeriods] = useState<string[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [rejecting, setRejecting] = useState<Submission | null>(null)
+  const [previewing, setPreviewing] = useState<Submission | null>(null)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
 
@@ -116,6 +118,7 @@ export function SubmissionsAdmin() {
     const data = await res.json()
     if (!res.ok) return toast(data.error ?? 'Gagal.', 'bad')
     replace(data.item)
+    setPreviewing((p) => (p && p.id === data.item.id ? data.item : p))
     toast(action === 'approve' ? 'Disetujui' : 'Dikembalikan ke menunggu')
   }
 
@@ -137,8 +140,17 @@ export function SubmissionsAdmin() {
   const allPicked = pendingIds.length > 0 && pendingIds.every((id) => selected.has(id))
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
+  const decide = (s: Submission) => (
+    <>
+      {s.status !== 'approved' && <button type="button" className="btn bg-ok text-white" onClick={() => act(s, 'approve')}>Setujui</button>}
+      {s.status !== 'rejected' && <button type="button" className="btn bg-bad text-white" onClick={() => setRejecting(s)}>Tolak</button>}
+      {s.status !== 'pending' && <button type="button" className="btn-ghost" onClick={() => act(s, 'reset')}>Batalkan</button>}
+    </>
+  )
+
   const actions = (s: Submission) => (
     <div className="flex flex-wrap gap-2">
+      <button type="button" className="btn-primary btn-sm" onClick={() => setPreviewing(s)}>Pratinjau & review</button>
       <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Buka link <ExternalIcon /></a>
       <a href={s.sharein_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Sharein <ExternalIcon /></a>
       {s.screenshot_url && <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Bukti</a>}
@@ -264,12 +276,36 @@ export function SubmissionsAdmin() {
           </div>
         </>
       )}
+      {previewing && (
+        <PreviewPanel
+          title={`${previewing.submitter_name} · ${previewing.platform === 'tiktok' ? 'TikTok' : 'Reels'}`}
+          tabs={[
+            { label: previewing.platform === 'tiktok' ? 'Konten TikTok' : 'Konten Reels', url: previewing.source_url },
+            { label: 'Link Sharein', url: previewing.sharein_url },
+          ]}
+          onClose={() => setPreviewing(null)}
+          details={
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+              <dt className="muted">Status</dt><dd><StatusBadge status={previewing.status} /></dd>
+              <dt className="muted">Like</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.likes)}</dd>
+              <dt className="muted">Komentar</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.comments)}</dd>
+              <dt className="muted">Sumber angka</dt><dd>{previewing.metrics_source === 'api' ? 'Adapter API' : 'Cek manual penyetor'}{previewing.needs_review ? ' · selisih dengan API' : ''}</dd>
+              <dt className="muted">Disetor</dt><dd>{formatDateTime(previewing.created_at)} · {previewing.period_id}</dd>
+              <dt className="muted">Organik</dt><dd>{previewing.organic_declared ? 'Dinyatakan muncul di FYP/Beranda' : '-'}</dd>
+              {previewing.screenshot_url && (<><dt className="muted">Bukti</dt><dd><a className="font-bold text-brand-purple underline" href={previewing.screenshot_url} target="_blank" rel="noopener noreferrer">Tangkapan layar</a></dd></>)}
+              {previewing.reject_reason && (<><dt className="muted">Alasan</dt><dd className="text-bad">{previewing.reject_reason}</dd></>)}
+            </dl>
+          }
+          actions={decide(previewing)}
+        />
+      )}
       {rejecting && (
         <RejectDialog
           target={rejecting}
           onClose={() => setRejecting(null)}
           onDone={(s) => {
             setRejecting(null)
+            setPreviewing((p) => (p && p.id === s.id ? s : p))
             replace(s)
             toast('Ditolak')
           }}

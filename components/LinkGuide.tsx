@@ -1,6 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { CheckIcon } from './icons'
+import { useAutoplay } from './useAutoplay'
+
+const STEP_MS = 3200
 
 type Step = {
   title: string
@@ -44,10 +47,24 @@ function PaperPlane() {
 export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels' }) {
   const [platform, setPlatform] = useState<'tiktok' | 'reels'>(initial)
   const [step, setStep] = useState(0)
+  const { ref, playing, auto, stop, resume } = useAutoplay<HTMLDivElement>()
   const guide = GUIDES[platform]
   const s = guide.steps[step]
   const last = step === guide.steps.length - 1
   const next = () => setStep((i) => Math.min(guide.steps.length - 1, i + 1))
+
+  // Autoplay: walk through the steps, then switch to the other app and loop.
+  useEffect(() => {
+    if (!playing) return
+    const t = setTimeout(() => {
+      if (step < guide.steps.length - 1) setStep(step + 1)
+      else {
+        setPlatform((p) => (p === 'tiktok' ? 'reels' : 'tiktok'))
+        setStep(0)
+      }
+    }, STEP_MS)
+    return () => clearTimeout(t)
+  }, [playing, step, guide.steps.length])
 
   // Warm the cache for the other screenshots (~20–35 KB each) so step changes are instant.
   useEffect(() => {
@@ -58,7 +75,7 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
   }, [])
 
   return (
-    <div>
+    <div ref={ref}>
       <div role="tablist" aria-label="Pilih aplikasi" className="mx-auto mb-4 grid max-w-xs grid-cols-2 gap-1 rounded-field bg-white p-1">
         {(Object.keys(GUIDES) as ('tiktok' | 'reels')[]).map((p) => (
           <button
@@ -66,7 +83,7 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
             role="tab"
             type="button"
             aria-selected={platform === p}
-            onClick={() => { setPlatform(p); setStep(0) }}
+            onClick={() => { stop(); setPlatform(p); setStep(0) }}
             className={`min-h-[44px] rounded-[12px] text-sm font-bold ${platform === p ? 'bg-brand-purple text-white' : 'text-brand-purple'}`}
           >
             {GUIDES[p].label}
@@ -76,6 +93,17 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
 
       <div className="grid items-center gap-5 md:grid-cols-[1fr_1fr]">
         <div className="relative mx-auto w-[236px] overflow-hidden rounded-[34px] border-[7px] border-ink bg-ink">
+          <div className="absolute inset-x-3 top-2 z-10 flex gap-1" aria-hidden="true">
+            {guide.steps.map((st, i) => (
+              <span key={st.title} className="h-1 flex-1 overflow-hidden rounded-full bg-white/35">
+                <span
+                  key={`${platform}-${i}-${step}-${playing}`}
+                  className={`block h-full origin-left rounded-full bg-white ${i < step ? 'w-full' : i === step ? `tut-bar w-full ${playing ? '' : 'is-static'}` : 'w-0'}`}
+                  style={i === step ? { animationDuration: `${STEP_MS}ms` } : undefined}
+                />
+              </span>
+            ))}
+          </div>
           <div className="relative aspect-[9/20] w-full">
             {s.img ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -93,7 +121,7 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
             {s.spot && (
               <button
                 type="button"
-                onClick={next}
+                onClick={() => { stop(); next() }}
                 aria-label={`Ketuk di sini: ${s.title}`}
                 className="guide-spot absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full"
                 style={{ left: `${s.spot.x}%`, top: `${s.spot.y}%` }}
@@ -108,7 +136,7 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
               <li key={st.title}>
                 <button
                   type="button"
-                  onClick={() => setStep(i)}
+                  onClick={() => { stop(); setStep(i) }}
                   aria-current={i === step ? 'step' : undefined}
                   className={`flex w-full items-start gap-3 rounded-field border p-3 text-left ${i === step ? 'border-brand-purple bg-white' : 'border-transparent bg-white/50'}`}
                 >
@@ -124,14 +152,21 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
             ))}
           </ol>
           <div className="mt-3 flex gap-2">
-            <button type="button" className="btn-ghost btn-sm" disabled={step === 0} onClick={() => setStep((i) => Math.max(0, i - 1))}>Kembali</button>
+            <button type="button" className="btn-ghost btn-sm" disabled={step === 0} onClick={() => { stop(); setStep((i) => Math.max(0, i - 1)) }}>Kembali</button>
             {last ? (
               <a href="/goldenticket/setor" className="btn-primary btn-sm">Buka form setoran</a>
             ) : (
-              <button type="button" className="btn-primary btn-sm" onClick={next}>Lanjut</button>
+              <button type="button" className="btn-primary btn-sm" onClick={() => { stop(); next() }}>Lanjut</button>
             )}
           </div>
-          {s.spot && <p className="muted mt-2 text-xs">Atau ketuk titik yang berdenyut di layar.</p>}
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            {auto ? (
+              <button type="button" onClick={stop} className="btn-ghost btn-sm">❚❚ Jeda</button>
+            ) : (
+              <button type="button" onClick={resume} className="btn-ghost btn-sm">▶ Putar otomatis</button>
+            )}
+            <span className="muted">{auto ? 'Berjalan otomatis. Klik langkah untuk berhenti.' : 'Ketuk titik oranye di layar untuk lanjut.'}</span>
+          </div>
         </div>
       </div>
     </div>

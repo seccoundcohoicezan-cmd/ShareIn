@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/format'
 import type { Program, Task, TaskSubmission } from '@/lib/types'
 import { ExternalIcon } from './icons'
+import { PreviewPanel } from './PreviewPanel'
 import { toast, Toaster } from './Toast'
 import { EmptyState } from './ui'
 
@@ -18,6 +19,7 @@ function Submissions({ program }: { program: Program }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [rejecting, setRejecting] = useState<Item | null>(null)
+  const [previewing, setPreviewing] = useState<Item | null>(null)
   const [reason, setReason] = useState('')
 
   const load = useCallback(async () => {
@@ -44,6 +46,7 @@ function Submissions({ program }: { program: Program }) {
     const data = await res.json()
     if (!res.ok) return toast(data.error ?? 'Gagal.', 'bad')
     toast(action === 'approve' ? 'Disetujui' : action === 'reject' ? 'Ditolak' : 'Dikembalikan')
+    setPreviewing((p) => (p && p.id === id ? { ...p, ...data.item } : p))
     load()
   }
 
@@ -118,6 +121,7 @@ function Submissions({ program }: { program: Program }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn-primary btn-sm" onClick={() => setPreviewing(s)}>Pratinjau & review</button>
               <a href={s.proof_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Buka bukti <ExternalIcon /></a>
               {s.status !== 'approved' && <button type="button" className="btn btn-sm bg-ok text-white" onClick={() => act(s.id, 'approve')}>Setujui</button>}
               {s.status !== 'rejected' && <button type="button" className="btn btn-sm bg-bad text-white" onClick={() => { setRejecting(s); setReason('') }}>Tolak</button>}
@@ -126,8 +130,33 @@ function Submissions({ program }: { program: Program }) {
           </li>
         ))}
       </ul>
+      {previewing && (
+        <PreviewPanel
+          title={`${previewing.code} · ${previewing.name}`}
+          tabs={[{ label: 'Bukti tugas', url: previewing.proof_url }]}
+          onClose={() => setPreviewing(null)}
+          details={
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+              <dt className="muted">Status</dt><dd><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS[previewing.status][1]}`}>{STATUS[previewing.status][0]}</span>{previewing.won && ' · Menang'}</dd>
+              <dt className="muted">Tugas</dt><dd className="font-bold">{titles.get(previewing.task_id) ?? previewing.task_id}</dd>
+              <dt className="muted">Peserta</dt><dd>{previewing.name}</dd>
+              <dt className="muted">WhatsApp</dt><dd><a className="font-bold text-brand-purple underline" href={`https://wa.me/${previewing.whatsapp}`} target="_blank" rel="noopener noreferrer">{previewing.whatsapp}</a></dd>
+              <dt className="muted">Dikumpulkan</dt><dd>{formatDateTime(previewing.created_at)}</dd>
+              {previewing.note && (<><dt className="muted">Catatan</dt><dd>{previewing.note}</dd></>)}
+              {previewing.reject_reason && (<><dt className="muted">Alasan</dt><dd className="text-bad">{previewing.reject_reason}</dd></>)}
+            </dl>
+          }
+          actions={
+            <>
+              {previewing.status !== 'approved' && <button type="button" className="btn bg-ok text-white" onClick={() => act(previewing.id, 'approve')}>Setujui</button>}
+              {previewing.status !== 'rejected' && <button type="button" className="btn bg-bad text-white" onClick={() => { setRejecting(previewing); setReason('') }}>Tolak</button>}
+              {previewing.status !== 'pending' && <button type="button" className="btn-ghost" onClick={() => act(previewing.id, 'reset')}>Batalkan</button>}
+            </>
+          }
+        />
+      )}
       {rejecting && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="tolak-tugas">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="tolak-tugas">
           <div className="w-full max-w-md rounded-panel bg-white p-5">
             <h2 id="tolak-tugas" className="text-lg font-extrabold">Tolak kode {rejecting.code}</h2>
             <div className="mt-3 flex flex-wrap gap-2">
