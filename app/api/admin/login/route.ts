@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const admin = await authenticate(body.data.email, body.data.password)
   if (!admin) return jsonError(401, 'Email atau sandi salah. Periksa lalu coba lagi.')
   resetRateLimit(key)
-  await audit(admin.email, 'admin.login', admin.email, '', '')
+  void audit(admin.email, 'admin.login', admin.email, '', '')
   const res = NextResponse.json({ ok: true, role: admin.role })
   res.cookies.set(SESSION_COOKIE, await signSession(admin), {
     httpOnly: true,

@@ -3,6 +3,7 @@ const nextConfig = {
   output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   poweredByHeader: false,
   experimental: {
+    instrumentationHook: true,
     serverComponentsExternalPackages: ['@googleapis/sheets', '@googleapis/drive', 'bcryptjs'],
   },
   async redirects() {

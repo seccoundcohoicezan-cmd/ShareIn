@@ -37,7 +37,7 @@ function useCountUp(target: number, run: boolean, ms = 1500) {
 
 /** Interactive phone story: plays by itself, stops when a step bar is clicked. */
 export function Tutorial() {
-  const { ref, playing, auto, stop, resume } = useAutoplay<HTMLDivElement>()
+  const { ref, playing, stop } = useAutoplay<HTMLDivElement>()
   const [step, setStep] = useState(0)
   const [frame, setFrame] = useState(0)
 
@@ -92,14 +92,6 @@ export function Tutorial() {
             </button>
           </li>
         ))}
-        <li className="flex items-center gap-2 pt-1 text-sm">
-          {auto ? (
-            <button type="button" onClick={stop} className="btn-ghost btn-sm">❚❚ Jeda</button>
-          ) : (
-            <button type="button" onClick={resume} className="btn-ghost btn-sm">▶ Putar otomatis</button>
-          )}
-          <span className="muted">{auto ? 'Berjalan otomatis. Klik langkah untuk berhenti.' : 'Mode manual: ketuk layar HP untuk lanjut.'}</span>
-        </li>
       </ol>
 
       <div className="order-1 flex flex-col items-center md:order-2">

@@ -47,7 +47,7 @@ function PaperPlane() {
 export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels' }) {
   const [platform, setPlatform] = useState<'tiktok' | 'reels'>(initial)
   const [step, setStep] = useState(0)
-  const { ref, playing, auto, stop, resume } = useAutoplay<HTMLDivElement>()
+  const { ref, playing, stop } = useAutoplay<HTMLDivElement>()
   const guide = GUIDES[platform]
   const s = guide.steps[step]
   const last = step === guide.steps.length - 1
@@ -158,14 +158,6 @@ export function LinkGuide({ initial = 'tiktok' }: { initial?: 'tiktok' | 'reels'
             ) : (
               <button type="button" className="btn-primary btn-sm" onClick={() => { stop(); next() }}>Lanjut</button>
             )}
-          </div>
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            {auto ? (
-              <button type="button" onClick={stop} className="btn-ghost btn-sm">❚❚ Jeda</button>
-            ) : (
-              <button type="button" onClick={resume} className="btn-ghost btn-sm">▶ Putar otomatis</button>
-            )}
-            <span className="muted">{auto ? 'Berjalan otomatis. Klik langkah untuk berhenti.' : 'Ketuk titik oranye di layar untuk lanjut.'}</span>
           </div>
         </div>
       </div>

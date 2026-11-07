@@ -29,7 +29,7 @@ test('landing: tutorial & panduan berjalan otomatis, berhenti saat langkah dikli
   // Click a step → autoplay stops on that step.
   await tut.getByRole('button', { name: /Dapatkan reward/ }).click()
   await expect(page.getByText('Reward terbuka!')).toBeVisible()
-  await expect(tut.getByRole('button', { name: '▶ Putar otomatis' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Putar otomatis|Jeda/ })).toHaveCount(0)
   await page.waitForTimeout(6000)
   expect(await current()).toBe('Dapatkan reward')
 

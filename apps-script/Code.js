@@ -17,17 +17,19 @@ function doPost(e) {
     return jsonOut_({ ok: false, error: 'bad_json' });
   }
   if (!rahasiaCocok_(req.secret)) return jsonOut_({ ok: false, error: 'unauthorized' });
-  var lock = LockService.getScriptLock();
+  var ops = Array.isArray(req.ops) ? req.ops : [req];
+  // Reads run in parallel; only writes (and schema changes) are serialized.
+  var writes = ops.some(function (op) { return op.action !== 'read'; });
+  var lock = writes ? LockService.getScriptLock() : null;
   try {
-    lock.waitLock(25000);
-    var ops = Array.isArray(req.ops) ? req.ops : [req];
+    if (lock) lock.waitLock(25000);
     var results = ops.map(jalankan_);
     SpreadsheetApp.flush();
     return jsonOut_({ ok: true, results: results });
   } catch (err) {
     return jsonOut_({ ok: false, error: String((err && err.message) || err) });
   } finally {
-    try { lock.releaseLock(); } catch (ignore) {}
+    if (lock) { try { lock.releaseLock(); } catch (ignore) {} }
   }
 }
 

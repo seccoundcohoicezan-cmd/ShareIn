@@ -1,3 +1,4 @@
+import { cached, invalidate } from '../cache'
 import type { Admin, AdminRole } from '../types'
 import { getStore } from './index'
 import { rowToRecord } from './store'
@@ -22,8 +23,9 @@ export async function listAdminsStored(): Promise<StoredAdmin[]> {
     }))
 }
 
+// Login reads this list; caching it skips a ~2 s spreadsheet round trip on warm servers.
 export async function listAdmins(): Promise<Admin[]> {
-  return (await listAdminsStored()).map(({ _index, ...a }) => {
+  return (await cached('admins', listAdminsStored, 5 * 60_000)).map(({ _index, ...a }) => {
     void _index
     return a
   })
@@ -31,8 +33,10 @@ export async function listAdmins(): Promise<Admin[]> {
 
 export async function addAdmin(a: Admin): Promise<void> {
   await getStore().append('admins', [toRow(a)])
+  invalidate('admins')
 }
 
 export async function updateAdmin(a: StoredAdmin): Promise<void> {
   await getStore().update('admins', [{ index: a._index, row: toRow(a) }])
+  invalidate('admins')
 }

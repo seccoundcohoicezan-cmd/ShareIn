@@ -1,5 +1,6 @@
 /** Process-wide async mutex keyed by name; serializes writes within one server instance. */
-const tails = new Map<string, Promise<void>>()
+const g = globalThis as unknown as { __shareinLocks?: Map<string, Promise<void>> }
+const tails = (g.__shareinLocks ??= new Map<string, Promise<void>>())
 
 export async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = tails.get(key) ?? Promise.resolve()

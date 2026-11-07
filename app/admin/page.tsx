@@ -6,6 +6,7 @@ import { programSummary } from '@/lib/program-service'
 import { getProgress } from '@/lib/service'
 import { isDemoStore } from '@/lib/repo'
 import { taskSubmissionsTable } from '@/lib/repo/programs'
+import { cached } from '@/lib/cache'
 import { AdminShell, requirePageSession } from './shell'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ export default async function AdminHome() {
     getProgress(),
     programSummary('pelatihan'),
     programSummary('duta'),
-    taskSubmissionsTable.list(),
+    cached('task_submissions', () => taskSubmissionsTable.list()),
   ])
   const pendingTasks = (p: string) => subs.filter((x) => x.program === p && x.status === 'pending').length
   const programs = [

@@ -2,14 +2,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { AppsScriptStore } from './apps-script-store'
 import { LocalStore } from './memory-store'
-import { createSheetsClient, SheetsStore } from './sheets-store'
 import type { TableStore } from './store'
 
 // Web App of apps-script/Code.js bound to the ShareIn spreadsheet. Not secret: every call needs APPS_SCRIPT_SECRET.
 export const DEFAULT_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbw9WV3F-s8f_kj0OIbaiEj0_Zc6n8o8R4EtmTAyh4OXgDD9EKkRE4kfBrUuhMBfP8s/exec'
 
-let store: TableStore | null = null
+// Process-wide singleton (shared by all server bundles), so read batching and caches are shared too.
+const g = globalThis as unknown as { __shareinStore?: TableStore | null }
 
 export function sheetsConfigured(): boolean {
   return Boolean(process.env.SHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY)
@@ -26,10 +26,13 @@ export function dataDir(): string {
 }
 
 export function getStore(): TableStore {
-  if (store) return store
+  if (g.__shareinStore) return g.__shareinStore
+  let store: TableStore
   if (appsScriptConfigured()) {
     store = new AppsScriptStore(process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL, process.env.APPS_SCRIPT_SECRET!)
   } else if (sheetsConfigured()) {
+    // Loaded only when used: the googleapis client is heavy and slows every cold start.
+    const { createSheetsClient, SheetsStore } = require('./sheets-store') as typeof import('./sheets-store')
     store = new SheetsStore(
       createSheetsClient(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!, process.env.GOOGLE_PRIVATE_KEY!),
       process.env.SHEET_ID!,
@@ -37,6 +40,7 @@ export function getStore(): TableStore {
   } else {
     store = new LocalStore(dataDir())
   }
+  g.__shareinStore = store
   return store
 }
 
@@ -48,5 +52,5 @@ export function isDemoStore(): boolean {
 
 /** Test hook. */
 export function setStore(s: TableStore | null) {
-  store = s
+  g.__shareinStore = s
 }

@@ -4,7 +4,7 @@ import { normalizeName } from './format'
 import { withLock } from './lock'
 import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
-import { listSubmissionsFresh, updateSubmissions, type StoredSubmission } from './repo/submissions'
+import { listSubmissionsCached, listSubmissionsFresh, updateSubmissions, type StoredSubmission } from './repo/submissions'
 import type { Submission } from './types'
 
 export const REJECT_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid'] as const
@@ -41,8 +41,9 @@ export async function adminList(f: Filters) {
 }
 
 export async function dashboard() {
-  const settings = await getSettings()
-  const all = (await listSubmissionsFresh()).map(strip).filter((s) => s.status !== 'void')
+  // Dashboard numbers: 60 s cache (cleared on every write from the web) keeps it instant.
+  const [settings, raw] = await Promise.all([getSettings(), listSubmissionsCached()])
+  const all = raw.map(strip).filter((s) => s.status !== 'void')
   const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
   const inPeriod = all.filter((s) => s.period_id === settings.period_id)
   const reviewedToday = (s: Submission) =>

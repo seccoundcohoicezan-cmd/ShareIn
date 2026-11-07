@@ -2,7 +2,9 @@ interface Entry<T> {
   value: T
   expires: number
 }
-const store = new Map<string, Entry<unknown>>()
+// On globalThis so every server bundle (routes, instrumentation warm-up) shares one cache.
+const g = globalThis as unknown as { __shareinCache?: Map<string, Entry<unknown>> }
+const store = (g.__shareinCache ??= new Map<string, Entry<unknown>>())
 
 export const CACHE_TTL_MS = 60_000
 
