@@ -31,3 +31,12 @@ Dicatat saat build v1 (MRKT-52). Ubah bila tidak sesuai.
 | 20 | Nominal hadiah spin diisi admin saat memutar (bawaan dari Pengaturan, Rp0 = wajib diisi). Pemenang dipilih acak di server (`crypto.randomInt`), roda di layar hanya animasi menuju hasil itu. | Nominal belum ditentukan; hasil undian tidak bisa dimanipulasi dari browser. |
 | 21 | Duta Teladan memakai mesin yang sama dengan label "Kewajiban" dan prefiks kode `DT-`. | "sistemnya sama spin wheel ... bonus". |
 | 22 | Menu landing hanya Tutorial & Aturan; program dibuka dari kartu landing. Bottom-tab dari paket UI/UX tidak dipakai. URL lama (`/setor`, `/riwayat`, `/golden-ticket`, `/pelatihan-content-creator`, `/duta`) dialihkan. | Permintaan pengguna. |
+
+## Putaran 3 (7 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 23 | Landing hanya tutorial interaktif + panduan salin link; kartu program dihapus. | Permintaan: halaman program dibagikan langsung per link. |
+| 24 | Tangkapan layar panduan dari pengguna dipakai apa adanya, tetapi foto profil & nama kontak orang lain di menu bagikan dan avatar kreator disamarkan (blur). Langkah "ketuk ikon Kirim" di Instagram memakai ilustrasi karena tidak ada tangkapan layarnya. | Privasi pihak ketiga. |
+| 25 | Latar: 3 blob + 6 aset brand (9 elemen), tetap hanya animasi transform & scroll-driven, mati saat reduced-motion/hemat data/RAM ≤ 4 GB. Posisi = di luar kolom baca 768 px (rumus `50vw − 408px − lebar`), dicek otomatis di 1280/1440/1920 px. Di HP aset mengintip dari tepi dengan opasitas 50%. | Permintaan "background bergerak + aset di titik paling optimal"; melonggarkan batas 4 node di rancangan awal. |
+| 26 | Akun owner awal dibuat langsung di sheet `admins` (bcrypt) untuk dutateladan@stekom.ac.id; sandi awal diberikan sekali dan wajib diganti lewat `/admin/akun`. Env `ADMIN_EMAIL/ADMIN_PASSWORD` tidak lagi diperlukan. | Permintaan email & sandi admin. |

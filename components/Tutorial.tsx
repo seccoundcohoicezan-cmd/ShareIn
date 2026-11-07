@@ -42,7 +42,7 @@ export function Tutorial() {
   if (compact) {
     return (
       <div className="panel text-center">
-        <p className="font-bold">Tutorial selesai. Pilih program di bawah untuk mulai.</p>
+        <p className="font-bold">Tutorial selesai. Lanjut lihat cara menyalin link di bawah.</p>
         <button type="button" className="btn-ghost mt-4" onClick={reset}>Lihat lagi tutorial</button>
       </div>
     )
@@ -135,7 +135,7 @@ export function Tutorial() {
               <p className="text-xs font-bold">{views ? 'Reward terbuka!' : 'Capai target untuk membuka hadiah'}</p>
             </div>
           )}
-          <p className="absolute inset-x-4 bottom-3 text-center text-[10px] text-brand-violet">Simulasi tutorial Sharein</p>
+          <p className="absolute inset-x-4 bottom-3 text-center text-[10px] text-brand-purple">Simulasi tutorial Sharein</p>
         </div>
         <p className="mt-4 text-center font-bold" aria-live="polite">{STEPS[step].help}</p>
         <div className="my-3 flex gap-2">

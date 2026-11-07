@@ -34,8 +34,9 @@ test('golden ticket: progres QTY, ketentuan, latar ringan', async ({ page }) => 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Golden Ticket')
   await expect(page.getByRole('progressbar', { name: 'Progres TikTok' })).toHaveAttribute('aria-valuemax', '20')
   await expect(page.getByText('≥ 100 rb like · ≥ 5 rb komentar')).toBeVisible()
-  const bgNodes = await page.evaluate(() => document.querySelectorAll('#bg, #bg *').length)
-  expect(bgNodes).toBeLessThanOrEqual(4)
+  // 1 layer + 3 blobs + 6 brand assets, all animated with transform only.
+  const layers = await page.evaluate(() => document.getElementById('bg')!.children.length)
+  expect(layers).toBe(9)
   await shot(page, '01-goldenticket')
 })
 

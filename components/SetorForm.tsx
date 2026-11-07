@@ -323,7 +323,10 @@ export function SetorForm() {
           </div>
           <div id="link-asal-status" aria-live="polite">
             {!sourceUrl.trim() ? (
-              <Status ok={null}>Salin dari tombol Bagikan → Salin tautan.</Status>
+              <Status ok={null}>
+                Salin dari tombol Bagikan → Salin tautan.{' '}
+                <a href="/#panduan" className="font-bold text-brand-purple underline underline-offset-2">Lihat panduan bergambar</a>
+              </Status>
             ) : typeof parsed === 'string' || !parsed ? (
               <Status ok={false}>
                 {parsed === 'not_https' ? 'Link harus diawali https://.' : 'Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.'}

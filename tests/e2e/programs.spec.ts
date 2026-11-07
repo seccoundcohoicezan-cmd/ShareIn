@@ -13,23 +13,45 @@ async function login(page: Page) {
 
 test.describe.configure({ mode: 'serial' })
 
-test('landing: menu hanya Tutorial & Aturan, tutorial interaktif, kartu program', async ({ page }) => {
+test('landing: menu Tutorial & Aturan, hanya tutorial interaktif + panduan salin link', async ({ page }) => {
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Navigasi utama' })
   await expect(nav.getByRole('link')).toHaveText(['Tutorial', 'Aturan'])
+  await expect(page.locator('main a[href="/goldenticket"], main a[href="/pelatihancontent"], main a[href="/dutateladan"]')).toHaveCount(0)
   await page.getByRole('button', { name: 'Pilih video' }).click()
   await expect(page.getByText('Upload selesai')).toBeVisible()
-  await page.getByRole('button', { name: 'Lanjut' }).click()
+  await page.getByRole('button', { name: 'Lanjut' }).first().click()
   await page.getByRole('button', { name: 'Salin link' }).click()
-  await page.getByRole('button', { name: 'Lanjut' }).click()
+  await page.getByRole('button', { name: 'Lanjut' }).first().click()
   await page.getByRole('button', { name: /penonton/ }).click()
   await expect(page.getByText('Reward terbuka!')).toBeVisible()
-  await shot(page, '11-landing')
   await page.getByRole('button', { name: 'Selesai' }).click()
   await expect(page.getByText('Tutorial selesai.')).toBeVisible()
-  for (const [name, path] of [[/Golden Ticket/, '/goldenticket'], [/Pelatihan Content/, '/pelatihancontent'], [/Duta Teladan/, '/dutateladan']] as const) {
-    await expect(page.locator(`a[href="${path}"]`).filter({ hasText: name })).toBeVisible()
-  }
+
+  // TikTok guide: tap the pulsing spots on the real screenshots.
+  const guide = page.locator('#panduan')
+  await guide.scrollIntoViewIfNeeded()
+  await expect(guide.getByRole('img', { name: /Buka video di FYP/ })).toBeVisible()
+  await shot(page, '11-landing')
+  await guide.getByRole('button', { name: /Ketuk di sini: Buka video di FYP/ }).click()
+  await expect(guide.getByRole('img', { name: /Salin Tautan/ })).toBeVisible()
+  await guide.getByRole('button', { name: /Ketuk di sini/ }).click()
+  await expect(guide.getByRole('link', { name: 'Buka form setoran' })).toHaveAttribute('href', '/goldenticket/setor')
+  // Instagram guide.
+  await guide.getByRole('tab', { name: 'Instagram Reels' }).click()
+  await expect(guide.getByRole('img', { name: /Buka Instagram/ })).toBeVisible()
+  for (let i = 0; i < 3; i++) await guide.getByRole('button', { name: 'Lanjut' }).click()
+  await expect(guide.getByRole('img', { name: /Disalin/ })).toBeVisible()
+  await shot(page, '11b-panduan-ig')
+})
+
+test('latar: aset ikut bergeser saat scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 700 })
+  await page.goto('/aturan')
+  const pos = () => page.locator('.a-gift').evaluate((el) => el.getBoundingClientRect().top)
+  const before = await pos()
+  await page.mouse.wheel(0, 2000)
+  await expect.poll(pos).toBeLessThan(before - 40)
 })
 
 test('golden ticket: hadiah berjalan mulai Rp2 jt dan terus naik', async ({ page }) => {
@@ -141,4 +163,34 @@ test('duta teladan: halaman kewajiban, kode DT-, pengumpulan bisa ditutup', asyn
     data: { task_id: 'x', name: 'Budi Santoso', whatsapp: '081298765432', proof_url: 'https://sharein.id/c/2' },
   })
   expect((await res.json()).message).toMatch(/ditutup/)
+})
+
+test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async ({ page }) => {
+  await login(page)
+  await page.goto('/admin/akun')
+  await page.getByLabel('Sandi saat ini').fill('rahasia-e2e-123')
+  await page.getByLabel('Sandi baru (min. 10 karakter)').fill('sandi-baru-e2e-456')
+  await page.getByLabel('Ulangi sandi baru').fill('sandi-baru-e2e-456')
+  await page.getByRole('button', { name: 'Simpan sandi baru' }).click()
+  await expect(page.getByText('Sandi diganti')).toBeVisible()
+
+  await page.getByLabel('Email', { exact: true }).fill('reviewer@sharein.test')
+  await page.getByLabel('Sandi awal (min. 10 karakter)').fill('reviewer-e2e-789')
+  await page.getByRole('button', { name: 'Tambah admin' }).click()
+  await expect(page.getByText('reviewer@sharein.test', { exact: true })).toBeVisible()
+  await shot(page, '17-admin-akun')
+
+  // Owner cannot demote the last owner.
+  await page.getByLabel('Peran owner@sharein.test').selectOption('reviewer')
+  await expect(page.getByText('Harus tersisa minimal satu owner aktif.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Keluar' }).click()
+  await expect(page.getByRole('heading', { name: 'Masuk admin' })).toBeVisible()
+  await page.getByLabel('Email').fill('owner@sharein.test')
+  await page.getByLabel('Sandi').fill('rahasia-e2e-123')
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await expect(page.getByText('Email atau sandi salah.')).toBeVisible()
+  await page.getByLabel('Sandi').fill('sandi-baru-e2e-456')
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
 })

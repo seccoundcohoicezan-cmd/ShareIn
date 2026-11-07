@@ -13,6 +13,7 @@ export function AdminNav({ email, role }: { email: string; role: AdminRole }) {
     { href: '/admin/program/pelatihan', t: 'Pelatihan' },
     { href: '/admin/program/duta', t: 'Duta Teladan' },
     ...(role === 'owner' ? [{ href: '/admin/spin', t: 'Spin wheel' }, { href: '/admin/pengaturan', t: 'Pengaturan' }] : []),
+    { href: '/admin/akun', t: 'Akun' },
   ]
   return (
     <header className="sticky top-0 z-20 border-b border-brand-purple/10 bg-white">

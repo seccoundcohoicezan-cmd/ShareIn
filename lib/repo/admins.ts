@@ -2,19 +2,37 @@ import type { Admin, AdminRole } from '../types'
 import { getStore } from './index'
 import { rowToRecord } from './store'
 
-export async function listAdmins(): Promise<Admin[]> {
+type StoredAdmin = Admin & { _index: number }
+
+function toRow(a: Admin) {
+  return [a.email.toLowerCase(), a.password_hash, a.role, a.active ? 'TRUE' : 'FALSE']
+}
+
+export async function listAdminsStored(): Promise<StoredAdmin[]> {
   const { header, rows } = await getStore().read('admins')
   return rows
-    .map((r) => rowToRecord(header, r))
-    .filter((r) => r.email)
-    .map((r) => ({
-      email: r.email.trim().toLowerCase(),
-      password_hash: r.password_hash,
-      role: (r.role?.trim().toLowerCase() === 'owner' ? 'owner' : 'reviewer') as AdminRole,
-      active: r.active === '' ? true : r.active.trim().toUpperCase() === 'TRUE',
+    .map((r, i) => ({ rec: rowToRecord(header, r), i }))
+    .filter(({ rec }) => rec.email)
+    .map(({ rec, i }) => ({
+      _index: i,
+      email: rec.email.trim().toLowerCase(),
+      password_hash: rec.password_hash,
+      role: (rec.role?.trim().toLowerCase() === 'owner' ? 'owner' : 'reviewer') as AdminRole,
+      active: rec.active === '' || rec.active === undefined ? true : rec.active.trim().toUpperCase() === 'TRUE',
     }))
 }
 
+export async function listAdmins(): Promise<Admin[]> {
+  return (await listAdminsStored()).map(({ _index, ...a }) => {
+    void _index
+    return a
+  })
+}
+
 export async function addAdmin(a: Admin): Promise<void> {
-  await getStore().append('admins', [[a.email.toLowerCase(), a.password_hash, a.role, a.active]])
+  await getStore().append('admins', [toRow(a)])
+}
+
+export async function updateAdmin(a: StoredAdmin): Promise<void> {
+  await getStore().update('admins', [{ index: a._index, row: toRow(a) }])
 }

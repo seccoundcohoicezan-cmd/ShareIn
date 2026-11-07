@@ -115,14 +115,48 @@ body {
     50% { opacity: 0.4; }
   }
 }
+/* Brand assets: start positions chosen at the edges (gutters on desktop, half off-screen on
+   mobile). --dy/--dx = travel over the whole page scroll; bigger travel = closer layer. */
+.asset {
+  position: absolute;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  filter: drop-shadow(0 10px 18px rgb(42 15 92 / 0.18));
+}
+.asset { width: var(--w); }
+/* Gutter rule: 408px = half the 768px reading column + 24px air. Desktop → asset sits fully in
+   the empty side area; phone → the max() clamps it to peek in from the edge. */
+.a-play { --w: clamp(84px, 22vmin, 190px); top: 9vh; right: max(-28px, calc(50vw - 408px - var(--w))); opacity: 0.9; --dx: -3vw; --dy: -38vh; --r: -18deg; rotate: 12deg; }
+.a-spark { --w: clamp(34px, 8vmin, 70px); top: 30vh; left: max(10px, calc(50vw - 408px - var(--w) - 40px)); opacity: 0.85; --dx: 4vw; --dy: -22vh; --r: 90deg; }
+.a-gift { --w: clamp(74px, 19vmin, 160px); top: 52vh; left: max(-30px, calc(50vw - 408px - var(--w))); opacity: 0.85; --dx: -2vw; --dy: -52vh; --r: 14deg; rotate: -10deg; }
+.a-up { --w: clamp(52px, 13vmin, 112px); top: 80vh; right: max(-14px, calc(50vw - 408px - var(--w) - 30px)); opacity: 0.85; --dx: 2vw; --dy: -70vh; --r: -10deg; }
+.a-link { --w: clamp(56px, 13vmin, 110px); top: 112vh; left: max(-10px, calc(50vw - 408px - var(--w) - 20px)); opacity: 0.9; --dx: -3vw; --dy: -88vh; --r: 20deg; rotate: -8deg; }
+.a-coin { --w: clamp(50px, 12vmin, 100px); top: 128vh; right: max(6px, calc(50vw - 408px - var(--w) - 50px)); opacity: 0.9; --dx: 4vw; --dy: -100vh; --r: 18deg; }
+@media (max-width: 640px) {
+  /* On phones the reading column is full width: keep assets smaller and fainter. */
+  .asset { opacity: 0.5 !important; }
+}
+@supports (animation-timeline: scroll()) {
+  html:not([data-motion='off']) .asset {
+    animation: float-asset linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes float-asset {
+    to { transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--r)); }
+  }
+}
+
 /* JS fallback writes --p (0..1) on .bg when scroll timelines are unsupported. */
 .bg[data-fallback] .blob {
   transform: translate3d(calc(var(--p, 0) * var(--dx)), calc(var(--p, 0) * var(--dy)), 0);
 }
-@media (prefers-reduced-motion: reduce) {
-  .blob { animation: none !important; transform: none !important; }
+.bg[data-fallback] .asset {
+  transform: translate3d(calc(var(--p, 0) * var(--dx)), calc(var(--p, 0) * var(--dy)), 0) rotate(calc(var(--p, 0) * var(--r)));
 }
-html[data-motion='off'] .blob { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .blob, .asset { animation: none !important; transform: none !important; }
+}
+html[data-motion='off'] .blob, html[data-motion='off'] .asset { animation: none !important; }
 
 /* The only directed motion: the reward bounces once on success. */
 @keyframes bounce-once {
@@ -139,4 +173,25 @@ html[data-motion='off'] .blob { animation: none !important; }
 
 .progress-fill {
   background: linear-gradient(90deg, var(--brand-purple), var(--brand-violet) 45%, var(--brand-orange));
+}
+
+/* Pulsing tap target in the link guide (transform/opacity only). */
+.guide-spot {
+  background: rgb(249 115 22 / 0.35);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #f97316;
+}
+.guide-spot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 3px solid #f97316;
+  animation: spot-pulse 1.4s ease-out infinite;
+}
+@keyframes spot-pulse {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(2.1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-spot::after { animation: none; }
 }

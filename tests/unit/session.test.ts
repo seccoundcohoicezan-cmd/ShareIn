@@ -8,7 +8,7 @@ describe('session token', () => {
     const [body, sig] = t.split('.')
     const forged = Buffer.from(JSON.stringify({ email: 'a@b.id', role: 'owner', exp: 9e9 })).toString('base64url')
     expect(await verifySession(`${forged}.${sig}`)).toBeNull()
-    expect(await verifySession(`${body}.x${sig.slice(1)}`)).toBeNull()
+    expect(await verifySession(`${body}.${sig[0] === 'A' ? 'B' : 'A'}${sig.slice(1)}`)).toBeNull()
     expect(await verifySession('garbage')).toBeNull()
   })
   it('expires after 8 hours', async () => {
