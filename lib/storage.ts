@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
+import { dataDir } from './repo'
 
 export const MAX_SCREENSHOT_BYTES = 2 * 1024 * 1024
 export const SCREENSHOT_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
@@ -16,7 +17,7 @@ export function sniffImage(buf: Buffer): keyof typeof SCREENSHOT_TYPES | null {
 }
 
 export function uploadsDir() {
-  return path.join(process.env.DATA_DIR || path.join(process.cwd(), '.data'), 'uploads')
+  return path.join(dataDir(), 'uploads')
 }
 
 /** Stores the image and returns the URL kept in the sheet (Drive link, or /api/admin/screenshot/<file>). */

@@ -12,8 +12,30 @@ export default async function AturanPage() {
   const { settings } = await loadPublic()
   return (
     <div className="space-y-5">
-      <h1 className="px-1 text-3xl font-extrabold tracking-tight">Aturan setoran</h1>
+      <h1 className="px-1 text-3xl font-extrabold tracking-tight">Aturan</h1>
 
+      <Panel aria-labelledby="umum">
+        <PillLabel id="umum">Semua program</PillLabel>
+        <ol className="mt-4 list-decimal space-y-2 pl-5">
+          <li>Gunakan nama asli dan nomor WhatsApp aktif. Hadiah hanya diberikan ke pemilik identitas yang terdaftar.</li>
+          <li>Satu orang dikenali dari nomor WhatsApp-nya. Jangan mendaftar dengan nomor orang lain.</li>
+          <li>Bukti palsu, curang, atau milik orang lain membuat seluruh kode dan hadiah dibatalkan.</li>
+          <li>Keputusan admin atas verifikasi dan hasil undian bersifat final.</li>
+        </ol>
+      </Panel>
+
+      <Panel aria-labelledby="program-kode">
+        <PillLabel id="program-kode">Pelatihan Content & Duta Teladan</PillLabel>
+        <ol className="mt-4 list-decimal space-y-2 pl-5">
+          <li>Setiap tugas yang dikumpulkan memberi satu kode unik (PC-… untuk Pelatihan, DT-… untuk Duta Teladan).</li>
+          <li>Satu tugas hanya bisa dikumpulkan sekali per nomor WhatsApp.</li>
+          <li>Kode masuk spin wheel setelah bukti tugas disetujui admin. Makin banyak tugas selesai, makin banyak kesempatan.</li>
+          <li>Tugas Duta Teladan bersifat wajib bagi setiap Duta Teladan; kodenya menjadi bonus undian.</li>
+          <li>Pemenang dipilih acak oleh sistem, diumumkan di halaman program, dan dihubungi lewat WhatsApp.</li>
+        </ol>
+      </Panel>
+
+      <h2 className="px-1 pt-2 text-2xl font-extrabold">Golden Ticket</h2>
       <Panel aria-labelledby="ringkas">
         <PillLabel id="ringkas">Ringkasan</PillLabel>
         <RulesList settings={settings} />
@@ -61,7 +83,7 @@ export default async function AturanPage() {
         </ol>
       </Panel>
 
-      <Link href="/setor" className="btn-primary w-full">Setor konten</Link>
+      <Link href="/goldenticket/setor" className="btn-primary w-full">Setor konten Golden Ticket</Link>
     </div>
   )
 }

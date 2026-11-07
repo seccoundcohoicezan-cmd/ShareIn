@@ -9,6 +9,8 @@ import { SheetsStore, type SheetsClient } from '@/lib/repo/sheets-store'
 import type { Row, TableName, TableStore } from '@/lib/repo/store'
 import { checkSubmission, createSubmission, getProgress, listMine, type SubmissionInput } from '@/lib/service'
 import { FakeSheets } from './fake-sheets'
+import { AppsScriptStore } from '@/lib/repo/apps-script-store'
+import { createAppsScriptSim } from './apps-script-sim'
 
 let n = 0
 function input(over: Partial<SubmissionInput> = {}): SubmissionInput {
@@ -36,6 +38,7 @@ async function setQty(tiktok: number, reels = 15) {
 describe.each([
   ['memory', () => new LocalStore(null) as TableStore],
   ['sheets (fake API)', () => new SheetsStore(new FakeSheets().client as unknown as SheetsClient, 'sheet-id') as TableStore],
+  ['Apps Script (real Code.js)', () => new AppsScriptStore('https://sim', 'k'.repeat(40), createAppsScriptSim('k'.repeat(40)).poster) as TableStore],
 ])('submission flow on %s store', (_name, make) => {
   beforeEach(() => {
     setStore(make())
@@ -158,9 +161,9 @@ describe('sheets store details', () => {
     invalidate()
     const s = await getSettingsFresh()
     expect(s.min_like_tiktok).toBe(100000)
-    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'audit_log', 'settings', 'submissions'])
+    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'audit_log', 'draws', 'settings', 'submissions', 'task_submissions', 'tasks'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
-    expect(fake.tabs.get('settings')!.length).toBe(12)
+    expect(fake.tabs.get('settings')!.length).toBe(1 + 20)
     const header = fake.tabs.get('submissions')![0] as string[]
     expect(header.slice(0, 3)).toEqual(['status', 'id', 'custom_note'])
     expect(header).toContain('source_key')

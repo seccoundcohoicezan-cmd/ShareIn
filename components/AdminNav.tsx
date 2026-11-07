@@ -9,8 +9,10 @@ export function AdminNav({ email, role }: { email: string; role: AdminRole }) {
   const router = useRouter()
   const links = [
     { href: '/admin', t: 'Dasbor' },
-    { href: '/admin/setoran', t: 'Setoran' },
-    ...(role === 'owner' ? [{ href: '/admin/pengaturan', t: 'Pengaturan' }] : []),
+    { href: '/admin/setoran', t: 'Golden Ticket' },
+    { href: '/admin/program/pelatihan', t: 'Pelatihan' },
+    { href: '/admin/program/duta', t: 'Duta Teladan' },
+    ...(role === 'owner' ? [{ href: '/admin/spin', t: 'Spin wheel' }, { href: '/admin/pengaturan', t: 'Pengaturan' }] : []),
   ]
   return (
     <header className="sticky top-0 z-20 border-b border-brand-purple/10 bg-white">
@@ -35,7 +37,7 @@ export function AdminNav({ email, role }: { email: string; role: AdminRole }) {
         {links.map((l) => {
           const active = l.href === '/admin' ? path === '/admin' : path.startsWith(l.href)
           return (
-            <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-[40px] items-center rounded-full px-4 text-sm font-bold ${active ? 'bg-brand-purple text-white' : 'text-brand-purple hover:bg-brand-lavender'}`}>
+            <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-bold ${active ? 'bg-brand-purple text-white' : 'text-brand-purple hover:bg-brand-lavender'}`}>
               {l.t}
             </Link>
           )

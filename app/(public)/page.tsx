@@ -1,89 +1,97 @@
 import Link from 'next/link'
-import { ArrowUpIcon, GiftIcon, LinkIcon, UploadIcon } from '@/components/icons'
-import { RulesList } from '@/components/RulesList'
-import { Panel, PillLabel, ProgressBar } from '@/components/ui'
+import { GoldenCounter } from '@/components/GoldenCounter'
+import { ArrowUpIcon, GiftIcon } from '@/components/icons'
+import { Tutorial } from '@/components/Tutorial'
+import { Panel, PillLabel } from '@/components/ui'
 import { loadPublic } from '@/lib/public-data'
 
 export const revalidate = 60
 
-const STEPS = [
-  { n: 1, t: 'Upload konten', d: 'Temukan konten viral, cek angkanya, lalu unggah ke Sharein.', Icon: UploadIcon },
-  { n: 2, t: 'Bagikan link', d: 'Setor link asli dan link Sharein lewat form setoran.', Icon: LinkIcon },
-  { n: 3, t: 'Dapatkan reward', d: 'Setoran yang disetujui admin berpeluang dapat reward.', Icon: GiftIcon },
-]
-
 export default async function Home() {
-  const { settings, progress } = await loadPublic()
-  const tiktok = progress.find((p) => p.platform === 'tiktok')!
-  const reels = progress.find((p) => p.platform === 'reels')!
-  const allFull = progress.every((p) => p.remaining === 0)
-
+  const { settings } = await loadPublic()
+  const programs = [
+    {
+      href: '/pelatihancontent',
+      pill: 'Pelatihan',
+      title: 'Pelatihan Content',
+      desc: 'Selesaikan tugas pelatihan, dapat kode, dan ikut spin wheel berhadiah uang.',
+      cta: 'Kerjakan tugas',
+      open: settings.pelatihan_open,
+    },
+    {
+      href: '/dutateladan',
+      pill: 'Kewajiban',
+      title: 'Duta Teladan',
+      desc: 'Tugas wajib Duta Teladan. Setiap tugas selesai jadi kode bonus spin wheel.',
+      cta: 'Lihat kewajiban',
+      open: settings.duta_open,
+    },
+  ]
   return (
-    <div className="space-y-5">
-      <section className="px-1 pb-2 pt-4">
-        <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-brand-purple">
-          <ArrowUpIcon className="h-3.5 w-3.5" /> Periode {settings.period_id}
-        </p>
+    <div className="space-y-6">
+      <section className="px-1 pb-1 pt-4">
         <h1 className="text-[2.25rem] font-extrabold leading-[1.1] tracking-tight">
-          Setor konten viral,
+          Upload, bagikan,
           <br />
-          <span className="bg-gradient-to-r from-brand-purple via-brand-violet to-brand-orange bg-clip-text text-transparent">dapatkan reward.</span>
+          <span className="bg-gradient-to-r from-brand-purple via-brand-violet to-brand-orange bg-clip-text text-transparent">dapat reward.</span>
         </h1>
         <p className="muted mt-3 max-w-md text-base">
-          Temukan konten TikTok atau Reels yang lagi ramai, cek angkanya, lalu unggah ke Sharein.
+          Sharein adalah platform berbagi konten. Unggah kontenmu, bagikan link-nya, dan raih peluang reward dari setiap akses.
         </p>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          {settings.period_open && !allFull ? (
-            <Link href="/setor" className="btn-primary w-full sm:w-auto">
-              Setor konten <ArrowUpIcon />
-            </Link>
-          ) : (
-            <span className="btn-primary w-full opacity-60 sm:w-auto" aria-disabled="true">
-              {settings.period_open ? 'Target periode ini sudah penuh' : 'Setoran sedang ditutup'}
-            </span>
-          )}
-          <Link href="/riwayat" className="btn-ghost w-full sm:w-auto">
-            Lihat riwayat
-          </Link>
+          <a href="#tutorial" className="btn-primary w-full sm:w-auto">Coba tutorialnya</a>
+          <a href="#program" className="btn-ghost w-full sm:w-auto">Pilih program</a>
         </div>
       </section>
 
-      <Panel aria-labelledby="target">
-        <PillLabel id="target">Target periode ini</PillLabel>
-        <div className="mt-4 space-y-4">
-          <ProgressBar label="TikTok" used={tiktok.used} target={tiktok.target} />
-          <ProgressBar label="Reels" used={reels.used} target={reels.target} />
-        </div>
-      </Panel>
+      <section id="tutorial" aria-labelledby="tutorial-judul" className="scroll-mt-20">
+        <PillLabel id="tutorial-judul">Tutorial</PillLabel>
+        <h2 className="mb-4 mt-3 text-2xl font-extrabold">Kenali cara kerja Sharein</h2>
+        <Tutorial />
+      </section>
 
-      <Panel aria-labelledby="ketentuan">
-        <PillLabel id="ketentuan">Ketentuan</PillLabel>
-        <RulesList settings={settings} />
-        <Link href="/aturan" className="mt-4 inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline-offset-4 hover:underline">
-          Baca ketentuan lengkap
+      <section id="program" aria-labelledby="program-judul" className="scroll-mt-20 space-y-4">
+        <div>
+          <PillLabel id="program-judul">Program</PillLabel>
+          <h2 className="mt-3 text-2xl font-extrabold">Pilih jalurmu</h2>
+        </div>
+
+        <Link href="/goldenticket" className="block rounded-panel bg-gradient-to-br from-brand-amber via-[#f9a63a] to-brand-orange p-5 text-ink transition-transform hover:-translate-y-0.5 sm:p-6">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-sm font-bold text-white">
+            <GiftIcon className="h-4 w-4 text-brand-amber" /> Golden Ticket
+          </span>
+          <p className="mt-4 text-sm font-bold">Total hadiah berjalan</p>
+          <GoldenCounter pool={settings} />
+          <p className="mt-3 text-sm font-bold">Setor konten viral TikTok / Reels lewat Sharein →</p>
+        </Link>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {programs.map((p) => (
+            <Link key={p.href} href={p.href} className="panel flex flex-col items-start gap-2 transition-colors hover:border-brand-violet">
+              <span className="pill">{p.pill}</span>
+              <h3 className="mt-2 text-xl font-extrabold">{p.title}</h3>
+              <p className="muted text-sm">{p.desc}</p>
+              <span className={`text-xs font-bold ${p.open ? 'text-green-700' : 'text-red-700'}`}>{p.open ? 'Dibuka' : 'Ditutup sementara'}</span>
+              <span className="mt-auto inline-flex min-h-[44px] items-center gap-1 font-bold text-brand-purple">
+                {p.cta} <ArrowUpIcon className="h-4 w-4 rotate-90" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <Panel aria-labelledby="aturan-ringkas">
+        <PillLabel id="aturan-ringkas">Aturan</PillLabel>
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm">
+          <li>Pakai identitas asli: nama dan nomor WhatsApp aktif untuk menerima hadiah.</li>
+          <li>Golden Ticket: hanya konten viral organik yang memenuhi batas like/komentar dan sudah diunggah ke Sharein.</li>
+          <li>Pelatihan Content & Duta Teladan: satu tugas selesai = satu kode. Kode yang disetujui admin masuk spin wheel.</li>
+          <li>Pemenang spin diumumkan di halaman program dan dihubungi lewat WhatsApp.</li>
+        </ul>
+        <Link href="/aturan" className="mt-3 inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-4">
+          Baca aturan lengkap
         </Link>
       </Panel>
-
-      <Panel aria-labelledby="cara">
-        <PillLabel id="cara">Cara kerja</PillLabel>
-        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-          {STEPS.map(({ n, t, d, Icon }) => (
-            <li key={n} className="rounded-field bg-brand-lavender/80 p-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-purple text-sm font-extrabold text-white">{n}</span>
-                <Icon className={`h-6 w-6 ${n === 3 ? 'text-brand-orange' : 'text-brand-purple'}`} />
-              </div>
-              <p className="mt-2 font-extrabold">{t}</p>
-              <p className="muted mt-1 text-sm">{d}</p>
-            </li>
-          ))}
-        </ol>
-      </Panel>
-
-      <div className="flex items-center gap-3 rounded-panel bg-brand-purple p-5 text-white">
-        <GiftIcon className="h-9 w-9 shrink-0 text-brand-amber" />
-        <p className="font-bold">Upload konten, bagikan link-nya, dan dapatkan sesuatu!</p>
-      </div>
     </div>
   )
 }

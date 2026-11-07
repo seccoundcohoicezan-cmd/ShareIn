@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429, readJson } from '@/lib/http'
 import { checkSubmission, createSubmission, submissionSchema } from '@/lib/service'
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const result = await createSubmission(input, undefined, screenshotUrl)
   if (!result.ok) return NextResponse.json({ ok: false, checks: result.checks }, { status: 422 })
-  revalidatePath('/')
+  revalidatePublic()
   const s = result.submission
   return NextResponse.json({ ok: true, id: s.id, status: s.status, created_at: s.created_at }, { status: 201 })
 }

@@ -17,6 +17,12 @@ export async function GET() {
         reels: { min_like: settings.min_like_reels, min_comment: settings.min_comment_reels },
       },
       progress,
+      golden: {
+        start: settings.golden_pool_start,
+        end: settings.golden_pool_end,
+        start_at: settings.golden_start_at,
+        end_at: settings.golden_end_at,
+      },
     },
     { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=60' } },
   )

@@ -15,6 +15,66 @@ export interface Settings {
   metrics_adapter: MetricsAdapterMode
   require_screenshot: boolean
   sharein_domains: string[]
+  golden_pool_start: number
+  golden_pool_end: number
+  /** ISO timestamps. */
+  golden_start_at: string
+  golden_end_at: string
+  pelatihan_open: boolean
+  duta_open: boolean
+  spin_prize_pelatihan: number
+  spin_prize_duta: number
+  spin_unique_winner: boolean
+}
+
+export type Program = 'pelatihan' | 'duta'
+export type TaskSubmissionStatus = 'pending' | 'approved' | 'rejected' | 'void'
+
+export interface Task {
+  id: string
+  program: Program
+  title: string
+  description: string
+  proof_hint: string
+  active: boolean
+  order: number
+  created_at: string
+}
+
+export interface TaskSubmission {
+  id: string
+  created_at: string
+  program: Program
+  task_id: string
+  /** Normalized WhatsApp number (62…): one identity. */
+  identity_key: string
+  name: string
+  whatsapp: string
+  proof_url: string
+  note: string
+  code: string
+  status: TaskSubmissionStatus
+  reject_reason: string
+  reviewed_by: string
+  reviewed_at: string
+}
+
+export interface Draw {
+  id: string
+  time: string
+  program: Program
+  code: string
+  submission_id: string
+  name: string
+  identity_key: string
+  prize: number
+  actor: string
+  status: 'active' | 'void'
+}
+
+export const PROGRAM_INFO: Record<Program, { label: string; path: string; prefix: string }> = {
+  pelatihan: { label: 'Pelatihan Content', path: '/pelatihancontent', prefix: 'PC' },
+  duta: { label: 'Duta Teladan', path: '/dutateladan', prefix: 'DT' },
 }
 
 export interface Submission {

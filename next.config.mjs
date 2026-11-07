@@ -5,6 +5,16 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@googleapis/sheets', '@googleapis/drive', 'bcryptjs'],
   },
+  async redirects() {
+    return [
+      { source: '/setor', destination: '/goldenticket/setor', permanent: true },
+      { source: '/riwayat', destination: '/goldenticket/riwayat', permanent: true },
+      { source: '/golden-ticket', destination: '/goldenticket', permanent: true },
+      { source: '/pelatihan-content-creator', destination: '/pelatihancontent', permanent: true },
+      { source: '/pelatihan', destination: '/pelatihancontent', permanent: true },
+      { source: '/duta', destination: '/dutateladan', permanent: true },
+    ]
+  },
   async headers() {
     return [
       {

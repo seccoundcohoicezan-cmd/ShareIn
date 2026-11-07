@@ -1,13 +1,16 @@
-# ShareIn Viral Intake
+# ShareIn
 
-Web setoran konten viral TikTok & Instagram Reels untuk ShareIn. Mobile-first, berbahasa Indonesia, database Google Sheets, dengan menu admin untuk mengatur QTY dan batas minimal like/komentar tanpa mengubah kode.
+Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — **Golden Ticket** (setoran konten viral TikTok/Reels dengan hadiah berjalan), **Pelatihan Content**, dan **Duta Teladan** (tugas → kode → spin wheel berhadiah uang). Mobile-first, berbahasa Indonesia, database Google Sheets.
 
-**Tumpukan:** Next.js 14 (App Router) · TypeScript · Tailwind CSS · Zod · Google Sheets API (service account) · bcrypt · Vercel / Docker.
+**Tumpukan:** Next.js 14 (App Router) · TypeScript · Tailwind CSS · Zod · Google Sheets lewat Apps Script (atau Sheets API service account) · bcrypt · Vercel / Docker.
 
 ## Fitur
 
-- **Publik** — `/` beranda (progres QTY, ketentuan, cara kerja), `/setor` form setoran dengan cek langsung, `/riwayat` riwayat per nama, `/aturan` ketentuan lengkap.
-- **Admin** — `/admin/login`, `/admin` dasbor, `/admin/setoran` review (setujui/tolak dengan alasan, aksi massal, ekspor CSV), `/admin/pengaturan` (periode, buka/tutup, QTY, minimal like/komentar, domain ShareIn, adapter metrik, wajib tangkapan layar). Peran `owner` (semua) dan `reviewer` (dasbor + review).
+- **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; tutorial interaktif (upload → bagikan link → reward); kartu ke tiga program.
+- **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), progres QTY, ketentuan. Setor di `/goldenticket/setor`, riwayat di `/goldenticket/riwayat`.
+- **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Kode yang disetujui admin masuk spin wheel. *Kode saya* (cek per nomor WA) dan daftar pemenang (nama disamarkan, mis. "Rina U.").
+- **`/aturan`** — aturan semua program.
+- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (setujui/tolak beralasan, massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/spin` (roda undian, pemenang dipilih acak di server, tercatat di sheet `draws`, bisa dibatalkan); `/admin/pengaturan` (periode/QTY/batas Golden Ticket, hadiah berjalan, buka/tutup program, hadiah spin bawaan, satu orang maks. menang sekali). Peran `owner` (semua) dan `reviewer` (dasbor + review).
 - **Validasi server** (diulang saat simpan): periode dibuka → format/domain URL (hanya https) → normalisasi & ikuti link pendek (HEAD, 3 dtk, hanya domain TikTok/Instagram, IP privat diblokir) → duplikat `source_key` di semua periode → minimal like/komentar (inklusif) → pernyataan organik (+ tangkapan layar bila wajib) → QTY belum penuh → simpan dengan penguncian.
 - **Latar bergerak ringan** — 1 lapisan fixed + 3 blob (4 node DOM), CSS `animation-timeline: scroll()` dengan fallback rAF; mati saat `prefers-reduced-motion`, Data Saver, atau RAM ≤ 4 GB. Admin polos.
 
@@ -24,7 +27,17 @@ npm run dev                   # http://localhost:3000
 
 Tanpa variabel Google Sheets, data disimpan di `.data/db.json` (mode lokal/demo).
 
-## Menyiapkan Google Sheets
+## Menyiapkan Google Sheets lewat Apps Script (cara utama)
+
+Spreadsheet ShareIn sudah punya proyek Apps Script terikat (`apps-script/`, deployment di `apps-script/.deployment-id`). Web memanggilnya dari server dengan rahasia bersama — spreadsheet tidak perlu dibagikan ke siapa pun.
+
+1. Pemilik spreadsheet membuka **Ekstensi → Apps Script**, memilih fungsi `siapkan`, lalu **Run** dan mengizinkan akses (sekali saja). Sebelum ini Web App membalas 403.
+2. Di editor yang sama, buka file `Rahasia.gs` dan salin nilai `API_SECRET`.
+3. Di Vercel → Settings → Environment Variables isi `APPS_SCRIPT_SECRET` (nilai tadi), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, lalu **Redeploy**. Tab `settings`, `submissions`, `admins`, `audit_log`, `tasks`, `task_submissions`, `draws` dibuat otomatis.
+
+Mengubah kode Apps Script: `cd apps-script && clasp push -f && clasp deploy -i $(cat .deployment-id)`.
+
+## Alternatif: Google Sheets API (service account)
 
 1. Buat spreadsheet baru (kosong). Salin ID dari URL: `docs.google.com/spreadsheets/d/<SHEET_ID>/edit`.
 2. Di Google Cloud Console: buat project → aktifkan **Google Sheets API** (dan **Google Drive API** bila memakai tangkapan layar) → buat **Service Account** → tab Keys → *Add key* → JSON.
@@ -44,7 +57,7 @@ ADMIN_NEW_PASSWORD='sandi-minimal-10' npm run admin:add -- reviewer@domain.id re
 
 ## Deploy
 
-**Vercel** — import repo, framework Next.js, isi env: `SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `SESSION_SECRET` (≥ 32 karakter, `openssl rand -base64 48`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, opsional `DRIVE_FOLDER_ID`. Google Sheets wajib di Vercel.
+**Vercel** — repo sudah terhubung (proyek `share-in`). Env minimal: `APPS_SCRIPT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (`SESSION_SECRET` opsional, diturunkan dari rahasia Apps Script). Tanpa env database, web berjalan dalam **mode demo** (data di /tmp, hilang saat server berganti) dan dasbor admin menampilkan peringatan.
 
 **Docker / Dokploy** — `docker build -t sharein .` lalu jalankan dengan env yang sama dan volume `/data` (dipakai mode lokal dan unggahan tangkapan layar). Port 3000.
 
@@ -54,7 +67,7 @@ ADMIN_NEW_PASSWORD='sandi-minimal-10' npm run admin:add -- reviewer@domain.id re
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run lint` · `npm run typecheck` | ESLint · TypeScript |
-| `npm test` | Uji unit (Vitest): URL, validasi, batas inklusif, duplikat, QTY bersamaan, driver Sheets palsu |
+| `npm test` | Uji unit (Vitest): URL, validasi, batas inklusif, duplikat, QTY bersamaan, hadiah berjalan, kode & spin, driver Sheets palsu, dan `apps-script/Code.js` asli yang dijalankan di Node dengan spreadsheet tiruan |
 | `npm run test:e2e` | Uji end-to-end Playwright di profil Pixel 7 (butuh `npm run build` dulu) |
 | `npm run sheet:setup` | Buat tab + header + nilai awal |
 | `npm run admin:add` | Tambah admin |
@@ -77,6 +90,13 @@ Prefiks `/api`, JSON.
 | POST | `/admin/submissions/bulk` | admin — setujui massal |
 | GET / PUT | `/admin/settings` | admin / owner |
 | GET | `/admin/export.csv` | admin |
+| GET | `/programs/:program` | publik — tugas, jumlah peserta/kode, pemenang (`pelatihan` \| `duta`) |
+| POST | `/programs/:program/submit` | publik — `{ task_id, name, whatsapp, proof_url, note? }` → `{ ok, code }` |
+| GET | `/programs/:program/codes?wa=` | publik — kode milik nomor WA |
+| GET / POST | `/admin/programs/:program/tasks` · PATCH `/tasks/:id` | admin / owner |
+| GET | `/admin/programs/:program/submissions` · PATCH `/:id` · POST `/bulk` | admin |
+| GET | `/admin/programs/:program/draws` · DELETE `/draws/:id` | admin / owner |
+| POST | `/admin/programs/:program/spin` | owner — `{ prize }` |
 
 Id cek: `period_open`, `url_valid`, `not_duplicate`, `min_like`, `min_comment`, `sharein_valid`, `qty_available`, `organic`.
 

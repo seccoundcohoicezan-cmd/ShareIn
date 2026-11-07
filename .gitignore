@@ -10,3 +10,4 @@ playwright-report/
 .env*.local
 .vercel
 .data-e2e/
+apps-script/Rahasia.js

@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { review } from '@/lib/admin-service'
@@ -13,6 +13,6 @@ export async function POST(req: NextRequest) {
   const body = schema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, 'Pilih setoran yang mau disetujui.')
   const items = await review(body.data.ids, 'approve', '', s.email)
-  revalidatePath('/')
+  revalidatePublic()
   return NextResponse.json({ ok: true, count: items.length })
 }

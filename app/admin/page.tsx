@@ -2,22 +2,41 @@ import Link from 'next/link'
 import { PlatformTag, ProgressBar, StatusBadge, EmptyState } from '@/components/ui'
 import { dashboard } from '@/lib/admin-service'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { programSummary } from '@/lib/program-service'
 import { getProgress } from '@/lib/service'
+import { isDemoStore } from '@/lib/repo'
+import { taskSubmissionsTable } from '@/lib/repo/programs'
 import { AdminShell, requirePageSession } from './shell'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminHome() {
   const session = await requirePageSession()
-  const [{ stats, recent, settings }, { progress }] = await Promise.all([dashboard(), getProgress()])
+  const [{ stats, recent, settings }, { progress }, pel, dut, subs] = await Promise.all([
+    dashboard(),
+    getProgress(),
+    programSummary('pelatihan'),
+    programSummary('duta'),
+    taskSubmissionsTable.list(),
+  ])
+  const pendingTasks = (p: string) => subs.filter((x) => x.program === p && x.status === 'pending').length
+  const programs = [
+    { key: 'pelatihan', label: 'Pelatihan Content', s: pel },
+    { key: 'duta', label: 'Duta Teladan', s: dut },
+  ]
   const cards = [
-    { t: 'Menunggu review', v: stats.pending, href: '/admin/setoran?status=pending', tone: 'text-warn' },
+    { t: 'Golden Ticket menunggu', v: stats.pending, href: '/admin/setoran?status=pending', tone: 'text-warn' },
     { t: 'Disetujui hari ini', v: stats.approvedToday, href: '/admin/setoran?status=approved', tone: 'text-ok' },
     { t: 'Ditolak (periode)', v: stats.rejected, href: '/admin/setoran?status=rejected', tone: 'text-bad' },
     { t: 'Total periode', v: stats.totalPeriod, href: `/admin/setoran?period=${encodeURIComponent(settings.period_id)}`, tone: 'text-brand-purple' },
   ]
   return (
     <AdminShell session={session}>
+      {isDemoStore() && (
+        <p role="alert" className="mb-4 rounded-field border border-warn/40 bg-amber-50 p-3 text-sm font-bold">
+          Mode demo: data belum tersimpan ke Google Sheets. Isi env APPS_SCRIPT_SECRET di server agar data permanen.
+        </p>
+      )}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold">Dasbor</h1>
         <span className={`rounded-full px-3 py-1 text-xs font-bold ${settings.period_open ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'}`}>
@@ -32,8 +51,18 @@ export default async function AdminHome() {
           </Link>
         ))}
       </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {programs.map((p) => (
+          <Link key={p.key} href={`/admin/program/${p.key}`} className="panel-solid !p-4 hover:border-brand-violet">
+            <p className="font-extrabold">{p.label}</p>
+            <p className="muted mt-1 text-sm">
+              <b className="text-warn">{pendingTasks(p.key)}</b> menunggu review · {p.s.codes} kode · {p.s.inWheel} siap diundi · {p.s.winners.length} pemenang
+            </p>
+          </Link>
+        ))}
+      </div>
       <section className="panel-solid mt-4 space-y-4">
-        <h2 className="font-extrabold">Progres QTY</h2>
+        <h2 className="font-extrabold">Progres QTY Golden Ticket</h2>
         {progress.map((p) => <ProgressBar key={p.platform} label={p.platform === 'tiktok' ? 'TikTok' : 'Reels'} used={p.used} target={p.target} />)}
       </section>
       <section className="panel-solid mt-4">

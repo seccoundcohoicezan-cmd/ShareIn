@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
@@ -23,6 +23,17 @@ const schema = z.object({
     .array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, 'Domain ShareIn tidak valid, contoh sharein.id.'))
     .min(1, 'Isi minimal satu domain ShareIn.')
     .max(10),
+  golden_pool_start: count,
+  golden_pool_end: count,
+  golden_start_at: z.string().datetime({ offset: true, message: 'Tanggal mulai hadiah tidak valid.' }),
+  golden_end_at: z.string().datetime({ offset: true, message: 'Tanggal akhir hadiah tidak valid.' }),
+  pelatihan_open: z.boolean(),
+  duta_open: z.boolean(),
+  spin_prize_pelatihan: count,
+  spin_prize_duta: count,
+  spin_unique_winner: z.boolean(),
+}).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
+  message: 'Tanggal akhir hadiah harus setelah tanggal mulai.',
 })
 
 export async function GET(req: NextRequest) {
@@ -39,7 +50,6 @@ export async function PUT(req: NextRequest) {
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
   const diff = await saveSettings(body.data)
   if (Object.keys(diff.after).length) await audit(s.email, 'settings.update', 'settings', diff.before, diff.after)
-  revalidatePath('/')
-  revalidatePath('/aturan')
+  revalidatePublic()
   return NextResponse.json({ ok: true, settings: await getSettingsFresh() })
 }

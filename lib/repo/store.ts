@@ -10,6 +10,12 @@ export const TABLES = {
   ],
   admins: ['email', 'password_hash', 'role', 'active'],
   audit_log: ['time', 'actor', 'action', 'target', 'before', 'after'],
+  tasks: ['id', 'program', 'title', 'description', 'proof_hint', 'active', 'order', 'created_at'],
+  task_submissions: [
+    'id', 'created_at', 'program', 'task_id', 'identity_key', 'name', 'whatsapp', 'proof_url', 'note', 'code',
+    'status', 'reject_reason', 'reviewed_by', 'reviewed_at',
+  ],
+  draws: ['id', 'time', 'program', 'code', 'submission_id', 'name', 'identity_key', 'prize', 'actor', 'status'],
 } as const
 
 export type TableName = keyof typeof TABLES
@@ -22,7 +28,7 @@ export interface TableData {
 
 /** Minimal tabular storage; implemented by Google Sheets and by a local JSON file store. */
 export interface TableStore {
-  readonly kind: 'sheets' | 'file' | 'memory'
+  readonly kind: 'sheets' | 'apps_script' | 'file' | 'memory'
   ensureSchema(): Promise<void>
   read(table: TableName): Promise<TableData>
   append(table: TableName, rows: Row[]): Promise<void>

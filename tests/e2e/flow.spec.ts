@@ -17,7 +17,7 @@ async function login(page: Page) {
 }
 
 async function fillForm(page: Page, o: { name: string; url: string; likes: string; comments: string; sharein?: string }) {
-  await page.goto('/setor')
+  await page.goto('/goldenticket/setor')
   await page.getByLabel('Nama penyetor').fill(o.name)
   await page.getByLabel(/Link TikTok|Link Instagram Reels/).fill(o.url)
   await page.getByLabel('Like', { exact: true }).fill(o.likes)
@@ -29,14 +29,14 @@ async function fillForm(page: Page, o: { name: string; url: string; likes: strin
 
 test.describe.configure({ mode: 'serial' })
 
-test('beranda: progres QTY, ketentuan, latar ringan', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Setor konten viral')
+test('golden ticket: progres QTY, ketentuan, latar ringan', async ({ page }) => {
+  await page.goto('/goldenticket')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Golden Ticket')
   await expect(page.getByRole('progressbar', { name: 'Progres TikTok' })).toHaveAttribute('aria-valuemax', '20')
   await expect(page.getByText('≥ 100 rb like · ≥ 5 rb komentar')).toBeVisible()
   const bgNodes = await page.evaluate(() => document.querySelectorAll('#bg, #bg *').length)
   expect(bgNodes).toBeLessThanOrEqual(4)
-  await shot(page, '01-beranda')
+  await shot(page, '01-goldenticket')
 })
 
 test('latar mati saat prefers-reduced-motion', async ({ browser }) => {
@@ -111,7 +111,7 @@ test('admin: login, ubah QTY 20 → 25, publik ikut berubah', async ({ page, req
   expect(rules.progress.find((p: { platform: string }) => p.platform === 'tiktok')).toMatchObject({ used: 1, target: 25 })
   await expect
     .poll(async () => {
-      await page.goto('/')
+      await page.goto('/goldenticket')
       return page.getByRole('progressbar', { name: 'Progres TikTok' }).getAttribute('aria-valuetext')
     }, { timeout: 15_000 })
     .toBe('1 dari 25')
@@ -160,7 +160,7 @@ test('admin: tolak wajib alasan, setujui, ekspor CSV; riwayat menampilkan alasan
   expect(text).toContain('id,created_at,period_id,submitter_name')
   expect(text).toContain('Rina Uji')
 
-  await page.goto('/riwayat?nama=rina%20uji')
+  await page.goto('/goldenticket/riwayat?nama=rina%20uji')
   await expect(page.getByText('Alasan: Bukan dari FYP')).toBeVisible()
 })
 
@@ -170,7 +170,7 @@ test('periode ditutup: form menampilkan pesan dan tombol nonaktif', async ({ pag
   await page.getByRole('switch', { name: 'Setoran dibuka' }).click()
   await page.getByRole('button', { name: 'Simpan perubahan' }).click()
   await expect(page.getByText('Tersimpan')).toBeVisible()
-  await page.goto('/setor')
+  await page.goto('/goldenticket/setor')
   await expect(page.getByText('Setoran sedang ditutup. Pantau beranda untuk periode berikutnya.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Cek setoran' })).toBeDisabled()
@@ -185,7 +185,7 @@ test('API admin menolak tanpa sesi; halaman admin dialihkan ke login', async ({ 
 })
 
 test('semua target sentuh di form setoran ≥ 44px', async ({ page }) => {
-  await page.goto('/setor')
+  await page.goto('/goldenticket/setor')
   const small = await page.evaluate(() =>
     Array.from(document.querySelectorAll('main button, main a, main input[type=checkbox]'))
       .map((el) => {

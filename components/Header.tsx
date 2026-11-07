@@ -10,6 +10,7 @@ export function Logo({ size = 36 }: { size?: number }) {
   )
 }
 
+// Landing menu: only Tutorial and Aturan. Programs are reached from landing cards.
 export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-brand-purple/10 bg-brand-lavender/85 backdrop-blur supports-[backdrop-filter]:bg-brand-lavender/70">
@@ -18,8 +19,8 @@ export function Header() {
           <Logo />
         </Link>
         <nav aria-label="Navigasi utama" className="flex items-center gap-1 text-sm font-bold">
-          <Link href="/riwayat" className="hidden min-h-[44px] items-center rounded-field px-3 text-[#4c1fa0] hover:bg-white/70 sm:inline-flex">
-            Riwayat
+          <Link href="/#tutorial" className="inline-flex min-h-[44px] items-center rounded-field px-3 text-[#4c1fa0] hover:bg-white/70">
+            Tutorial
           </Link>
           <Link href="/aturan" className="inline-flex min-h-[44px] items-center rounded-field px-3 text-[#4c1fa0] hover:bg-white/70">
             Aturan

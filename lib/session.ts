@@ -15,6 +15,9 @@ const enc = new TextEncoder()
 function secret(): string {
   const s = process.env.SESSION_SECRET
   if (s && s.length >= 32) return s
+  // One less env var to set: derive from the Apps Script secret when SESSION_SECRET is absent.
+  const a = process.env.APPS_SCRIPT_SECRET
+  if (a && a.length >= 32) return `session:${a}`
   if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build') {
     throw new Error('SESSION_SECRET wajib diisi (minimal 32 karakter).')
   }

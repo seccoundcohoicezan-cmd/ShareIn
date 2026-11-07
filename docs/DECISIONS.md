@@ -18,3 +18,16 @@ Dicatat saat build v1 (MRKT-52). Ubah bila tidak sesuai.
 | 12 | Admin pertama dibuat otomatis dari `ADMIN_EMAIL` + `ADMIN_PASSWORD` hanya bila sheet `admins` masih kosong. Admin berikutnya lewat `npm run admin:add`. | Tidak perlu menulis hash bcrypt manual ke sheet. |
 | 13 | Adapter metrik RapidAPI/Apify dibuat generik (URL/actor diatur lewat env). Default mati. | Penyedia & endpoint belum dipilih; alur utama tetap input manual. |
 | 14 | JS awal beranda 96 kB gzip (target rancangan < 90 kB). | Itu ukuran dasar runtime Next.js 14 + React; beranda sendiri tidak memuat komponen klien. Tidak bisa turun di bawah 90 kB tanpa mengganti framework. |
+
+## Pembaruan MRKT-52 putaran 2 (7 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 15 | Database lewat **Apps Script Web App** yang terikat ke spreadsheet (`apps-script/Code.js`), dipanggil server Next dengan rahasia bersama, operasi tabel generik di bawah LockService. | Pengguna memberi spreadsheet + proyek Apps Script, bukan service account. Spreadsheet tetap privat. |
+| 16 | Golden Ticket = program setoran konten viral yang sudah ada; hadiah berjalan linier berbasis waktu dari `golden_pool_start` ke `golden_pool_end` antara `golden_start_at` (7 Nov 2026 00.00 WIB) dan `golden_end_at` (5 Des 2026 23.59 WIB). ±Rp1,2 per detik. | "2.000.000 nambah sedikit demi sedikit sampai 5 Desember". Semua bisa diubah di Pengaturan. |
+| 17 | Identitas peserta Pelatihan/Duta = nomor WhatsApp (dinormalkan ke 628…), nama ikut dicatat. Satu tugas sekali per nomor. | "1 nama identitas". Nomor lebih unik daripada nama dan dipakai menghubungi pemenang. |
+| 18 | Kode diberikan **langsung** saat tugas dikumpulkan (status menunggu), tetapi baru masuk roda setelah disetujui admin. | Peserta langsung dapat kode, admin tetap bisa menyaring bukti palsu. |
+| 19 | Satu tugas = satu kode; makin banyak tugas, makin banyak peluang. Bawaan: satu orang maksimal menang sekali per program (bisa dimatikan). | Interpretasi "kode dikumpulkan dan masuk spin wheel". |
+| 20 | Nominal hadiah spin diisi admin saat memutar (bawaan dari Pengaturan, Rp0 = wajib diisi). Pemenang dipilih acak di server (`crypto.randomInt`), roda di layar hanya animasi menuju hasil itu. | Nominal belum ditentukan; hasil undian tidak bisa dimanipulasi dari browser. |
+| 21 | Duta Teladan memakai mesin yang sama dengan label "Kewajiban" dan prefiks kode `DT-`. | "sistemnya sama spin wheel ... bonus". |
+| 22 | Menu landing hanya Tutorial & Aturan; program dibuka dari kartu landing. Bottom-tab dari paket UI/UX tidak dipakai. URL lama (`/setor`, `/riwayat`, `/golden-ticket`, `/pelatihan-content-creator`, `/duta`) dialihkan. | Permintaan pengguna. |

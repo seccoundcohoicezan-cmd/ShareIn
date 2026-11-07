@@ -12,6 +12,15 @@ export const SETTING_KEYS = [
   'metrics_adapter',
   'require_screenshot',
   'sharein_domains',
+  'golden_pool_start',
+  'golden_pool_end',
+  'golden_start_at',
+  'golden_end_at',
+  'pelatihan_open',
+  'duta_open',
+  'spin_prize_pelatihan',
+  'spin_prize_duta',
+  'spin_unique_winner',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -29,6 +38,15 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   metrics_adapter: 'off',
   require_screenshot: 'FALSE',
   sharein_domains: 'sharein.id,sharein.app',
+  golden_pool_start: '2000000',
+  golden_pool_end: '5000000',
+  golden_start_at: '2026-11-07T00:00:00+07:00',
+  golden_end_at: '2026-12-05T23:59:59+07:00',
+  pelatihan_open: 'TRUE',
+  duta_open: 'TRUE',
+  spin_prize_pelatihan: '0',
+  spin_prize_duta: '0',
+  spin_unique_winner: 'TRUE',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -60,7 +78,21 @@ export function parseSettings(raw: Map<string, string>): Settings {
       .split(/[,\s]+/)
       .map((d) => d.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
       .filter(Boolean),
+    golden_pool_start: toInt(get('golden_pool_start'), 2_000_000),
+    golden_pool_end: toInt(get('golden_pool_end'), 5_000_000),
+    golden_start_at: toIso(get('golden_start_at'), SEED_SETTINGS.golden_start_at),
+    golden_end_at: toIso(get('golden_end_at'), SEED_SETTINGS.golden_end_at),
+    pelatihan_open: toBool(get('pelatihan_open')),
+    duta_open: toBool(get('duta_open')),
+    spin_prize_pelatihan: toInt(get('spin_prize_pelatihan'), 0),
+    spin_prize_duta: toInt(get('spin_prize_duta'), 0),
+    spin_unique_winner: toBool(get('spin_unique_winner')),
   }
+}
+
+function toIso(v: string | undefined, fallback: string): string {
+  const d = new Date(String(v ?? '').trim())
+  return Number.isNaN(d.getTime()) ? new Date(fallback).toISOString() : d.toISOString()
 }
 
 export function serializeSettings(s: Settings): Record<SettingKey, string> {
@@ -76,6 +108,15 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     metrics_adapter: s.metrics_adapter,
     require_screenshot: s.require_screenshot ? 'TRUE' : 'FALSE',
     sharein_domains: s.sharein_domains.join(','),
+    golden_pool_start: String(s.golden_pool_start),
+    golden_pool_end: String(s.golden_pool_end),
+    golden_start_at: s.golden_start_at,
+    golden_end_at: s.golden_end_at,
+    pelatihan_open: s.pelatihan_open ? 'TRUE' : 'FALSE',
+    duta_open: s.duta_open ? 'TRUE' : 'FALSE',
+    spin_prize_pelatihan: String(s.spin_prize_pelatihan),
+    spin_prize_duta: String(s.spin_prize_duta),
+    spin_unique_winner: s.spin_unique_winner ? 'TRUE' : 'FALSE',
   }
 }
 

@@ -65,7 +65,7 @@ export function RiwayatClient() {
 
       {items && items.length === 0 && (
         <EmptyState title="Belum ada setoran atas nama ini.">
-          <Link href="/setor" className="font-bold text-brand-purple underline underline-offset-4">Setor konten pertamamu.</Link>
+          <Link href="/goldenticket/setor" className="font-bold text-brand-purple underline underline-offset-4">Setor konten pertamamu.</Link>
         </EmptyState>
       )}
 

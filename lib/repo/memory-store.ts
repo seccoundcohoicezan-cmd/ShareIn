@@ -20,7 +20,7 @@ export class LocalStore implements TableStore {
 
   private async load(): Promise<Data> {
     if (this.data) return this.data
-    const empty: Data = { settings: [], submissions: [], admins: [], audit_log: [] }
+    const empty: Data = { settings: [], submissions: [], admins: [], audit_log: [], tasks: [], task_submissions: [], draws: [] }
     if (this.dir) {
       try {
         const raw = JSON.parse(await fs.readFile(this.file(), 'utf8')) as Partial<Data>

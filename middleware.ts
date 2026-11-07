@@ -16,7 +16,7 @@ export async function middleware(req: NextRequest) {
   if (!session) {
     return redirectTo(req, pathname === '/admin' ? '/admin/login' : `/admin/login?next=${encodeURIComponent(pathname)}`)
   }
-  if (pathname.startsWith('/admin/pengaturan') && session.role !== 'owner') return redirectTo(req, '/admin')
+  if ((pathname.startsWith('/admin/pengaturan') || pathname.startsWith('/admin/spin')) && session.role !== 'owner') return redirectTo(req, '/admin')
   return NextResponse.next()
 }
 

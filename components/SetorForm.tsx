@@ -243,7 +243,7 @@ export function SetorForm() {
         <p className="muted mx-auto mt-2 max-w-sm">Admin akan memeriksa dalam 1×24 jam. Pantau statusnya di halaman riwayat.</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button type="button" className="btn-primary" onClick={reset}>Setor lagi</button>
-          <Link href={`/riwayat?nama=${encodeURIComponent(name.trim())}`} className="btn-ghost">Lihat riwayat</Link>
+          <Link href={`/goldenticket/riwayat?nama=${encodeURIComponent(name.trim())}`} className="btn-ghost">Lihat riwayat</Link>
         </div>
       </div>
     )

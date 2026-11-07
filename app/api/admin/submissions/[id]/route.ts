@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { review, reviewSchema } from '@/lib/admin-service'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
@@ -11,6 +11,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
   const [item] = await review([params.id], body.data.action, body.data.reason, s.email)
   if (!item) return jsonError(404, 'Setoran tidak ditemukan.')
-  revalidatePath('/')
+  revalidatePublic()
   return NextResponse.json({ ok: true, item })
 }
