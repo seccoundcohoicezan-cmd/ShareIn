@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { jsonError, limitOr429, readJson } from '@/lib/http'
 import { parseAndResolve } from '@/lib/resolve'
+import { LINK_RULE_MESSAGE } from '@/lib/url'
 
 const schema = z.object({ url: z.string().trim().min(1).max(500) })
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
         ? 'Link harus diawali https://.'
         : r === 'unresolved'
           ? 'Link pendek tidak bisa dibuka. Salin link lengkap dari browser.'
-          : 'Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.'
+          : LINK_RULE_MESSAGE
     return NextResponse.json({ ok: false, reason: r, message })
   }
   return NextResponse.json({ ok: true, platform: r.platform, url: r.url, source_key: r.source_key })

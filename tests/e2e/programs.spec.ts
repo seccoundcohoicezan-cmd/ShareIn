@@ -28,7 +28,8 @@ test('landing: tutorial & panduan berjalan otomatis, berhenti saat langkah dikli
   await shot(page, '11-landing')
   // Click a step → autoplay stops on that step.
   await tut.getByRole('button', { name: /Dapatkan reward/ }).click()
-  await expect(page.getByText('Reward terbuka!')).toBeVisible()
+  await expect(page.getByText('Peluang reward makin besar!')).toBeVisible()
+  await expect(page.getByText('Makin banyak konten yang kamu submit, makin besar peluang rewardmu.').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /Putar otomatis|Jeda/ })).toHaveCount(0)
   await page.waitForTimeout(6000)
   expect(await current()).toBe('Dapatkan reward')
@@ -256,4 +257,54 @@ test('setujui otomatis per program + API Golden Ticket dengan kunci', async ({ p
   await page.getByRole('button', { name: 'Cabut' }).click()
   await expect(page.getByText('Dicabut', { exact: true })).toBeVisible()
   expect((await request.get('/api/v1/goldenticket/summary', { headers: auth })).status()).toBe(401)
+})
+
+test('setor banyak: tambah (+) sampai 10, link salah merah dan tidak bisa kirim, kirim sekaligus', async ({ page, browser }) => {
+  await page.goto('/goldenticket/setor')
+  await page.getByLabel('Nama penyetor').fill('Banyak Konten')
+  await page.getByLabel('Nomor WhatsApp').fill('081299990001')
+  const add = page.getByRole('button', { name: /Tambah konten/ })
+  await expect(add).toHaveText('+ Tambah konten (1/10)')
+  for (let i = 0; i < 9; i++) await add.click()
+  await expect(page.getByRole('button', { name: 'Sudah maksimal 10 konten' })).toBeDisabled()
+  await expect(page.getByRole('region', { name: /^Konten \d+$/ })).toHaveCount(10)
+  await page.getByRole('button', { name: 'Hapus konten 10' }).click()
+  for (let i = 9; i > 3; i--) await page.getByRole('button', { name: `Hapus konten ${i}` }).click()
+  await expect(page.getByRole('region', { name: /^Konten \d+$/ })).toHaveCount(3)
+
+  const links = ['https://www.tiktok.com/@a/video/7400000000000055501', 'https://www.instagram.com/reel/DeDMIOTB2WD/?utm_source=ig_web_copy_link&dlrf=NTc4MTIwNjQ2YQ==', 'https://www.instagram.com/p/C1aBcD2eFgH/']
+  for (let i = 0; i < 3; i++) {
+    const c = page.getByRole('region', { name: `Konten ${i + 1}`, exact: true })
+    await c.getByLabel('Link konten').fill(links[i])
+    await c.getByLabel('Like', { exact: true }).fill('150000')
+    await c.getByLabel('Komentar', { exact: true }).fill('9000')
+    await c.getByLabel('Link Sharein').fill(`https://sharein.id/c/banyak${i}`)
+  }
+  await page.getByLabel(/muncul organik/).check()
+  await page.getByLabel(/sudah membuka link/).check()
+
+  // Third link is an Instagram post, not a reel: red, and the form cannot be sent.
+  const third = page.getByRole('region', { name: 'Konten 3', exact: true })
+  await expect(third.getByLabel('Link konten')).toHaveAttribute('aria-invalid', 'true')
+  await page.getByRole('button', { name: 'Cek setoran' }).click()
+  await expect(third.locator('ul').getByText(/Link harus dari tiktok\.com/)).toBeVisible()
+  await expect(third.locator('ul li')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Kirim 3 setoran' })).toBeDisabled()
+  await shot(page, '22-setor-banyak-merah')
+
+  await page.getByRole('button', { name: 'Hapus konten 3' }).click()
+  await page.getByRole('button', { name: 'Cek setoran' }).click()
+  await expect(page.getByText(/Lolos semua cek/)).toHaveCount(2)
+  await page.getByRole('button', { name: 'Kirim 2 setoran' }).click()
+  await expect(page.getByRole('heading', { name: '2 setoran terkirim' })).toBeVisible()
+  await shot(page, '23-setor-banyak-sukses')
+  const href = await page.getByRole('link', { name: 'Buka halaman pantau' }).getAttribute('href')
+
+  const ctx = await browser.newContext()
+  const u = await ctx.newPage()
+  await u.goto(href!)
+  const list = u.getByRole('list', { name: 'Daftar setoran' })
+  await expect(list).toContainText('Konten TikTok')
+  await expect(list).toContainText('Konten Instagram Reels')
+  await ctx.close()
 })

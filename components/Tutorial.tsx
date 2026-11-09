@@ -6,7 +6,7 @@ import { useAutoplay } from './useAutoplay'
 const STEPS = [
   { title: 'Upload konten', help: 'Unggah video, artikel, atau konten lainnya ke Sharein.' },
   { title: 'Bagikan link', help: 'Salin link unik kontenmu lalu bagikan ke WA, IG, atau TikTok.' },
-  { title: 'Dapatkan reward', help: 'Makin banyak yang mengakses, makin besar peluang reward.' },
+  { title: 'Dapatkan reward', help: 'Makin banyak konten yang kamu submit, makin besar peluang rewardmu.' },
 ]
 // Each step plays as a tiny storyboard: frame durations in ms.
 const FRAMES = [
@@ -64,7 +64,7 @@ export function Tutorial() {
     if (frame < LAST[step]) setFrame(frame + 1)
   }
 
-  const views = useCountUp(1250, step === 2 && frame >= 1)
+  const submitted = useCountUp(10, step === 2 && frame >= 1)
   const f = frame
 
   return (
@@ -157,10 +157,10 @@ export function Tutorial() {
             )}
             {step === 2 && (
               <div className="relative space-y-4 text-center">
-                <p className="text-lg font-extrabold">Performa konten</p>
+                <p className="text-lg font-extrabold">Konten kamu</p>
                 <div className="rounded-field bg-brand-lavender p-5">
-                  <span className="block text-4xl font-extrabold tabular-nums text-brand-purple">{(f === 0 ? 0 : f >= 2 ? 1250 : views).toLocaleString('id-ID')}</span>
-                  <span className="muted text-xs">penonton</span>
+                  <span className="block text-4xl font-extrabold tabular-nums text-brand-purple">{f === 0 ? 1 : f >= 2 ? 10 : Math.max(1, submitted)}</span>
+                  <span className="muted text-xs">konten disubmit</span>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-brand-purple/15">
                     <div className="progress-fill h-full rounded-full transition-[width] duration-[1500ms] ease-out" style={{ width: f === 0 ? '0%' : '100%' }} />
                   </div>
@@ -175,7 +175,7 @@ export function Tutorial() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs font-bold">{f >= 2 ? 'Reward terbuka!' : 'Capai target untuk membuka hadiah'}</p>
+                <p className="text-xs font-bold">{f >= 2 ? 'Peluang reward makin besar!' : 'Submit lebih banyak konten'}</p>
               </div>
             )}
           </div>

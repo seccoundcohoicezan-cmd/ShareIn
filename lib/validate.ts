@@ -3,7 +3,7 @@ import { minComment, minLike, qtyTarget } from './settings-schema'
 import type { Check, CheckResult, Platform, Settings, Submission } from './types'
 import { PLATFORM_LABEL } from './types'
 import type { ParsedLink, ParseError } from './url'
-import { checkShareinUrl } from './url'
+import { checkShareinUrl, LINK_RULE_MESSAGE } from './url'
 
 export interface CheckInput {
   platform: Platform
@@ -31,7 +31,7 @@ function linkCheck(input: CheckInput, link: CheckContext['link']): Check {
   if (link === 'unresolved')
     return { id: 'url_valid', pass: false, message: 'Link pendek tidak bisa dibuka. Buka kontennya lalu salin link lengkap dari browser.' }
   if (typeof link === 'string')
-    return { id: 'url_valid', pass: false, message: 'Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.' }
+    return { id: 'url_valid', pass: false, message: LINK_RULE_MESSAGE }
   if (link.platform !== input.platform)
     return {
       id: 'url_valid',

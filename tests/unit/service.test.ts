@@ -7,7 +7,7 @@ import { getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 import { listSubmissionsFresh } from '@/lib/repo/submissions'
 import { SheetsStore, type SheetsClient } from '@/lib/repo/sheets-store'
 import type { Row, TableName, TableStore } from '@/lib/repo/store'
-import { checkSubmission, createSubmission, getProgress, listMine, type SubmissionInput } from '@/lib/service'
+import { checkBatch, checkSubmission, createBatch, createSubmission, batchSchema, getProgress, listMine, type SubmissionInput } from '@/lib/service'
 import { FakeSheets } from './fake-sheets'
 import { AppsScriptStore } from '@/lib/repo/apps-script-store'
 import { createAppsScriptSim } from './apps-script-sim'
@@ -88,6 +88,47 @@ describe.each([
     await saveSettings({ ...s, period_open: false })
     expect((await checkSubmission(input())).checks[0]).toMatchObject({ id: 'period_open', pass: false })
     expect((await createSubmission(input())).ok).toBe(false)
+  })
+
+  it('batch: up to 10 saved in one go with the same identity', async () => {
+    await setQty(20)
+    const items = Array.from({ length: 10 }, () => input())
+    const r = await createBatch(items)
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.results.every((x) => x.ok)).toBe(true)
+    expect(await listSubmissionsFresh()).toHaveLength(10)
+    expect(batchSchema.safeParse({ submitter_name: 'Rina', whatsapp: '081234567890', items: Array.from({ length: 11 }, () => ({ platform: 'tiktok', source_url: 'x' })) }).success).toBe(false)
+    expect(batchSchema.safeParse({ submitter_name: 'Rina', whatsapp: '081234567890', items: [] }).success).toBe(false)
+  })
+
+  it('batch: one bad link means nothing is saved, and each item reports its own problem', async () => {
+    const good = input()
+    const r = await createBatch([good, input({ source_url: 'https://www.instagram.com/p/C1aBcD2eFgH/' }), input({ likes: 5 })])
+    expect(r.ok).toBe(false)
+    if (r.ok) throw new Error('expected failure')
+    expect(r.items.map((i) => i.ok)).toEqual([true, false, false])
+    expect(r.items[1].checks.find((c) => c.id === 'url_valid')?.message).toContain('instagram.com/reel/')
+    expect(r.items[2].checks.find((c) => c.id === 'min_like')?.pass).toBe(false)
+    expect(await listSubmissionsFresh()).toHaveLength(0)
+  })
+
+  it('batch: same link twice in the list is refused, platform comes from each link', async () => {
+    const a = input()
+    const reel = input({ platform: 'tiktok', source_url: 'https://www.instagram.com/reel/DeDMIOTB2WD/?utm_source=ig_web_copy_link&dlrf=NTc4MTIwNjQ2YQ==', comments: 3000 })
+    const dup = await checkBatch([a, { ...a, source_url: a.source_url.split('?')[0] }])
+    expect(dup.items[1].checks.find((c) => c.id === 'not_duplicate')?.message).toBe('Link ini sama dengan konten nomor 1 di daftar ini.')
+    const r = await createBatch([a, reel])
+    expect(r.ok).toBe(true)
+    expect((await listSubmissionsFresh()).map((s) => s.platform)).toEqual(['tiktok', 'reels'])
+  })
+
+  it('batch: the quota the list itself uses counts', async () => {
+    await setQty(2)
+    const r = await createBatch([input(), input(), input()])
+    expect(r.ok).toBe(false)
+    if (r.ok) throw new Error('expected failure')
+    expect(r.items.map((i) => i.ok)).toEqual([true, true, false])
+    expect(r.items[2].checks.find((c) => c.id === 'qty_available')?.pass).toBe(false)
   })
 
   it('auto-approve on: valid submission is approved by the system, invalid is still refused', async () => {

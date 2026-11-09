@@ -7,7 +7,7 @@ Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — 
 ## Fitur
 
 - **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; isinya hanya tutorial interaktif yang berjalan otomatis (storyboard animasi, berhenti saat langkah diklik) (upload → bagikan link → reward) dan panduan bergambar cara menyalin link TikTok / Instagram Reels (tangkapan layar asli, titik ketuk berdenyut). Halaman program dibagikan langsung lewat link-nya. Latar: gradasi + 6 aset brand yang bergeser beda kecepatan saat scroll, diparkir di area kosong kiri/kanan (desktop) dan mengintip di tepi (HP).
-- **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), progres QTY, ketentuan. Setor di `/goldenticket/setor`, riwayat di `/goldenticket/riwayat`.
+- **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), progres QTY, ketentuan. Setor di `/goldenticket/setor` (sampai 10 konten sekali kirim, link wajib dari `tiktok.com` atau `instagram.com/reel/`), riwayat di `/goldenticket/riwayat`.
 - **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Status tiap tugas dipantau lewat link pantau unik. Hadiah hanya ada di Golden Ticket.
 - **`/pantau/<kode>`** — halaman pantau pribadi (seperti pelacakan aduan): 1 nomor WhatsApp = 1 peserta = 1 kode/link unik (12 karakter, mis. `ABCD-EFGH-JKLM`). Link dibuat otomatis saat pertama menyetor Golden Ticket atau mengumpulkan tugas, sekaligus berfungsi sebagai login (cookie) sehingga form terisi otomatis. Isinya semua setoran lintas program dengan status Menunggu/Disetujui/Ditolak, alasan tolak, kode undian & kemenangan, linimasa pemeriksaan, dan **diperbarui otomatis tiap 15 detik langsung dari spreadsheet** (perubahan status yang diketik admin langsung di sheet ikut tampil; kolom status punya dropdown + warna, kata "disetujui"/"ditolak" juga diterima). `/pantau` untuk memasukkan kode.
 - **`/aturan`** — aturan semua program.
@@ -85,7 +85,7 @@ Prefiks `/api`, JSON.
 | POST | `/links/parse` | publik |
 | POST | `/submissions/check` | publik — `{ ok, checks: [{ id, pass, message?, remaining? }] }` |
 | POST | `/submissions` | publik (JSON, atau multipart `data` + `screenshot`) |
-| GET | `/submissions/mine?name=` | publik |
+| POST | `/submissions/batch/check` · `/submissions/batch` | publik — sampai 10 konten (`items`) |
 | POST | `/metrics/fetch` | publik, 10/menit/IP |
 | POST | `/admin/login` · `/admin/logout` | — |
 | GET | `/admin/submissions` | admin |

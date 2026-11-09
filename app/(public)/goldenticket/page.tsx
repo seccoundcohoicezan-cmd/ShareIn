@@ -19,7 +19,7 @@ export default async function GoldenTicketPage() {
       <section className="px-1 pt-2">
         <PillLabel as="span">Program reward</PillLabel>
         <h1 className="mt-3 text-[2.25rem] font-extrabold leading-tight tracking-tight">Golden Ticket</h1>
-        <p className="muted mt-2 max-w-md">Temukan konten viral TikTok atau Reels, unggah ulang lewat Sharein, dan setor di sini. Setoran yang disetujui jadi Golden Ticket-mu.</p>
+        <p className="muted mt-2 max-w-md">Temukan konten viral TikTok atau Reels, unggah ulang lewat Sharein, dan setor di sini. Makin banyak konten yang kamu submit, makin besar peluang rewardmu. Sekali kirim bisa sampai 10 konten.</p>
       </section>
 
       <div className="-rotate-1 rounded-panel bg-gradient-to-br from-brand-amber via-[#f9a63a] to-brand-orange p-6 text-ink">

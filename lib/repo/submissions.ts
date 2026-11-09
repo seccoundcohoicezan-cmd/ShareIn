@@ -81,8 +81,9 @@ async function header() {
   return lastHeader!
 }
 
-export async function appendSubmission(s: Submission): Promise<void> {
-  await getStore().append('submissions', [recordToRow(await header(), toRecord(s))])
+export async function appendSubmissions(items: Submission[]): Promise<void> {
+  const h = await header()
+  await getStore().append('submissions', items.map((s) => recordToRow(h, toRecord(s))))
   invalidate('submissions')
   invalidate('progress')
 }

@@ -23,7 +23,7 @@ async function fillForm(page: Page, o: { name: string; url: string; likes: strin
   await page.goto('/goldenticket/setor')
   await page.getByLabel('Nama penyetor').fill(o.name)
   await page.getByLabel('Nomor WhatsApp').fill(waFor(o.name))
-  await page.getByLabel(/Link TikTok|Link Instagram Reels/).fill(o.url)
+  await page.getByLabel('Link konten').fill(o.url)
   await page.getByLabel('Like', { exact: true }).fill(o.likes)
   await page.getByLabel('Komentar', { exact: true }).fill(o.comments)
   await page.getByLabel('Link Sharein').fill(o.sharein ?? 'https://sharein.id/c/abc123')
@@ -69,7 +69,7 @@ test('setor: 99.999 like ditolak, 100.000 lolos, kirim, sukses, riwayat', async 
 
   await page.getByLabel('Like', { exact: true }).fill('100000')
   await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText('Target belum penuh')).toBeVisible()
+  await expect(page.getByText(/Lolos semua cek · sisa kuota/)).toBeVisible()
   await expect(send).toBeEnabled()
   await shot(page, '03-setor-lolos')
   await send.click()
@@ -102,13 +102,16 @@ test('duplikat ditolak walau parameter berbeda', async ({ page }) => {
 
 test('link bukan TikTok/Reels dan domain Sharein salah dijelaskan', async ({ page }) => {
   await fillForm(page, { name: 'Sari', url: 'https://youtube.com/shorts/abc', likes: '150000', comments: '9000', sharein: 'https://contoh.com/x' })
-  await expect(page.getByText('Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.')).toBeVisible()
+  await expect(page.getByText('Link harus dari tiktok.com atau instagram.com/reel/. Tempel link dari tombol Bagikan.')).toBeVisible()
+  await expect(page.getByLabel('Link konten')).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
+  await expect(page.getByText('Ada link yang merah.')).toBeVisible()
   await expect(page.getByText(/Link harus dari sharein.id atau sharein.app/)).toBeVisible()
 })
 
 test('reels: komentar 2.999 ditolak, 3.000 lolos; platform terdeteksi otomatis', async ({ page }) => {
   await fillForm(page, { name: 'Dewi', url: 'https://www.instagram.com/reel/C9zYxW8vUtS/?igsh=abc', likes: '100000', comments: '2999' })
-  await expect(page.getByRole('radio', { name: 'Instagram Reels' })).toBeChecked()
+  await expect(page.getByText('Link valid · Instagram Reels')).toBeVisible()
   await page.getByRole('button', { name: 'Cek setoran' }).click()
   await expect(page.getByText('Komentar 2.999 belum cukup. Reels minimal 3.000.')).toBeVisible()
   await page.getByLabel('Komentar', { exact: true }).fill('3000')

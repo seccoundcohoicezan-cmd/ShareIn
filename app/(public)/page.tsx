@@ -14,7 +14,7 @@ export default function Home() {
           <span className="bg-gradient-to-r from-brand-purple via-brand-violet to-brand-orange bg-clip-text text-transparent">dapat reward.</span>
         </h1>
         <p className="muted mt-3 max-w-md text-base">
-          Sharein adalah platform berbagi konten. Unggah kontenmu, bagikan link-nya, dan raih peluang reward dari setiap akses.
+          Sharein adalah platform berbagi konten. Unggah kontenmu dan bagikan link-nya. Makin banyak konten yang kamu submit, makin besar peluang rewardmu.
         </p>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           <a href="#tutorial" className="btn-primary w-full sm:w-auto">Coba tutorialnya</a>

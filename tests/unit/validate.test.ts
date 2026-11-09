@@ -68,7 +68,7 @@ describe('runChecks', () => {
   it('rejects a link from the other platform and non-TikTok/IG links', () => {
     expect(byId(check('reels', {}, { link: links.tiktok }), 'url_valid').pass).toBe(false)
     expect(byId(check('tiktok', {}, { link: 'unsupported' }), 'url_valid').message).toBe(
-      'Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.',
+      'Link harus dari tiktok.com atau instagram.com/reel/. Tempel link dari tombol Bagikan.',
     )
   })
   it('requires both declarations and, when configured, a screenshot', () => {

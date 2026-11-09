@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatNumber, parseCount } from '@/lib/format'
 import type { Check, CheckId, Platform } from '@/lib/types'
-import { checkShareinUrl, detectPlatform, parseSourceUrl } from '@/lib/url'
+import { PLATFORM_LABEL } from '@/lib/types'
+import { checkShareinUrl, detectPlatform, LINK_RULE_MESSAGE, parseSourceUrl } from '@/lib/url'
 import { CheckIcon, CrossIcon, GiftSolid } from './icons'
 import { PantauCard } from './PantauCard'
 import { toast } from './Toast'
@@ -18,18 +19,6 @@ interface Rules {
   sharein_domains: string[]
   rules: Record<Platform, { min_like: number; min_comment: number }>
   progress: { platform: Platform; used: number; target: number; remaining: number }[]
-}
-
-const CHECK_LABEL: Record<CheckId, string> = {
-  period_open: 'Periode setoran dibuka',
-  identity: 'Nomor WhatsApp valid',
-  url_valid: 'Link konten valid',
-  not_duplicate: 'Belum pernah disetor',
-  min_like: 'Like memenuhi minimal',
-  min_comment: 'Komentar memenuhi minimal',
-  sharein_valid: 'Link Sharein valid',
-  qty_available: 'Target belum penuh',
-  organic: 'Pernyataan organik',
 }
 
 const NAME_KEY = 'sharein_name'
@@ -56,30 +45,232 @@ async function pasteInto(set: (v: string) => void) {
   }
 }
 
+const MAX_ITEMS = 10
+// Reported once for the whole form rather than on every content card.
+const GLOBAL_CHECKS: CheckId[] = ['period_open', 'identity', 'organic']
+
+type Item = { key: number; url: string; likes: string; comments: string; sharein: string; api: { likes: number; comments: number } | null }
+type ItemResult = { ok: boolean; checks: Check[] }
+
+let nextKey = 1
+const blankItem = (): Item => ({ key: nextKey++, url: '', likes: '', comments: '', sharein: '', api: null })
+// Fixed key: the first card is server-rendered, so its field ids must match on hydration.
+const FIRST_ITEM: Item = { key: 0, url: '', likes: '', comments: '', sharein: '', api: null }
+
+function linkState(url: string) {
+  if (!url.trim()) return { state: 'empty' as const }
+  const parsed = parseSourceUrl(url)
+  if (typeof parsed === 'string') return { state: 'bad' as const, message: parsed === 'not_https' ? 'Link harus diawali https://.' : LINK_RULE_MESSAGE }
+  return { state: parsed.short ? ('short' as const) : ('ok' as const), parsed }
+}
+
+function ContentCard({
+  item, index, total, rules, result, onChange, onRemove,
+}: {
+  item: Item
+  index: number
+  total: number
+  rules: Rules | null
+  result: ItemResult | null
+  onChange: (patch: Partial<Item>) => void
+  onRemove: () => void
+}) {
+  const [fetching, setFetching] = useState(false)
+  const link = linkState(item.url)
+  const platform: Platform = detectPlatform(item.url) ?? 'tiktok'
+  const rule = rules?.rules[platform]
+  const likesN = parseCount(item.likes)
+  const commentsN = parseCount(item.comments)
+  const share = item.sharein.trim() && rules ? checkShareinUrl(item.sharein, rules.sharein_domains) : null
+  const id = (n: string) => `${n}-${item.key}`
+  const failed = result?.checks.filter((c) => !c.pass && !GLOBAL_CHECKS.includes(c.id)) ?? []
+  // A wrong link also fails the duplicate check; one message is enough.
+  const shown = failed.some((c) => c.id === 'url_valid') ? failed.filter((c) => c.id !== 'not_duplicate') : failed
+  const qty = result?.checks.find((c) => c.id === 'qty_available')
+
+  async function fetchMetrics() {
+    setFetching(true)
+    try {
+      const res = await fetch('/api/metrics/fetch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: item.url }) })
+      const data = await res.json()
+      if (data.ok) {
+        onChange({ api: { likes: data.likes, comments: data.comments }, likes: formatNumber(data.likes), comments: formatNumber(data.comments) })
+        toast('Angka terisi otomatis')
+      } else toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
+    } catch {
+      toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  return (
+    <section className="panel-solid space-y-4" aria-label={`Konten ${index + 1}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="pill">Konten {index + 1}</span>
+        {total > 1 && (
+          <button type="button" className="min-h-[44px] rounded-field px-3 text-sm font-bold text-bad hover:bg-red-50" onClick={onRemove} aria-label={`Hapus konten ${index + 1}`}>
+            Hapus
+          </button>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor={id('link')} className="label">Link konten</label>
+        <div className="relative">
+          <input
+            id={id('link')}
+            className={`field pr-24 ${link.state === 'bad' ? '!border-bad !bg-red-50 !text-bad' : ''}`}
+            inputMode="url"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={item.url}
+            aria-invalid={link.state === 'bad'}
+            onChange={(e) => onChange({ url: e.target.value })}
+            placeholder="https://www.tiktok.com/… atau https://www.instagram.com/reel/…"
+            aria-describedby={id('link-status')}
+          />
+          <button type="button" className="absolute right-1.5 top-1/2 min-h-[38px] -translate-y-1/2 rounded-[12px] bg-brand-purple/10 px-3 text-sm font-bold text-brand-purple hover:bg-brand-purple/20" onClick={() => pasteInto((v) => onChange({ url: v }))}>
+            Tempel
+          </button>
+        </div>
+        <div id={id('link-status')} aria-live="polite">
+          {link.state === 'empty' && (
+            <>
+              <Status ok={null}>Wajib dari tiktok.com atau instagram.com/reel/.</Status>
+              <a href="/#panduan" className="inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-2">Lihat panduan bergambar</a>
+            </>
+          )}
+          {link.state === 'bad' && <Status ok={false}>{link.message}</Status>}
+          {link.state === 'short' && <Status ok={null}>Link pendek {PLATFORM_LABEL[link.parsed.platform]} terdeteksi. Server akan membukanya saat kamu menekan Cek setoran.</Status>}
+          {link.state === 'ok' && <Status ok>Link valid · {PLATFORM_LABEL[link.parsed.platform]}</Status>}
+        </div>
+        {(link.state === 'ok' || link.state === 'short') && (
+          <a href={link.parsed.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-4">
+            Buka link untuk cek angka
+          </a>
+        )}
+      </div>
+
+      {rules && rules.metrics_adapter !== 'off' && (
+        <button type="button" className="btn-ghost btn-sm" disabled={fetching || link.state === 'empty' || link.state === 'bad'} onClick={fetchMetrics}>
+          {fetching ? 'Mengambil angka…' : 'Ambil angka otomatis'}
+        </button>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        {([
+          { k: 'like', label: 'Like', field: 'likes', value: item.likes, n: likesN, min: rule?.min_like },
+          { k: 'komentar', label: 'Komentar', field: 'comments', value: item.comments, n: commentsN, min: rule?.min_comment },
+        ] as const).map((f) => (
+          <div key={f.k}>
+            <label htmlFor={id(f.k)} className="label">{f.label}</label>
+            <input
+              id={id(f.k)}
+              className="field tabular-nums"
+              inputMode="numeric"
+              autoComplete="off"
+              value={f.value}
+              placeholder={f.min ? formatNumber(f.min) : ''}
+              onChange={(e) => onChange({ [f.field]: e.target.value.replace(/[^\d.,rbkjtRBKJT ]/g, '') })}
+              onBlur={() => {
+                const n = parseCount(f.value)
+                if (n !== null) onChange({ [f.field]: formatNumber(n) })
+              }}
+              aria-describedby={id(`${f.k}-status`)}
+            />
+            <div id={id(`${f.k}-status`)} aria-live="polite">
+              {f.min === undefined ? (
+                <Status ok={null}>Memuat batas…</Status>
+              ) : !f.value.trim() ? (
+                <Status ok={null}>Minimal {formatNumber(f.min)}</Status>
+              ) : f.n === null ? (
+                <Status ok={false}>Tulis angka saja, contoh 120000.</Status>
+              ) : f.n >= f.min ? (
+                <Status ok>Memenuhi (≥ {formatNumber(f.min)})</Status>
+              ) : (
+                <Status ok={false}>Kurang {formatNumber(f.min - f.n)} dari {formatNumber(f.min)}</Status>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <label htmlFor={id('sharein')} className="label">Link Sharein</label>
+        <div className="relative">
+          <input
+            id={id('sharein')}
+            className={`field pr-24 ${share && !share.ok ? '!border-bad !bg-red-50 !text-bad' : ''}`}
+            inputMode="url"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={item.sharein}
+            aria-invalid={Boolean(share && !share.ok)}
+            onChange={(e) => onChange({ sharein: e.target.value })}
+            placeholder={`https://${rules?.sharein_domains[0] ?? 'sharein.id'}/…`}
+            aria-describedby={id('sharein-status')}
+          />
+          <button type="button" className="absolute right-1.5 top-1/2 min-h-[38px] -translate-y-1/2 rounded-[12px] bg-brand-purple/10 px-3 text-sm font-bold text-brand-purple hover:bg-brand-purple/20" onClick={() => pasteInto((v) => onChange({ sharein: v }))}>
+            Tempel
+          </button>
+        </div>
+        <div id={id('sharein-status')} aria-live="polite">
+          {!share ? (
+            <Status ok={null}>Unggah kontennya ke Sharein dulu, lalu tempel link-nya di sini.</Status>
+          ) : share.ok ? (
+            <Status ok>Link Sharein valid</Status>
+          ) : (
+            <Status ok={false}>
+              {share.reason === 'domain'
+                ? `Link harus dari ${rules?.sharein_domains.join(' atau ')}.`
+                : share.reason === 'no_path'
+                  ? 'Tempel link halaman konten, bukan beranda Sharein.'
+                  : share.reason === 'not_https'
+                    ? 'Link Sharein harus diawali https://.'
+                    : 'Link Sharein tidak terbaca. Salin ulang dari Sharein.'}
+            </Status>
+          )}
+        </div>
+      </div>
+
+      {result && (
+        failed.length === 0 ? (
+          <p className="flex items-center gap-2 rounded-field bg-green-50 px-3 py-2 text-sm font-bold text-green-900">
+            <CheckIcon /> Lolos semua cek{typeof qty?.remaining === 'number' ? ` · sisa kuota ${qty.remaining}` : ''}
+          </p>
+        ) : (
+          <ul className="space-y-1 rounded-field bg-red-50 px-3 py-2 text-sm text-bad">
+            {shown.map((c) => (
+              <li key={c.id} className="flex items-start gap-2">
+                <span className="mt-0.5"><CrossIcon /></span>
+                <span>{c.message}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </section>
+  )
+}
+
 export function SetorForm() {
   const [rules, setRules] = useState<Rules | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [name, setName] = useState('')
   const [wa, setWa] = useState('')
-  const [token, setToken] = useState('')
-  const [autoApproved, setAutoApproved] = useState(false)
   const me = useMe()
-  const [platform, setPlatform] = useState<Platform>('tiktok')
-  const [sourceUrl, setSourceUrl] = useState('')
-  const [likes, setLikes] = useState('')
-  const [comments, setComments] = useState('')
-  const [apiMetrics, setApiMetrics] = useState<{ likes: number; comments: number } | null>(null)
-  const [fetchingMetrics, setFetchingMetrics] = useState(false)
-  const [shareinUrl, setShareinUrl] = useState('')
+  const [items, setItems] = useState<Item[]>([FIRST_ITEM])
   const [organic, setOrganic] = useState(false)
   const [checked, setChecked] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
-  const [checks, setChecks] = useState<Check[] | null>(null)
+  const [results, setResults] = useState<ItemResult[] | null>(null)
   const [checkedKey, setCheckedKey] = useState('')
   const [busy, setBusy] = useState<'check' | 'send' | null>(null)
   const [formError, setFormError] = useState('')
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<{ saved: number; total: number; token: string; auto: boolean; failed: string[] } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -97,40 +288,44 @@ export function SetorForm() {
       .catch(() => setLoadError(true))
   }, [])
 
-  const rule = rules?.rules[platform]
-  const likesN = parseCount(likes)
-  const commentsN = parseCount(comments)
-  const parsed = sourceUrl.trim() ? parseSourceUrl(sourceUrl) : null
-  const detected = sourceUrl.trim() ? detectPlatform(sourceUrl) : null
-  const share = shareinUrl.trim() && rules ? checkShareinUrl(shareinUrl, rules.sharein_domains) : null
-  const prog = rules?.progress.find((p) => p.platform === platform)
-
-  useEffect(() => {
-    if (detected && detected !== platform) setPlatform(detected)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detected])
-
   const formKey = useMemo(
-    () => JSON.stringify([name.trim(), wa.trim(), platform, sourceUrl.trim(), likesN, commentsN, shareinUrl.trim(), organic, checked, file?.name ?? '', file?.size ?? 0]),
-    [name, wa, platform, sourceUrl, likesN, commentsN, shareinUrl, organic, checked, file],
+    () => JSON.stringify([name.trim(), wa.trim(), items.map((i) => [i.url.trim(), parseCount(i.likes), parseCount(i.comments), i.sharein.trim()]), organic, checked, file?.name ?? '', file?.size ?? 0]),
+    [name, wa, items, organic, checked, file],
   )
-  const canSend = checks !== null && checks.every((c) => c.pass) && checkedKey === formKey
+  const fresh = results !== null && checkedKey === formKey
+  const anyRedLink = items.some((i) => linkState(i.url).state === 'bad')
+  const canSend = fresh && !anyRedLink && results.every((r) => r.ok)
+  const globalFails = results ? Array.from(new Map(results.flatMap((r) => r.checks).filter((c) => !c.pass && GLOBAL_CHECKS.includes(c.id)).map((c) => [c.id, c])).values()) : []
+
+  const update = (key: number, patch: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...patch } : x)))
+
+  function addItem() {
+    const it = blankItem()
+    setItems((xs) => (xs.length >= MAX_ITEMS ? xs : [...xs, it]))
+    requestAnimationFrame(() => document.getElementById(`link-${it.key}`)?.focus())
+  }
 
   function payload() {
     return {
       submitter_name: name,
       whatsapp: wa,
-      platform,
-      source_url: sourceUrl,
-      sharein_url: shareinUrl,
-      likes: likesN,
-      comments: commentsN,
       organic_declared: organic,
       checked_declared: checked,
       has_screenshot: Boolean(file),
-      metrics_source: apiMetrics && apiMetrics.likes === likesN && apiMetrics.comments === commentsN ? 'api' : 'manual',
-      api_likes: apiMetrics?.likes ?? null,
-      api_comments: apiMetrics?.comments ?? null,
+      items: items.map((i) => {
+        const likes = parseCount(i.likes)
+        const comments = parseCount(i.comments)
+        return {
+          platform: detectPlatform(i.url) ?? 'tiktok',
+          source_url: i.url,
+          sharein_url: i.sharein,
+          likes,
+          comments,
+          metrics_source: i.api && i.api.likes === likes && i.api.comments === comments ? 'api' : 'manual',
+          api_likes: i.api?.likes ?? null,
+          api_comments: i.api?.comments ?? null,
+        }
+      }),
     }
   }
 
@@ -148,20 +343,16 @@ export function SetorForm() {
     }
     setBusy('check')
     try {
-      const res = await fetch('/api/submissions/check', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload()),
-      })
+      const res = await fetch('/api/submissions/batch/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload()) })
       const data = await res.json()
       if (!res.ok) {
         setFormError(data.error ?? 'Cek gagal. Coba lagi.')
-        setChecks(null)
+        setResults(null)
         return
       }
-      setChecks(data.checks)
+      setResults(data.items)
       setCheckedKey(formKey)
-      requestAnimationFrame(() => document.getElementById('hasil-cek')?.focus())
+      if (!data.ok) setFormError('Ada yang belum lolos. Perbaiki bagian yang merah lalu cek lagi.')
     } catch {
       setFormError('Tidak terhubung ke server. Periksa internet lalu coba lagi.')
     } finally {
@@ -177,50 +368,25 @@ export function SetorForm() {
       const fd = new FormData()
       fd.set('data', JSON.stringify(payload()))
       if (file) fd.set('screenshot', file)
-      const res = await fetch('/api/submissions', { method: 'POST', body: fd })
+      const res = await fetch('/api/submissions/batch', { method: 'POST', body: fd })
       const data = await res.json()
       if (res.ok && data.ok) {
         localStorage.setItem(NAME_KEY, name.trim())
-        if (data.token) setToken(data.token)
-        setAutoApproved(data.status === 'approved')
         toast('Terkirim')
-        setDone(true)
+        const failed = (data.results as { ok: boolean; checks?: Check[] }[]).flatMap((r, i) => (r.ok ? [] : [`Konten ${i + 1}: ${r.checks?.[0]?.message ?? 'gagal disimpan'}`]))
+        setDone({ saved: data.saved, total: items.length, token: data.token ?? '', auto: data.status === 'approved', failed })
         window.scrollTo({ top: 0 })
         return
       }
-      if (data.checks) {
-        setChecks(data.checks)
-        setCheckedKey('')
+      if (data.items) {
+        setResults(data.items)
+        setCheckedKey(formKey)
       }
       setFormError(data.error ?? 'Setoran belum bisa dikirim. Perbaiki poin yang merah lalu cek lagi.')
     } catch {
       setFormError('Tidak terhubung ke server. Periksa internet lalu coba lagi.')
     } finally {
       setBusy(null)
-    }
-  }
-
-  async function fetchMetrics() {
-    setFetchingMetrics(true)
-    try {
-      const res = await fetch('/api/metrics/fetch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: sourceUrl }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setApiMetrics({ likes: data.likes, comments: data.comments })
-        setLikes(formatNumber(data.likes))
-        setComments(formatNumber(data.comments))
-        toast('Angka terisi otomatis')
-      } else {
-        toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
-      }
-    } catch {
-      toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
-    } finally {
-      setFetchingMetrics(false)
     }
   }
 
@@ -241,18 +407,13 @@ export function SetorForm() {
   }
 
   function reset() {
-    setSourceUrl('')
-    setLikes('')
-    setComments('')
-    setShareinUrl('')
+    setItems([blankItem()])
     setOrganic(false)
     setChecked(false)
     setFile(null)
-    setApiMetrics(null)
-    setChecks(null)
+    setResults(null)
     setCheckedKey('')
-    setDone(false)
-    setToken('')
+    setDone(null)
     fetch('/api/rules').then((r) => r.json()).then(setRules).catch(() => {})
   }
 
@@ -262,12 +423,17 @@ export function SetorForm() {
         <div className="bounce-once mx-auto mt-2 w-fit">
           <GiftSolid className="h-24 w-24" />
         </div>
-        <h2 className="mt-4 text-2xl font-extrabold">Setoran terkirim</h2>
-        <p className="muted mx-auto mt-2 max-w-sm">{autoApproved ? 'Setoranmu sudah disetujui otomatis.' : 'Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.'}</p>
-        {token && <PantauCard token={token} />}
+        <h2 className="mt-4 text-2xl font-extrabold">{done.saved === 1 ? 'Setoran terkirim' : `${done.saved} setoran terkirim`}</h2>
+        <p className="muted mx-auto mt-2 max-w-sm">{done.auto ? 'Setoranmu sudah disetujui otomatis.' : 'Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.'} Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
+        {done.failed.length > 0 && (
+          <ul className="mx-auto mt-3 max-w-sm rounded-field bg-red-50 p-3 text-left text-sm text-bad">
+            {done.failed.map((f) => <li key={f}>{f}</li>)}
+          </ul>
+        )}
+        {done.token && <PantauCard token={done.token} />}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button type="button" className="btn-primary" onClick={reset}>Setor lagi</button>
-          {!token && <Link href="/pantau" className="btn-ghost">Pantau setoranku</Link>}
+          {!done.token && <Link href="/pantau" className="btn-ghost">Pantau setoranku</Link>}
         </div>
       </div>
     )
@@ -284,7 +450,7 @@ export function SetorForm() {
   }
 
   const closed = rules && !rules.period_open
-  const full = prog && prog.remaining === 0
+  const quota = (p: Platform) => rules?.progress.find((x) => x.platform === p)
 
   return (
     <form
@@ -320,158 +486,33 @@ export function SetorForm() {
             <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>
           </div>
         </div>
-        <fieldset>
-          <legend className="label">Platform asal</legend>
-          <div className="grid grid-cols-2 gap-1 rounded-field bg-brand-lavender p-1" role="radiogroup">
-            {(['tiktok', 'reels'] as Platform[]).map((p) => (
-              <label key={p} className={`flex min-h-[44px] cursor-pointer items-center justify-center rounded-[12px] text-sm font-bold transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-brand-violet ${platform === p ? 'bg-brand-purple text-white' : 'text-brand-purple hover:bg-white'}`}>
-                <input type="radio" name="platform" value={p} checked={platform === p} onChange={() => setPlatform(p)} className="sr-only" />
-                {p === 'tiktok' ? 'TikTok' : 'Instagram Reels'}
-              </label>
-            ))}
-          </div>
-          <p className={`mt-1.5 min-h-[1.25rem] text-sm ${full ? 'font-bold text-bad' : 'muted'}`}>
-            {prog ? (full ? `Target ${platform === 'tiktok' ? 'TikTok' : 'Reels'} periode ini sudah terpenuhi (${prog.used}/${prog.target}).` : `Sisa kuota ${prog.remaining} dari ${prog.target}.`) : 'Memuat kuota…'}
-          </p>
-        </fieldset>
+        <p className="muted min-h-[1.25rem] text-sm">
+          {rules ? `Sisa kuota: TikTok ${quota('tiktok')?.remaining ?? 0} · Reels ${quota('reels')?.remaining ?? 0}` : 'Memuat kuota…'}
+        </p>
+        <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
       </section>
 
-      <section className="panel-solid space-y-5" aria-labelledby="konten">
-        <PillLabel id="konten">1 · Link konten asal</PillLabel>
-        <div>
-          <label htmlFor="link-asal" className="label">{platform === 'tiktok' ? 'Link TikTok' : 'Link Instagram Reels'}</label>
-          <div className="relative">
-            <input
-              id="link-asal"
-              className="field pr-24"
-              inputMode="url"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder={platform === 'tiktok' ? 'https://www.tiktok.com/@akun/video/…' : 'https://www.instagram.com/reel/…'}
-              aria-describedby="link-asal-status"
-            />
-            <button type="button" className="absolute right-1.5 top-1/2 min-h-[38px] -translate-y-1/2 rounded-[12px] bg-brand-purple/10 px-3 text-sm font-bold text-brand-purple hover:bg-brand-purple/20" onClick={() => pasteInto(setSourceUrl)}>
-              Tempel
-            </button>
-          </div>
-          <div id="link-asal-status" aria-live="polite">
-            {!sourceUrl.trim() ? (
-              <Status ok={null}>
-                Salin dari tombol Bagikan → Salin tautan.{' '}
-                <a href="/#panduan" className="font-bold text-brand-purple underline underline-offset-2">Lihat panduan bergambar</a>
-              </Status>
-            ) : typeof parsed === 'string' || !parsed ? (
-              <Status ok={false}>
-                {parsed === 'not_https' ? 'Link harus diawali https://.' : 'Link ini bukan dari TikTok atau Instagram Reels. Tempel link dari tombol Bagikan.'}
-              </Status>
-            ) : parsed.short ? (
-              <Status ok={null}>Link pendek {parsed.platform === 'tiktok' ? 'TikTok' : 'Instagram'} terdeteksi. Server akan membukanya saat kamu menekan Cek setoran.</Status>
-            ) : (
-              <Status ok>Link valid · {parsed.platform === 'tiktok' ? 'TikTok' : 'Instagram Reels'}</Status>
-            )}
-          </div>
-          {sourceUrl.trim() && typeof parsed !== 'string' && parsed && (
-            <a href={parsed.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-4">
-              Buka link untuk cek angka
-            </a>
-          )}
-        </div>
-      </section>
+      {items.map((it, i) => (
+        <ContentCard
+          key={it.key}
+          item={it}
+          index={i}
+          total={items.length}
+          rules={rules}
+          result={fresh ? results![i] : null}
+          onChange={(p) => update(it.key, p)}
+          onRemove={() => setItems((xs) => xs.filter((x) => x.key !== it.key))}
+        />
+      ))}
 
-      <section className="panel-solid space-y-4" aria-labelledby="angka">
-        <PillLabel id="angka">2 · Angka hasil cek manual</PillLabel>
-        {rules?.metrics_adapter !== 'off' && rules && (
-          <button type="button" className="btn-ghost btn-sm" disabled={fetchingMetrics || !sourceUrl.trim()} onClick={fetchMetrics}>
-            {fetchingMetrics ? 'Mengambil angka…' : 'Ambil angka otomatis'}
-          </button>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { id: 'like', label: 'Like', value: likes, set: setLikes, n: likesN, min: rule?.min_like },
-            { id: 'komentar', label: 'Komentar', value: comments, set: setComments, n: commentsN, min: rule?.min_comment },
-          ].map((f) => (
-            <div key={f.id}>
-              <label htmlFor={f.id} className="label">{f.label}</label>
-              <input
-                id={f.id}
-                className="field tabular-nums"
-                inputMode="numeric"
-                autoComplete="off"
-                value={f.value}
-                placeholder={f.min ? formatNumber(f.min) : ''}
-                onChange={(e) => f.set(e.target.value.replace(/[^\d.,rbkjtRBKJT ]/g, ''))}
-                onBlur={() => {
-                  const n = parseCount(f.value)
-                  if (n !== null) f.set(formatNumber(n))
-                }}
-                aria-describedby={`${f.id}-status`}
-              />
-              <div id={`${f.id}-status`} aria-live="polite">
-                {f.min === undefined ? (
-                  <Status ok={null}>Memuat batas…</Status>
-                ) : !f.value.trim() ? (
-                  <Status ok={null}>Minimal {formatNumber(f.min)}</Status>
-                ) : f.n === null ? (
-                  <Status ok={false}>Tulis angka saja, contoh 120000.</Status>
-                ) : f.n >= f.min ? (
-                  <Status ok>Memenuhi (≥ {formatNumber(f.min)})</Status>
-                ) : (
-                  <Status ok={false}>Kurang {formatNumber(f.min - f.n)} dari {formatNumber(f.min)}</Status>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-solid space-y-4" aria-labelledby="sharein">
-        <PillLabel id="sharein">3 · Link hasil unggah Sharein</PillLabel>
-        <div>
-          <label htmlFor="link-sharein" className="label">Link Sharein</label>
-          <div className="relative">
-            <input
-              id="link-sharein"
-              className="field pr-24"
-              inputMode="url"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={shareinUrl}
-              onChange={(e) => setShareinUrl(e.target.value)}
-              placeholder={`https://${rules?.sharein_domains[0] ?? 'sharein.id'}/…`}
-              aria-describedby="sharein-status"
-            />
-            <button type="button" className="absolute right-1.5 top-1/2 min-h-[38px] -translate-y-1/2 rounded-[12px] bg-brand-purple/10 px-3 text-sm font-bold text-brand-purple hover:bg-brand-purple/20" onClick={() => pasteInto(setShareinUrl)}>
-              Tempel
-            </button>
-          </div>
-          <div id="sharein-status" aria-live="polite">
-            {!share ? (
-              <Status ok={null}>Unggah kontennya ke Sharein dulu, lalu tempel link-nya di sini.</Status>
-            ) : share.ok ? (
-              <Status ok>Link Sharein valid</Status>
-            ) : (
-              <Status ok={false}>
-                {share.reason === 'domain'
-                  ? `Link harus dari ${rules?.sharein_domains.join(' atau ')}.`
-                  : share.reason === 'no_path'
-                    ? 'Tempel link halaman konten, bukan beranda Sharein.'
-                    : share.reason === 'not_https'
-                      ? 'Link Sharein harus diawali https://.'
-                      : 'Link Sharein tidak terbaca. Salin ulang dari Sharein.'}
-              </Status>
-            )}
-          </div>
-        </div>
-      </section>
+      <button type="button" className="btn-ghost w-full" onClick={addItem} disabled={items.length >= MAX_ITEMS}>
+        {items.length >= MAX_ITEMS ? `Sudah maksimal ${MAX_ITEMS} konten` : `+ Tambah konten (${items.length}/${MAX_ITEMS})`}
+      </button>
 
       <section className="panel-solid space-y-3" aria-labelledby="pernyataan">
         <PillLabel id="pernyataan">Pernyataan</PillLabel>
         {[
-          { id: 'organik', v: organic, set: setOrganic, t: `Konten ini muncul organik di ${platform === 'tiktok' ? 'FYP TikTok' : 'Beranda Reels'} saya.` },
+          { id: 'organik', v: organic, set: setOrganic, t: 'Konten ini muncul organik di FYP TikTok / Beranda Reels saya.' },
           { id: 'sudah-cek', v: checked, set: setChecked, t: 'Saya sudah membuka link dan memeriksa angkanya.' },
         ].map((c) => (
           <label key={c.id} htmlFor={c.id} className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-field bg-brand-lavender/70 p-3">
@@ -493,31 +534,17 @@ export function SetorForm() {
             aria-describedby="ss-status"
           />
           <div id="ss-status">
-            {fileError ? <Status ok={false}>{fileError}</Status> : file ? <Status ok>{file.name}</Status> : <Status ok={null}>JPG/PNG/WebP, maksimal 2 MB.</Status>}
+            {fileError ? <Status ok={false}>{fileError}</Status> : file ? <Status ok>{file.name}</Status> : <Status ok={null}>Satu gambar untuk semua konten di setoran ini. JPG/PNG/WebP, maksimal 2 MB.</Status>}
           </div>
         </div>
       </section>
 
-      {checks && (
-        <section id="hasil-cek" tabIndex={-1} className="panel-solid outline-none" aria-labelledby="hasil">
-          <PillLabel id="hasil">Hasil cek</PillLabel>
-          <ul className="mt-4 space-y-2.5">
-            {checks.map((c) => (
-              <li key={c.id} className="flex items-start gap-3">
-                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white ${c.pass ? 'bg-ok' : 'bg-bad'}`}>
-                  {c.pass ? <CheckIcon className="h-3.5 w-3.5" /> : <CrossIcon className="h-3.5 w-3.5" />}
-                </span>
-                <span>
-                  <span className="font-bold">{CHECK_LABEL[c.id]}</span>
-                  {c.pass && c.id === 'qty_available' && typeof c.remaining === 'number' && <span className="muted"> · sisa {c.remaining}</span>}
-                  {!c.pass && c.message && <span className="block text-sm text-bad">{c.message}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {checks.every((c) => c.pass) && checkedKey !== formKey && <p className="mt-3 text-sm font-bold text-warn">Ada perubahan setelah dicek. Tekan Cek setoran lagi.</p>}
-        </section>
+      {fresh && globalFails.length > 0 && (
+        <ul className="space-y-1 rounded-field bg-red-50 p-3 text-sm text-bad" role="alert">
+          {globalFails.map((c) => <li key={c.id}>{c.message}</li>)}
+        </ul>
       )}
+      {results && !fresh && <p className="text-center text-sm font-bold text-amber-800">Ada perubahan setelah dicek. Tekan Cek setoran lagi.</p>}
 
       {formError && (
         <p role="alert" className="rounded-field bg-red-50 p-3 text-sm font-bold text-bad">
@@ -530,12 +557,12 @@ export function SetorForm() {
           {busy === 'check' ? 'Mengecek…' : 'Cek setoran'}
         </button>
         <button type="button" className="btn-primary" onClick={send} disabled={!canSend || busy !== null || Boolean(closed)} aria-describedby={canSend ? undefined : 'kirim-hint'}>
-          {busy === 'send' ? 'Mengirim…' : 'Kirim setoran'}
+          {busy === 'send' ? 'Mengirim…' : items.length > 1 ? `Kirim ${items.length} setoran` : 'Kirim setoran'}
         </button>
       </div>
       {!canSend && (
         <p id="kirim-hint" className="muted -mt-2 text-center text-xs">
-          Tombol Kirim setoran aktif setelah semua cek lolos.
+          {anyRedLink ? 'Ada link yang merah. Perbaiki atau hapus dulu sebelum mengirim.' : 'Tombol Kirim setoran aktif setelah semua cek lolos.'}
         </p>
       )}
     </form>

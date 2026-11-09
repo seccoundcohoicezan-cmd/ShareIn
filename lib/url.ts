@@ -12,6 +12,8 @@ export interface ParsedLink {
 
 export type ParseError = 'invalid' | 'not_https' | 'unsupported'
 
+export const LINK_RULE_MESSAGE = 'Link harus dari tiktok.com atau instagram.com/reel/. Tempel link dari tombol Bagikan.'
+
 function toUrl(input: string): URL | null {
   const trimmed = input.trim()
   if (!trimmed) return null
@@ -36,7 +38,7 @@ export function isTikTokHost(host: string) {
   return hostMatches(host, 'tiktok.com')
 }
 export function isInstagramHost(host: string) {
-  return hostMatches(host, 'instagram.com') || hostMatches(host, 'instagr.am')
+  return hostMatches(host, 'instagram.com')
 }
 
 function stripTracking(u: URL): URL {
@@ -75,17 +77,9 @@ export function parseSourceUrl(input: string): ParsedLink | ParseError {
   }
 
   if (isInstagramHost(host)) {
-    const m = path.match(/^(?:\/[A-Za-z0-9._]+)?\/(reel|reels|p)\/([A-Za-z0-9_-]{5,40})$/)
-    if (m) {
-      return {
-        platform: 'reels',
-        url: `https://www.instagram.com/${m[1] === 'p' ? 'p' : 'reel'}/${m[2]}/`,
-        source_key: `ig:${m[2]}`,
-        short: false,
-      }
-    }
-    const share = path.match(/^\/share\/(?:reel\/)?([A-Za-z0-9_-]+)$/)
-    if (share) return { platform: 'reels', url: stripTracking(u).toString(), source_key: null, short: true }
+    // Reels only: /reel/<code>, also /reels/<code> and /<account>/reel/<code>. Posts (/p/) are refused.
+    const m = path.match(/^(?:\/(?!share\/)[A-Za-z0-9._]+)?\/(?:reel|reels)\/([A-Za-z0-9_-]{5,40})$/)
+    if (m) return { platform: 'reels', url: `https://www.instagram.com/reel/${m[1]}/`, source_key: `ig:${m[1]}`, short: false }
     return 'unsupported'
   }
 

@@ -27,8 +27,9 @@ describe('parseSourceUrl', () => {
       const r = parseSourceUrl(u)
       expect(r).toEqual({ platform: 'reels', url: 'https://www.instagram.com/reel/C1aBcD2eFgH/', source_key: 'ig:C1aBcD2eFgH', short: false })
     }
-    const p = parseSourceUrl('https://www.instagram.com/p/C1aBcD2eFgH/')
-    expect(typeof p !== 'string' && p.source_key).toBe('ig:C1aBcD2eFgH')
+    // Example link from the campaign owner, with tracking parameters.
+    const real = parseSourceUrl('https://www.instagram.com/reel/DeDMIOTB2WD/?utm_source=ig_web_copy_link&dlrf=NTc4MTIwNjQ2YQ==')
+    expect(typeof real !== 'string' && real.source_key).toBe('ig:DeDMIOTB2WD')
   })
   it('rejects http, other domains, look-alike hosts and profile pages', () => {
     expect(parseSourceUrl('http://www.tiktok.com/@a/video/7300000000000000000')).toBe('not_https')
@@ -38,6 +39,10 @@ describe('parseSourceUrl', () => {
     expect(parseSourceUrl('https://www.instagram.com/akun/')).toBe('unsupported')
     expect(parseSourceUrl('javascript:alert(1)')).toBe('invalid')
     expect(parseSourceUrl('')).toBe('invalid')
+  })
+  it('only tiktok.com and instagram.com/reel/ are allowed', () => {
+    for (const u of ['https://www.instagram.com/p/C1aBcD2eFgH/', 'https://www.instagram.com/share/reel/BAabc123/', 'https://instagr.am/reel/C1aBcD2eFgH/', 'https://www.instagram.com/stories/a/123', 'https://www.tiktok.com/@akun', 'https://sharein.id/c/abc', 'https://facebook.com/reel/123'])
+      expect(parseSourceUrl(u)).toBe('unsupported')
   })
   it('accepts links pasted without scheme', () => {
     const r = parseSourceUrl('www.tiktok.com/@a/video/7300000000000000001')

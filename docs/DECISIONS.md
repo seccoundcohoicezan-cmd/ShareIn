@@ -68,3 +68,11 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 35 | Hadiah hanya di Golden Ticket. Spin wheel (halaman admin, API, tab `draws`, pengaturan hadiah) dihapus; Pelatihan & Duta tetap memberi kode tugas sebagai tanda terkumpul. | Permintaan pengguna. Belum ada data undian di spreadsheet saat dihapus. |
 | 36 | Setujui otomatis per program (`auto_approve_golden/pelatihan/duta`, bawaan mati). Hanya berlaku untuk setoran baru; `reviewed_by` = `otomatis`. Golden Ticket tetap harus lolos semua cek server. | Permintaan pengguna. |
 | 37 | API Golden Ticket hanya-baca di `/api/v1/goldenticket/*`, memakai kunci yang dibuat owner; tersimpan hanya hash SHA-256. Data memuat nomor WhatsApp, jadi harus dipanggil dari server. | "Tarik ke sistem lain". Menulis lewat API tidak diminta. |
+
+## Putaran 9 (9 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 38 | Link konten hanya dari `tiktok.com` atau `instagram.com/reel/` (juga `/reels/` dan `/<akun>/reel/`). Instagram `/p/` dan `/share/` ditolak; kolom langsung merah dan tombol kirim mati. | Permintaan pengguna. |
+| 39 | Link pendek TikTok `vt.`/`vm.tiktok.com` tetap diterima dan dibuka server menjadi link `www.tiktok.com`. | Tombol Salin Tautan di aplikasi TikTok HP menghasilkan link ini; menolaknya membuat panduan tidak bisa diikuti. |
+| 40 | Setor sampai 10 konten sekali kirim. Platform dideteksi per link (pilihan platform dihapus). Nama, WhatsApp, pernyataan, dan satu tangkapan layar berlaku untuk semua. Bila satu konten gagal cek, tidak ada yang disimpan. | Permintaan pengguna. Satu tangkapan layar menjaga unggahan di bawah batas 4,5 MB Vercel. |
