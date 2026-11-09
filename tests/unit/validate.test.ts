@@ -4,7 +4,7 @@ import type { Platform } from '@/lib/types'
 import { parseSourceUrl } from '@/lib/url'
 import { runChecks, type CheckInput } from '@/lib/validate'
 
-const settings = parseSettings(new Map([['qty_tiktok', '20'], ['qty_reels', '15']]))
+const settings = parseSettings(new Map())
 const links: Record<Platform, ReturnType<typeof parseSourceUrl>> = {
   tiktok: parseSourceUrl('https://www.tiktok.com/@a/video/7300000000000000000'),
   reels: parseSourceUrl('https://www.instagram.com/reel/C1aBcD2eFgH/'),
@@ -24,7 +24,7 @@ function input(p: Platform, over: Partial<CheckInput> = {}): CheckInput {
 }
 
 function check(p: Platform, over: Partial<CheckInput> = {}, ctx: Partial<Parameters<typeof runChecks>[1]> = {}) {
-  return runChecks(input(p, over), { settings, link: links[p], duplicate: null, used: 0, ...ctx })
+  return runChecks(input(p, over), { settings, link: links[p], duplicate: null, ...ctx })
 }
 const byId = (r: ReturnType<typeof check>, id: string) => r.checks.find((c) => c.id === id)!
 
@@ -32,8 +32,7 @@ describe('runChecks', () => {
   it('returns the documented check ids in order on success', () => {
     const r = check('tiktok')
     expect(r.ok).toBe(true)
-    expect(r.checks.map((c) => c.id)).toEqual(['url_valid', 'not_duplicate', 'min_like', 'min_comment', 'sharein_valid', 'qty_available', 'organic'])
-    expect(byId(r, 'qty_available').remaining).toBe(20)
+    expect(r.checks.map((c) => c.id)).toEqual(['url_valid', 'not_duplicate', 'min_like', 'min_comment', 'sharein_valid', 'organic'])
   })
   it.each(['tiktok', 'reels'] as const)('likes threshold is inclusive (%s): 99.999 rejected, 100.000 accepted', (p) => {
     expect(byId(check(p, { likes: 99999 }), 'min_like').pass).toBe(false)
@@ -48,7 +47,6 @@ describe('runChecks', () => {
   it('uses the documented messages', () => {
     expect(byId(check('tiktok', { likes: 80000 }), 'min_like').message).toBe('Like 80.000 belum cukup. TikTok minimal 100.000.')
     expect(byId(check('reels', { comments: 2000 }), 'min_comment').message).toBe('Komentar 2.000 belum cukup. Reels minimal 3.000.')
-    expect(byId(check('tiktok', {}, { used: 20 }), 'qty_available').message).toBe('Target TikTok periode ini sudah terpenuhi (20/20).')
     expect(byId(check('tiktok', { sharein_url: '' }), 'sharein_valid').message).toBe('Unggah kontennya ke ShareIn dulu, lalu tempel link-nya di sini.')
     expect(byId(check('tiktok', {}, { duplicate: { created_at: '2026-11-03T05:00:00Z' } }), 'not_duplicate').message).toBe(
       'Link ini sudah pernah disetor pada 3 Nov. Cari konten lain.',
@@ -56,12 +54,12 @@ describe('runChecks', () => {
   })
   it('reads thresholds from settings, not code', () => {
     const custom = parseSettings(new Map([['min_like_tiktok', '50000']]))
-    const r = runChecks(input('tiktok', { likes: 60000 }), { settings: custom, link: links.tiktok, duplicate: null, used: 0 })
+    const r = runChecks(input('tiktok', { likes: 60000 }), { settings: custom, link: links.tiktok, duplicate: null })
     expect(byId(r, 'min_like').pass).toBe(true)
   })
   it('blocks when the period is closed', () => {
     const closed = parseSettings(new Map([['period_open', 'FALSE']]))
-    const r = runChecks(input('tiktok'), { settings: closed, link: links.tiktok, duplicate: null, used: 0 })
+    const r = runChecks(input('tiktok'), { settings: closed, link: links.tiktok, duplicate: null })
     expect(r.ok).toBe(false)
     expect(r.checks[0].id).toBe('period_open')
   })
@@ -75,7 +73,7 @@ describe('runChecks', () => {
     expect(byId(check('tiktok', { organic_declared: false }), 'organic').pass).toBe(false)
     expect(byId(check('tiktok', { checked_declared: false }), 'organic').pass).toBe(false)
     const strict = parseSettings(new Map([['require_screenshot', 'TRUE']]))
-    const base = { link: links.tiktok, duplicate: null, used: 0 }
+    const base = { link: links.tiktok, duplicate: null }
     expect(byId(runChecks(input('tiktok'), { settings: strict, ...base }), 'organic').pass).toBe(false)
     expect(byId(runChecks(input('tiktok', { has_screenshot: true }), { settings: strict, ...base }), 'organic').pass).toBe(true)
   })

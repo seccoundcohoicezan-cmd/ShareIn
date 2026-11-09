@@ -76,3 +76,10 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 38 | Link konten hanya dari `tiktok.com` atau `instagram.com/reel/` (juga `/reels/` dan `/<akun>/reel/`). Instagram `/p/` dan `/share/` ditolak; kolom langsung merah dan tombol kirim mati. | Permintaan pengguna. |
 | 39 | Link pendek TikTok `vt.`/`vm.tiktok.com` tetap diterima dan dibuka server menjadi link `www.tiktok.com`. | Tombol Salin Tautan di aplikasi TikTok HP menghasilkan link ini; menolaknya membuat panduan tidak bisa diikuti. |
 | 40 | Setor sampai 10 konten sekali kirim. Platform dideteksi per link (pilihan platform dihapus). Nama, WhatsApp, pernyataan, dan satu tangkapan layar berlaku untuk semua. Bila satu konten gagal cek, tidak ada yang disimpan. | Permintaan pengguna. Satu tangkapan layar menjaga unggahan di bawah batas 4,5 MB Vercel. |
+
+## Putaran 10 (9 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 41 | Golden Ticket tanpa target/QTY ("banyak-banyakan"): pengaturan QTY, cek kuota, dan progres dihapus. Pengganti progres: jumlah link terkumpul. | Permintaan pengguna. |
+| 42 | `/goldenticket` menampilkan link terkumpul (menunggu + disetujui), terbaru dulu, nama disingkat, tanpa nomor WA. Pemutar resmi hanya dimuat saat "Putar di sini" ditekan. | Permintaan pratinjau; memuat banyak iframe sekaligus membuat halaman berat. |

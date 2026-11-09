@@ -3,8 +3,6 @@ import type { MetricsAdapterMode, Platform, Settings } from './types'
 export const SETTING_KEYS = [
   'period_id',
   'period_open',
-  'qty_tiktok',
-  'qty_reels',
   'min_like_tiktok',
   'min_comment_tiktok',
   'min_like_reels',
@@ -29,8 +27,6 @@ export type SettingKey = (typeof SETTING_KEYS)[number]
 export const SEED_SETTINGS: Record<SettingKey, string> = {
   period_id: currentWeekId(new Date()),
   period_open: 'TRUE',
-  qty_tiktok: '20',
-  qty_reels: '15',
   min_like_tiktok: '100000',
   min_comment_tiktok: '5000',
   min_like_reels: '100000',
@@ -66,8 +62,6 @@ export function parseSettings(raw: Map<string, string>): Settings {
   return {
     period_id: get('period_id').trim() || SEED_SETTINGS.period_id,
     period_open: toBool(get('period_open')),
-    qty_tiktok: toInt(get('qty_tiktok'), 0),
-    qty_reels: toInt(get('qty_reels'), 0),
     min_like_tiktok: toInt(get('min_like_tiktok'), 100000),
     min_comment_tiktok: toInt(get('min_comment_tiktok'), 5000),
     min_like_reels: toInt(get('min_like_reels'), 100000),
@@ -99,8 +93,6 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
   return {
     period_id: s.period_id,
     period_open: s.period_open ? 'TRUE' : 'FALSE',
-    qty_tiktok: String(s.qty_tiktok),
-    qty_reels: String(s.qty_reels),
     min_like_tiktok: String(s.min_like_tiktok),
     min_comment_tiktok: String(s.min_comment_tiktok),
     min_like_reels: String(s.min_like_reels),
@@ -125,9 +117,6 @@ export function minLike(s: Settings, p: Platform) {
 }
 export function minComment(s: Settings, p: Platform) {
   return p === 'tiktok' ? s.min_comment_tiktok : s.min_comment_reels
-}
-export function qtyTarget(s: Settings, p: Platform) {
-  return p === 'tiktok' ? s.qty_tiktok : s.qty_reels
 }
 
 /** ISO week id such as 2026-11-W1 (week of month, Monday based). */

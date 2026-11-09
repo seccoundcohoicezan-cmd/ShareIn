@@ -87,7 +87,7 @@ export default async function AturanPage() {
           <li>Link konten wajib dari <b>tiktok.com</b> atau <b>instagram.com/reel/</b>. Link lain ditolak.</li>
           <li>Makin banyak konten yang kamu submit, makin besar peluang rewardmu. Sekali kirim bisa sampai 10 konten.</li>
           <li>Satu konten hanya boleh disetor satu kali di seluruh periode. Link yang sama akan ditolak sebagai duplikat.</li>
-          <li>Setiap platform punya target jumlah (QTY) per periode. Setoran ditutup otomatis saat target terpenuhi.</li>
+          <li>Tidak ada batas jumlah setoran. Link yang disetor tampil di halaman Golden Ticket dengan nama singkat, misalnya Rina U.</li>
           {settings.require_screenshot && <li>Periode ini <b>wajib</b> melampirkan tangkapan layar konten saat muncul di FYP/Beranda.</li>}
           <li>Admin memeriksa setiap setoran. Status disetujui/ditolak bisa kamu pantau di link pantau unikmu (halaman Pantau).</li>
         </ol>

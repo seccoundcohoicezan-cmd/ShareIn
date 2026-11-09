@@ -7,7 +7,7 @@ import { getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 import { listSubmissionsFresh } from '@/lib/repo/submissions'
 import { SheetsStore, type SheetsClient } from '@/lib/repo/sheets-store'
 import type { Row, TableName, TableStore } from '@/lib/repo/store'
-import { checkBatch, checkSubmission, createBatch, createSubmission, batchSchema, getProgress, listMine, type SubmissionInput } from '@/lib/service'
+import { checkBatch, checkSubmission, createBatch, createSubmission, batchSchema, collectedFeed, getProgress, type SubmissionInput } from '@/lib/service'
 import { FakeSheets } from './fake-sheets'
 import { AppsScriptStore } from '@/lib/repo/apps-script-store'
 import { createAppsScriptSim } from './apps-script-sim'
@@ -29,11 +29,6 @@ function input(over: Partial<SubmissionInput> = {}): SubmissionInput {
     metrics_source: 'manual',
     ...over,
   }
-}
-
-async function setQty(tiktok: number, reels = 15) {
-  const s = await getSettingsFresh()
-  await saveSettings({ ...s, qty_tiktok: tiktok, qty_reels: reels })
 }
 
 describe.each([
@@ -66,21 +61,16 @@ describe.each([
     expect(!again.ok && again.checks.map((c) => c.id)).toContain('not_duplicate')
   })
 
-  it('two people submitting at once with 1 slot left: only one gets in', async () => {
-    await setQty(1)
-    const [a, b] = await Promise.all([createSubmission(input()), createSubmission(input({ submitter_name: 'Budi' }))])
-    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1)
-    const loser = a.ok ? b : a
-    expect(!loser.ok && loser.checks[0].id).toBe('qty_available')
-    expect((await listSubmissionsFresh()).filter((s) => s.status === 'pending')).toHaveLength(1)
+  it('no target: people submitting at once all get in, far beyond the old limits', async () => {
+    const results = await Promise.all(Array.from({ length: 30 }, (_, i) => createSubmission(input({ submitter_name: `Orang ${i}` }))))
+    expect(results.every((r) => r.ok)).toBe(true)
+    expect((await getProgress()).progress.find((p) => p.platform === 'tiktok')).toMatchObject({ used: 30 })
   })
 
-  it('admin changes QTY 20 → 25 and public progress follows', async () => {
-    await setQty(20)
-    await createSubmission(input())
-    expect((await getProgress()).progress.find((p) => p.platform === 'tiktok')).toMatchObject({ used: 1, target: 20 })
-    await setQty(25)
-    expect((await getProgress()).progress.find((p) => p.platform === 'tiktok')).toMatchObject({ used: 1, target: 25 })
+  it('two people submitting the same link at once: only one gets in', async () => {
+    const i = input()
+    const [a, b] = await Promise.all([createSubmission(i), createSubmission({ ...i, submitter_name: 'Budi' })])
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1)
   })
 
   it('closed period blocks check and submit', async () => {
@@ -91,7 +81,6 @@ describe.each([
   })
 
   it('batch: up to 10 saved in one go with the same identity', async () => {
-    await setQty(20)
     const items = Array.from({ length: 10 }, () => input())
     const r = await createBatch(items)
     expect(r.ok).toBe(true)
@@ -122,15 +111,6 @@ describe.each([
     expect((await listSubmissionsFresh()).map((s) => s.platform)).toEqual(['tiktok', 'reels'])
   })
 
-  it('batch: the quota the list itself uses counts', async () => {
-    await setQty(2)
-    const r = await createBatch([input(), input(), input()])
-    expect(r.ok).toBe(false)
-    if (r.ok) throw new Error('expected failure')
-    expect(r.items.map((i) => i.ok)).toEqual([true, true, false])
-    expect(r.items[2].checks.find((c) => c.id === 'qty_available')?.pass).toBe(false)
-  })
-
   it('auto-approve on: valid submission is approved by the system, invalid is still refused', async () => {
     const s = await getSettingsFresh()
     await saveSettings({ ...s, auto_approve_golden: true })
@@ -141,17 +121,18 @@ describe.each([
     expect((await listSubmissionsFresh()).length).toBe(1)
   })
 
-  it('rejecting frees a QTY slot; history by name hides other people', async () => {
-    await setQty(1)
-    const a = await createSubmission(input())
-    expect((await createSubmission(input({ submitter_name: 'Budi' }))).ok).toBe(false)
-    if (!a.ok) throw new Error('expected ok')
-    await review([a.submission.id], 'reject', 'Bukan dari FYP', 'admin@x.id')
-    expect((await createSubmission(input({ submitter_name: 'Budi' }))).ok).toBe(true)
-    const mine = await listMine('  rina ')
-    expect(mine).toHaveLength(1)
-    expect(mine[0]).toMatchObject({ status: 'rejected', reject_reason: 'Bukan dari FYP' })
-    expect(Object.keys(mine[0])).not.toContain('submitter_name')
+  it('public feed: newest first, shortened names, no WhatsApp, rejected links hidden', async () => {
+    const a = await createSubmission(input({ submitter_name: 'Rina Utami Sari' }))
+    const b = await createSubmission(input({ submitter_name: 'Budi' }))
+    const c = await createSubmission(input({ submitter_name: 'Citra', platform: 'reels', source_url: 'https://www.instagram.com/reel/DeDMIOTB2WD/', comments: 3000 }))
+    if (!a.ok || !b.ok || !c.ok) throw new Error('expected ok')
+    await review([b.submission.id], 'reject', 'Bukan dari FYP', 'admin@x.id')
+    const feed = await collectedFeed()
+    expect(feed).toMatchObject({ total: 2, tiktok: 1, reels: 1 })
+    expect(feed.items.map((i) => i.name).sort()).toEqual(['Citra', 'Rina U.'])
+    expect(JSON.stringify(feed)).not.toContain('628')
+    expect(JSON.stringify(feed)).not.toContain('Utami')
+    expect((await collectedFeed(1, 12)).items).toHaveLength(1)
   })
 })
 
@@ -180,29 +161,6 @@ describe('cross-instance race (append-then-verify)', () => {
     const rows = await listSubmissionsFresh()
     expect(rows.map((s) => s.status)).toEqual(['pending', 'void'])
   })
-
-  it('voids our row when the competing instance used the last QTY slot', async () => {
-    const store = new RacingStore(null)
-    setStore(store)
-    await setQty(1)
-    // Competing row is for different content: patch its source key after the fact.
-    const orig = store.append.bind(store)
-    store.append = async (table, rows) => {
-      if (table === 'submissions' && !store.raced) {
-        store.raced = true
-        const other = [...rows[0]]
-        other[0] = 'sub_other'
-        other[6] = 'tt:999'
-        await LocalStore.prototype.append.call(store, table, [other])
-      }
-      return LocalStore.prototype.append.call(store, table, rows)
-    }
-    void orig
-    const r = await createSubmission(input())
-    expect(r.ok).toBe(false)
-    expect(!r.ok && r.checks[0].id).toBe('qty_available')
-    expect((await listSubmissionsFresh()).filter((s) => s.status === 'pending')).toHaveLength(1)
-  })
 })
 
 describe('sheets store details', () => {
@@ -215,7 +173,7 @@ describe('sheets store details', () => {
     expect(s.min_like_tiktok).toBe(100000)
     expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'api_keys', 'audit_log', 'participants', 'settings', 'submissions', 'task_submissions', 'tasks'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
-    expect(fake.tabs.get('settings')!.length).toBe(1 + 20)
+    expect(fake.tabs.get('settings')!.length).toBe(1 + 18)
     const header = fake.tabs.get('submissions')![0] as string[]
     expect(header.slice(0, 3)).toEqual(['status', 'id', 'custom_note'])
     expect(header).toContain('source_key')

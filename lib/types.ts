@@ -6,8 +6,6 @@ export type AdminRole = 'owner' | 'reviewer'
 export interface Settings {
   period_id: string
   period_open: boolean
-  qty_tiktok: number
-  qty_reels: number
   min_like_tiktok: number
   min_comment_tiktok: number
   min_like_reels: number
@@ -137,7 +135,6 @@ export type CheckId =
   | 'min_like'
   | 'min_comment'
   | 'sharein_valid'
-  | 'qty_available'
   | 'organic'
 
 export interface Check {

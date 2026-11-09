@@ -82,7 +82,7 @@ export async function goldenSummary(now = Date.now()) {
       tiktok: { min_like: settings.min_like_tiktok, min_comment: settings.min_comment_tiktok },
       reels: { min_like: settings.min_like_reels, min_comment: settings.min_comment_reels },
     },
-    quota: progress,
+    collected: { total: progress.reduce((n, p) => n + p.used, 0), tiktok: progress.find((p) => p.platform === 'tiktok')?.used ?? 0, reels: progress.find((p) => p.platform === 'reels')?.used ?? 0 },
     counts: { total: inPeriod.length, pending: count('pending'), approved: count('approved'), rejected: count('rejected') },
     generated_at: new Date(now).toISOString(),
   }

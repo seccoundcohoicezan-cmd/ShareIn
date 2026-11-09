@@ -98,11 +98,9 @@ export async function updateSubmissions(items: StoredSubmission[]): Promise<void
   invalidate('progress')
 }
 
-/** Slots in use for a platform in a period (pending + approved). */
-export function countUsed(all: Submission[], periodId: string, platform: Platform): number {
-  return all.filter(
-    (s) => s.period_id === periodId && s.platform === platform && (s.status === 'pending' || s.status === 'approved'),
-  ).length
+/** Links counted as collected for a platform (pending + approved). */
+export function countCollected(all: Submission[], platform: Platform): number {
+  return all.filter((s) => s.platform === platform && (s.status === 'pending' || s.status === 'approved')).length
 }
 
 export function findDuplicate(all: Submission[], sourceKey: string): Submission | null {

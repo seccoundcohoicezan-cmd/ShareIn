@@ -18,7 +18,6 @@ interface Rules {
   metrics_adapter: 'off' | 'rapidapi' | 'apify'
   sharein_domains: string[]
   rules: Record<Platform, { min_like: number; min_comment: number }>
-  progress: { platform: Platform; used: number; target: number; remaining: number }[]
 }
 
 const NAME_KEY = 'sharein_name'
@@ -86,7 +85,6 @@ function ContentCard({
   const failed = result?.checks.filter((c) => !c.pass && !GLOBAL_CHECKS.includes(c.id)) ?? []
   // A wrong link also fails the duplicate check; one message is enough.
   const shown = failed.some((c) => c.id === 'url_valid') ? failed.filter((c) => c.id !== 'not_duplicate') : failed
-  const qty = result?.checks.find((c) => c.id === 'qty_available')
 
   async function fetchMetrics() {
     setFetching(true)
@@ -238,7 +236,7 @@ function ContentCard({
       {result && (
         failed.length === 0 ? (
           <p className="flex items-center gap-2 rounded-field bg-green-50 px-3 py-2 text-sm font-bold text-green-900">
-            <CheckIcon /> Lolos semua cek{typeof qty?.remaining === 'number' ? ` · sisa kuota ${qty.remaining}` : ''}
+            <CheckIcon /> Lolos semua cek
           </p>
         ) : (
           <ul className="space-y-1 rounded-field bg-red-50 px-3 py-2 text-sm text-bad">
@@ -450,7 +448,6 @@ export function SetorForm() {
   }
 
   const closed = rules && !rules.period_open
-  const quota = (p: Platform) => rules?.progress.find((x) => x.platform === p)
 
   return (
     <form
@@ -486,9 +483,6 @@ export function SetorForm() {
             <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>
           </div>
         </div>
-        <p className="muted min-h-[1.25rem] text-sm">
-          {rules ? `Sisa kuota: TikTok ${quota('tiktok')?.remaining ?? 0} · Reels ${quota('reels')?.remaining ?? 0}` : 'Memuat kuota…'}
-        </p>
         <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
       </section>
 

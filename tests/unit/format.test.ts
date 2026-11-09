@@ -23,9 +23,8 @@ describe('parseCount', () => {
 
 describe('settings', () => {
   it('parses sheet values tolerantly', () => {
-    const s = parseSettings(new Map([['period_open', 'false'], ['qty_tiktok', '25'], ['sharein_domains', 'https://ShareIn.id/, sharein.app']]))
+    const s = parseSettings(new Map([['period_open', 'false'], ['sharein_domains', 'https://ShareIn.id/, sharein.app']]))
     expect(s.period_open).toBe(false)
-    expect(s.qty_tiktok).toBe(25)
     expect(s.sharein_domains).toEqual(['sharein.id', 'sharein.app'])
     expect(s.metrics_adapter).toBe('off')
   })

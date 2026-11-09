@@ -1,5 +1,5 @@
 import { formatDate, formatNumber } from './format'
-import { minComment, minLike, qtyTarget } from './settings-schema'
+import { minComment, minLike } from './settings-schema'
 import type { Check, CheckResult, Platform, Settings, Submission } from './types'
 import { PLATFORM_LABEL } from './types'
 import type { ParsedLink, ParseError } from './url'
@@ -20,8 +20,6 @@ export interface CheckContext {
   link: ParsedLink | ParseError | 'unresolved'
   /** Existing non-void submission with the same source_key in any period. */
   duplicate: Pick<Submission, 'created_at'> | null
-  /** approved + pending in the active period for the chosen platform. */
-  used: number
 }
 
 const SHORT_PLATFORM: Record<Platform, string> = { tiktok: 'TikTok', reels: 'Reels' }
@@ -86,19 +84,6 @@ export function runChecks(input: CheckInput, ctx: CheckContext): CheckResult {
     no_path: 'Itu alamat beranda ShareIn. Tempel link halaman konten yang kamu unggah.',
   }
   checks.push(share.ok ? { id: 'sharein_valid', pass: true } : { id: 'sharein_valid', pass: false, message: shareMsg[share.reason!] })
-
-  const target = qtyTarget(settings, input.platform)
-  const remaining = Math.max(0, target - ctx.used)
-  checks.push(
-    remaining > 0
-      ? { id: 'qty_available', pass: true, remaining }
-      : {
-          id: 'qty_available',
-          pass: false,
-          remaining: 0,
-          message: `Target ${SHORT_PLATFORM[input.platform]} periode ini sudah terpenuhi (${ctx.used}/${target}).`,
-        },
-  )
 
   let organic: Check = { id: 'organic', pass: true }
   if (!input.organic_declared) organic = { id: 'organic', pass: false, message: 'Centang pernyataan bahwa konten muncul organik di FYP/Beranda kamu.' }

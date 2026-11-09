@@ -1,21 +1,15 @@
 import 'server-only'
-import { parseSettings, qtyTarget } from './settings-schema'
-import { getProgress, type Progress } from './service'
-import type { Platform, Settings } from './types'
+import { parseSettings } from './settings-schema'
+import { collectedFeed, getProgress, type CollectedFeed } from './service'
+import type { Settings } from './types'
 
 /** Public pages must render even when the database is unreachable (e.g. at build time). */
-export async function loadPublic(): Promise<{ settings: Settings; progress: Progress[]; degraded: boolean }> {
+export async function loadPublic(): Promise<{ settings: Settings; feed: CollectedFeed }> {
   try {
-    return { ...(await getProgress()), degraded: false }
+    const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed()])
+    return { settings, feed }
   } catch (e) {
     console.error('public data unavailable', (e as Error).message)
-    const settings = parseSettings(new Map())
-    const progress = (['tiktok', 'reels'] as Platform[]).map((p) => ({
-      platform: p,
-      used: 0,
-      target: qtyTarget(settings, p),
-      remaining: qtyTarget(settings, p),
-    }))
-    return { settings, progress, degraded: true }
+    return { settings: parseSettings(new Map()), feed: { total: 0, tiktok: 0, reels: 0, items: [] } }
   }
 }

@@ -33,10 +33,12 @@ async function fillForm(page: Page, o: { name: string; url: string; likes: strin
 
 test.describe.configure({ mode: 'serial' })
 
-test('golden ticket: progres QTY, ketentuan, latar ringan', async ({ page }) => {
+test('golden ticket: tanpa target, link terkumpul, ketentuan, latar ringan', async ({ page }) => {
   await page.goto('/goldenticket')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Golden Ticket')
-  await expect(page.getByRole('progressbar', { name: 'Progres TikTok' })).toHaveAttribute('aria-valuemax', '20')
+  await expect(page.getByText('Target periode ini')).toHaveCount(0)
+  await expect(page.getByRole('progressbar')).toHaveCount(0)
+  await expect(page.getByText('Belum ada link terkumpul.')).toBeVisible()
   await expect(page.getByText('≥ 100 rb like · ≥ 5 rb komentar')).toBeVisible()
   // 1 layer + 3 blobs + 6 brand assets, all animated with transform only.
   const layers = await page.evaluate(() => document.getElementById('bg')!.children.length)
@@ -69,7 +71,7 @@ test('setor: 99.999 like ditolak, 100.000 lolos, kirim, sukses, riwayat', async 
 
   await page.getByLabel('Like', { exact: true }).fill('100000')
   await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText(/Lolos semua cek · sisa kuota/)).toBeVisible()
+  await expect(page.getByText('Lolos semua cek')).toBeVisible()
   await expect(send).toBeEnabled()
   await shot(page, '03-setor-lolos')
   await send.click()
@@ -119,41 +121,34 @@ test('reels: komentar 2.999 ditolak, 3.000 lolos; platform terdeteksi otomatis',
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeEnabled()
 })
 
-test('admin: login, ubah QTY 20 → 25, publik ikut berubah', async ({ page, request }) => {
+test('admin: login; link terkumpul tampil publik tanpa nomor WA, bisa diputar di halaman', async ({ page }) => {
   await login(page)
   await shot(page, '06-admin-dasbor')
-  await page.goto('/admin/pengaturan')
-  await page.getByLabel('QTY TikTok').fill('25')
-  await page.getByRole('button', { name: 'Simpan perubahan' }).click()
-  await expect(page.getByText('Tersimpan')).toBeVisible()
-  await shot(page, '07-admin-pengaturan')
-  const rules = await (await request.get('/api/rules')).json()
-  expect(rules.progress.find((p: { platform: string }) => p.platform === 'tiktok')).toMatchObject({ used: 1, target: 25 })
   await expect
     .poll(async () => {
       await page.goto('/goldenticket')
-      return page.getByRole('progressbar', { name: 'Progres TikTok' }).getAttribute('aria-valuetext')
+      return page.locator('section', { hasText: 'Link terkumpul' }).textContent()
     }, { timeout: 15_000 })
-    .toBe('1 dari 25')
+    .toContain('Rina U.')
+  const feed = page.locator('section', { hasText: 'Link terkumpul' })
+  await expect(feed).not.toContainText('Rina Uji')
+  await expect(feed).not.toContainText('6281')
+  // Card must stay inside the panel on phones even with a long link.
+  const panelBox = (await feed.boundingBox())!
+  const cardBox = (await feed.getByRole('listitem').first().boundingBox())!
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width)
+  await shot(page, '06b-link-terkumpul')
+  await feed.getByRole('button', { name: 'Putar di sini' }).first().click()
+  await expect(feed.locator('iframe')).toHaveAttribute('src', /^https:\/\/www\.tiktok\.com\/embed\/v2\//)
 })
 
-test('dua penyetor bersamaan saat sisa QTY = 1: hanya satu masuk', async ({ request, page }) => {
-  await login(page)
-  await page.goto('/admin/pengaturan')
-  await page.getByLabel('QTY TikTok').fill('2')
-  await page.getByRole('button', { name: 'Simpan perubahan' }).click()
-  await expect(page.getByText('Tersimpan')).toBeVisible()
+test('dua penyetor bersamaan: link beda masuk semua, tanpa batas target', async ({ request }) => {
   const body = (n: number, name: string) => ({
     submitter_name: name, whatsapp: waFor(name), platform: 'tiktok', source_url: vid(n), sharein_url: 'https://sharein.id/c/x' + n,
     likes: 200000, comments: 8000, organic_declared: true, checked_declared: true,
   })
-  const [a, b] = await Promise.all([
-    request.post('/api/submissions', { data: body(10, 'Paralel A') }),
-    request.post('/api/submissions', { data: body(11, 'Paralel B') }),
-  ])
-  expect([a.status(), b.status()].sort()).toEqual([201, 422])
-  const loser = (await (a.status() === 422 ? a : b).json()) as { checks: { id: string }[] }
-  expect(loser.checks[0].id).toBe('qty_available')
+  const res = await Promise.all(Array.from({ length: 6 }, (_, i) => request.post('/api/submissions', { data: body(10 + i, `Paralel ${String.fromCharCode(65 + i)}`) })))
+  expect(res.map((r) => r.status())).toEqual([201, 201, 201, 201, 201, 201])
 })
 
 test('admin: tolak wajib alasan, setujui, ekspor CSV; halaman pantau ikut berubah live', async ({ page, browser }) => {

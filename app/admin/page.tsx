@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PlatformTag, ProgressBar, StatusBadge, EmptyState } from '@/components/ui'
+import { PlatformTag, StatusBadge, EmptyState } from '@/components/ui'
 import { dashboard } from '@/lib/admin-service'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { programSummary } from '@/lib/program-service'
@@ -62,9 +62,13 @@ export default async function AdminHome() {
           </Link>
         ))}
       </div>
-      <section className="panel-solid mt-4 space-y-4">
-        <h2 className="font-extrabold">Progres QTY Golden Ticket</h2>
-        {progress.map((p) => <ProgressBar key={p.platform} label={p.platform === 'tiktok' ? 'TikTok' : 'Reels'} used={p.used} target={p.target} />)}
+      <section className="panel-solid mt-4">
+        <h2 className="font-extrabold">Link Golden Ticket terkumpul</h2>
+        <p className="mt-1 text-sm">
+          {progress.map((p) => (
+            <span key={p.platform} className="mr-4"><b className="tabular-nums text-brand-purple">{formatNumber(p.used)}</b> {p.platform === 'tiktok' ? 'TikTok' : 'Reels'}</span>
+          ))}
+        </p>
       </section>
       <section className="panel-solid mt-4">
         <div className="mb-3 flex items-center justify-between">

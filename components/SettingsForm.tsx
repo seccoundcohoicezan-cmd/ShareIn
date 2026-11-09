@@ -5,7 +5,7 @@ import type { Settings } from '@/lib/types'
 import { toast, Toaster } from './Toast'
 
 type NumKey =
-  | 'qty_tiktok' | 'qty_reels' | 'min_like_tiktok' | 'min_comment_tiktok' | 'min_like_reels' | 'min_comment_reels'
+  | 'min_like_tiktok' | 'min_comment_tiktok' | 'min_like_reels' | 'min_comment_reels'
   | 'golden_pool_start' | 'golden_pool_end'
 
 // datetime-local works in the browser's zone; the program runs on WIB, so convert explicitly.
@@ -41,7 +41,7 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState(initial)
   const [nums, setNums] = useState<Record<NumKey, string>>(() => {
-    const keys: NumKey[] = ['qty_tiktok', 'qty_reels', 'min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end']
+    const keys: NumKey[] = ['min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end']
     return Object.fromEntries(keys.map((k) => [k, formatNumber(initial[k])])) as Record<NumKey, string>
   })
   const [domains, setDomains] = useState(initial.sharein_domains.join(', '))
@@ -114,7 +114,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <div>
           <label htmlFor="period_id" className="label">Periode aktif</label>
           <input id="period_id" className="field" value={s.period_id} maxLength={40} onChange={(e) => setS({ ...s, period_id: e.target.value })} />
-          <p className="muted mt-1 text-sm">Contoh 2026-11-W1. QTY dihitung per periode; ganti nama periode untuk mulai hitungan baru.</p>
+          <p className="muted mt-1 text-sm">Contoh 2026-11-W1. Hanya label untuk mengelompokkan setoran.</p>
         </div>
         <Toggle id="period_open" label="Setoran dibuka" hint="Matikan untuk menutup form setoran." checked={s.period_open} onChange={(v) => setS({ ...s, period_open: v })} />
       </section>
@@ -150,14 +150,6 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <h2 className="font-extrabold">Pelatihan Content & Duta Teladan</h2>
         <Toggle id="pelatihan_open" label="Pengumpulan Pelatihan dibuka" checked={s.pelatihan_open} onChange={(v) => setS({ ...s, pelatihan_open: v })} />
         <Toggle id="duta_open" label="Pengumpulan Duta Teladan dibuka" checked={s.duta_open} onChange={(v) => setS({ ...s, duta_open: v })} />
-      </section>
-
-      <section className="panel-solid">
-        <h2 className="mb-4 font-extrabold">Target QTY</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {num('qty_tiktok', 'QTY TikTok')}
-          {num('qty_reels', 'QTY Reels')}
-        </div>
       </section>
 
       <section className="panel-solid">

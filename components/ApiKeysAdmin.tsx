@@ -6,7 +6,7 @@ import { toast, Toaster } from './Toast'
 type Key = { id: string; name: string; prefix: string; active: boolean; created_at: string; created_by: string }
 
 const ENDPOINTS = [
-  ['GET', '/api/v1/goldenticket/summary', 'Hadiah berjalan saat ini, periode, kuota, jumlah per status'],
+  ['GET', '/api/v1/goldenticket/summary', 'Hadiah berjalan saat ini, periode, link terkumpul, jumlah per status'],
   ['GET', '/api/v1/goldenticket/submissions', 'Daftar setoran. Filter: status, platform, period, updated_since, limit (maks 500), offset'],
   ['GET', '/api/v1/goldenticket/submissions/{id}', 'Satu setoran'],
 ]

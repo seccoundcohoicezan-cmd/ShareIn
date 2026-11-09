@@ -11,8 +11,6 @@ const count = z.number().int().min(0).max(1_000_000_000)
 const schema = z.object({
   period_id: z.string().trim().min(1, 'Isi periode aktif.').max(40).regex(/^[\w.\-]+$/, 'Periode hanya huruf, angka, titik, strip.'),
   period_open: z.boolean(),
-  qty_tiktok: count,
-  qty_reels: count,
   min_like_tiktok: count,
   min_comment_tiktok: count,
   min_like_reels: count,

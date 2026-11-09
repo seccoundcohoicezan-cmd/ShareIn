@@ -4,7 +4,6 @@ import { invalidate } from '@/lib/cache'
 import { findGolden, goldenSummary, goldenListSchema, listGolden, selectGolden } from '@/lib/golden-api'
 import { getStore, setStore } from '@/lib/repo'
 import { LocalStore } from '@/lib/repo/memory-store'
-import { getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 import { createSubmission, type SubmissionInput } from '@/lib/service'
 import type { Submission } from '@/lib/types'
 
@@ -65,15 +64,13 @@ describe('Golden Ticket API data', () => {
     expect(goldenListSchema.safeParse({ limit: '501' }).success).toBe(false)
   })
 
-  it('summary reports the running prize, quota and counts', async () => {
-    const s = await getSettingsFresh()
-    await saveSettings({ ...s, qty_tiktok: 10 })
+  it('summary reports the running prize, collected links and counts', async () => {
     await createSubmission(input(1))
     invalidate()
     const r = await goldenSummary(Date.parse('2026-11-20T12:00:00Z'))
     expect(r.prize.current).toBeGreaterThan(2_000_000)
     expect(r.prize.current).toBeLessThan(5_000_000)
-    expect(r.quota.find((q) => q.platform === 'tiktok')).toMatchObject({ used: 1, target: 10, remaining: 9 })
+    expect(r.collected).toEqual({ total: 1, tiktok: 1, reels: 0 })
     expect(r.counts).toMatchObject({ total: 1, pending: 1 })
     expect(r.auto_approve).toBe(false)
   })

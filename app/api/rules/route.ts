@@ -16,7 +16,7 @@ export async function GET() {
         tiktok: { min_like: settings.min_like_tiktok, min_comment: settings.min_comment_tiktok },
         reels: { min_like: settings.min_like_reels, min_comment: settings.min_comment_reels },
       },
-      progress,
+      collected: progress,
       golden: {
         start: settings.golden_pool_start,
         end: settings.golden_pool_end,

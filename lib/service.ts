@@ -6,7 +6,7 @@ import { withLock } from './lock'
 import { getSettings, getSettingsFresh } from './repo/settings'
 import {
   appendSubmissions,
-  countUsed,
+  countCollected,
   findDuplicate,
   listSubmissionsCached,
   listSubmissionsFresh,
@@ -14,10 +14,9 @@ import {
   type StoredSubmission,
 } from './repo/submissions'
 import { parseAndResolve, type Fetcher, type Resolver } from './resolve'
-import { qtyTarget } from './settings-schema'
 import { AUTO_REVIEWER, type CheckResult, type Platform, type Settings, type Submission } from './types'
 import { runChecks } from './validate'
-import { normalizeWhatsapp } from './identity'
+import { maskName, normalizeWhatsapp } from './identity'
 import type { ParsedLink } from './url'
 
 export const submissionSchema = z.object({
@@ -45,7 +44,7 @@ export interface NetOpts {
 
 type Link = Awaited<ReturnType<typeof parseAndResolve>>
 
-function evaluate(input: SubmissionInput, settings: Settings, all: Submission[], link: Link, extraUsed = 0) {
+function evaluate(input: SubmissionInput, settings: Settings, all: Submission[], link: Link) {
   const likes = parseCount(input.likes)
   const comments = parseCount(input.comments)
   const duplicate = typeof link !== 'string' && link.source_key ? findDuplicate(all, link.source_key) : null
@@ -59,7 +58,7 @@ function evaluate(input: SubmissionInput, settings: Settings, all: Submission[],
       checked_declared: input.checked_declared,
       has_screenshot: input.has_screenshot,
     },
-    { settings, link, duplicate, used: countUsed(all, settings.period_id, input.platform) + extraUsed },
+    { settings, link, duplicate },
   )
   // One person = one WhatsApp number; it keys the personal monitoring link.
   if (!normalizeWhatsapp(input.whatsapp)) {
@@ -103,14 +102,13 @@ export function expandBatch(b: BatchInput): SubmissionInput[] {
   return items.map((i) => ({ ...shared, ...i }))
 }
 
-/** Evaluates a batch in order: links repeated in the batch and the quota the batch itself uses count too. */
+/** Evaluates a batch in order: a link repeated within the batch is refused like any duplicate. */
 function evaluateBatch(inputs: SubmissionInput[], settings: Settings, all: Submission[], links: Link[]) {
   const seen = new Map<string, number>()
-  const extra: Record<Platform, number> = { tiktok: 0, reels: 0 }
   return inputs.map((input, i) => {
     const link = links[i]
     const platform = typeof link !== 'string' ? link.platform : input.platform
-    const ev = evaluate({ ...input, platform }, settings, all, link, extra[platform])
+    const ev = evaluate({ ...input, platform }, settings, all, link)
     const key = typeof link !== 'string' ? link.source_key : null
     const earlier = key ? seen.get(key) : undefined
     if (earlier !== undefined) {
@@ -120,7 +118,6 @@ function evaluateBatch(inputs: SubmissionInput[], settings: Settings, all: Submi
       ev.result.ok = false
     }
     if (key && earlier === undefined) seen.set(key, i)
-    if (ev.result.ok) extra[platform]++
     return { ...ev, platform }
   })
 }
@@ -141,7 +138,7 @@ export type BatchCreateResult = { ok: false; items: CheckResult[] } | { ok: true
 /**
  * Validates the whole batch with fresh data (nothing is saved unless every item passes), appends all
  * rows in one request, then re-reads to settle races between server instances: the earliest row wins
- * a duplicate, and rows beyond the QTY target are voided.
+ * a duplicate.
  */
 export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, screenshotUrl = ''): Promise<BatchCreateResult> {
   const links = await Promise.all(inputs.map((i) => parseAndResolve(i.source_url, net)))
@@ -190,13 +187,6 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
         voids.push({ ...mine, status: 'void', reject_reason: 'Duplikat bersamaan (otomatis)' })
         return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini baru saja disetor orang lain. Cari konten lain.' }] }
       }
-      const active = after.filter((s) => s.period_id === sub.period_id && s.platform === sub.platform && (s.status === 'pending' || s.status === 'approved'))
-      const position = active.findIndex((s) => s.id === sub.id) + 1
-      const target = qtyTarget(settings, sub.platform)
-      if (position > target) {
-        voids.push({ ...mine, status: 'void', reject_reason: 'Kuota penuh bersamaan (otomatis)' })
-        return { ok: false, checks: [{ id: 'qty_available', pass: false, remaining: 0, message: `Target periode ini baru saja terpenuhi (${target}/${target}).` }] }
-      }
       return { ok: true, submission: sub }
     })
     if (voids.length) await updateSubmissions(voids)
@@ -213,37 +203,55 @@ export async function createSubmission(input: SubmissionInput, net?: NetOpts, sc
 export interface Progress {
   platform: Platform
   used: number
-  target: number
-  remaining: number
 }
 
+/** Links collected so far (pending + approved), all periods: Golden Ticket has no target. */
 export async function getProgress(): Promise<{ settings: Settings; progress: Progress[] }> {
   return cached('progress', async () => {
     const settings = await getSettings()
     const all = await listSubmissionsCached()
-    const progress = (['tiktok', 'reels'] as Platform[]).map((p) => {
-      const used = countUsed(all, settings.period_id, p)
-      const target = qtyTarget(settings, p)
-      return { platform: p, used, target, remaining: Math.max(0, target - used) }
-    })
+    const progress = (['tiktok', 'reels'] as Platform[]).map((p) => ({ platform: p, used: countCollected(all, p) }))
     return { settings, progress }
   })
 }
 
-export type PublicSubmission = Pick<
-  Submission,
-  'id' | 'created_at' | 'period_id' | 'platform' | 'source_url' | 'sharein_url' | 'likes' | 'comments' | 'status' | 'reject_reason'
->
+export interface CollectedItem {
+  id: string
+  created_at: string
+  platform: Platform
+  name: string
+  source_url: string
+  sharein_url: string
+  likes: number
+  comments: number
+  status: 'pending' | 'approved'
+}
 
-export async function listMine(name: string): Promise<PublicSubmission[]> {
-  const key = normalizeName(name)
-  if (key.length < 2) return []
-  const all = await listSubmissionsFresh()
-  return all
-    .filter((s) => normalizeName(s.submitter_name) === key && s.status !== 'void')
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, 100)
-    .map(({ id, created_at, period_id, platform, source_url, sharein_url, likes, comments, status, reject_reason }) => ({
-      id, created_at, period_id, platform, source_url, sharein_url, likes, comments, status, reject_reason,
-    }))
+export interface CollectedFeed {
+  total: number
+  tiktok: number
+  reels: number
+  items: CollectedItem[]
+}
+
+/** Public list of collected links, newest first. Names are shortened; WhatsApp numbers never leave the server. */
+export async function collectedFeed(offset = 0, limit = 12): Promise<CollectedFeed> {
+  const all = (await listSubmissionsCached()).filter((s) => s.status === 'pending' || s.status === 'approved')
+  const sorted = [...all].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))
+  return {
+    total: sorted.length,
+    tiktok: sorted.filter((s) => s.platform === 'tiktok').length,
+    reels: sorted.filter((s) => s.platform === 'reels').length,
+    items: sorted.slice(offset, offset + limit).map((s) => ({
+      id: s.id,
+      created_at: s.created_at,
+      platform: s.platform,
+      name: maskName(s.submitter_name),
+      source_url: s.source_url,
+      sharein_url: s.sharein_url,
+      likes: s.likes,
+      comments: s.comments,
+      status: s.status as CollectedItem['status'],
+    })),
+  }
 }

@@ -15,7 +15,7 @@ Panggil dari server, bukan dari kode browser: data berisi nama dan nomor WhatsAp
 
 ## GET /api/v1/goldenticket/summary
 
-Hadiah berjalan, periode aktif, aturan, kuota, dan jumlah setoran periode ini.
+Hadiah berjalan, periode aktif, aturan, jumlah link terkumpul (`collected`, semua periode), dan jumlah setoran periode ini.
 
 ```json
 {
@@ -25,7 +25,7 @@ Hadiah berjalan, periode aktif, aturan, kuota, dan jumlah setoran periode ini.
   "auto_approve": false,
   "prize": { "current": 2345678, "start": 2000000, "end": 5000000, "start_at": "…", "end_at": "…" },
   "rules": { "tiktok": { "min_like": 100000, "min_comment": 5000 }, "reels": { "min_like": 100000, "min_comment": 3000 } },
-  "quota": [{ "platform": "tiktok", "used": 1, "target": 20, "remaining": 19 }],
+  "collected": { "total": 1, "tiktok": 1, "reels": 0 },
   "counts": { "total": 1, "pending": 1, "approved": 0, "rejected": 0 },
   "generated_at": "…"
 }

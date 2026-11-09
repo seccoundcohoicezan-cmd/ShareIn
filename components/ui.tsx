@@ -18,33 +18,6 @@ export function Panel({ children, className = '', solid = false, ...rest }: { ch
   )
 }
 
-export function ProgressBar({ label, used, target }: { label: string; used: number; target: number }) {
-  const pct = target > 0 ? Math.min(100, Math.round((used / target) * 100)) : 0
-  const full = target > 0 && used >= target
-  return (
-    <div>
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="font-bold">{label}</span>
-        <span className="text-sm font-bold tabular-nums">
-          {used}/{target}
-          {full && <span className="ml-2 rounded-full bg-brand-amber/30 px-2 py-0.5 text-xs text-ink">Penuh</span>}
-        </span>
-      </div>
-      <div
-        role="progressbar"
-        aria-label={`Progres ${label}`}
-        aria-valuemin={0}
-        aria-valuemax={target}
-        aria-valuenow={Math.min(used, target)}
-        aria-valuetext={`${used} dari ${target}`}
-        className="h-3 overflow-hidden rounded-full bg-brand-purple/15"
-      >
-        <div className="progress-fill h-full rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
 const STATUS: Record<SubmissionStatus, { text: string; cls: string }> = {
   pending: { text: 'Menunggu', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
   approved: { text: 'Disetujui', cls: 'bg-green-100 text-green-900 border-green-300' },

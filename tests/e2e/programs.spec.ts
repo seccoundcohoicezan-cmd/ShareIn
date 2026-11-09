@@ -231,7 +231,6 @@ test('setujui otomatis per program + API Golden Ticket dengan kunci', async ({ p
 
   await page.goto('/admin/pengaturan')
   for (const n of ['Golden Ticket', 'Pelatihan Content', 'Setoran dibuka']) await page.getByRole('switch', { name: n, exact: true }).click()
-  await page.getByLabel('QTY TikTok').fill('50')
   await page.getByRole('button', { name: 'Simpan perubahan' }).click()
   await expect(page.getByText('Tersimpan')).toBeVisible()
   await shot(page, '21-admin-otomatis')

@@ -11,3 +11,10 @@ export function normalizeWhatsapp(input: string): string | null {
 export function maskWhatsapp(wa: string): string {
   return wa.length > 7 ? `${wa.slice(0, 4)}••••${wa.slice(-3)}` : '••••'
 }
+
+/** "Rina Utami Sari" → "Rina U." for public lists. */
+export function maskName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'Peserta'
+  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[1][0].toUpperCase()}.`
+}
