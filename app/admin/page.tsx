@@ -57,7 +57,7 @@ export default async function AdminHome() {
           <Link key={p.key} href={`/admin/program/${p.key}`} className="panel-solid !p-4 hover:border-brand-violet">
             <p className="font-extrabold">{p.label}</p>
             <p className="muted mt-1 text-sm">
-              <b className="text-warn">{pendingTasks(p.key)}</b> menunggu review · {p.s.codes} kode · {p.s.inWheel} siap diundi · {p.s.winners.length} pemenang
+              <b className="text-warn">{pendingTasks(p.key)}</b> menunggu review · {p.s.codes} kode · {p.s.approved} disetujui
             </p>
           </Link>
         ))}

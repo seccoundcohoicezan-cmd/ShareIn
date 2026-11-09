@@ -62,6 +62,7 @@ export function SetorForm() {
   const [name, setName] = useState('')
   const [wa, setWa] = useState('')
   const [token, setToken] = useState('')
+  const [autoApproved, setAutoApproved] = useState(false)
   const me = useMe()
   const [platform, setPlatform] = useState<Platform>('tiktok')
   const [sourceUrl, setSourceUrl] = useState('')
@@ -181,6 +182,7 @@ export function SetorForm() {
       if (res.ok && data.ok) {
         localStorage.setItem(NAME_KEY, name.trim())
         if (data.token) setToken(data.token)
+        setAutoApproved(data.status === 'approved')
         toast('Terkirim')
         setDone(true)
         window.scrollTo({ top: 0 })
@@ -261,7 +263,7 @@ export function SetorForm() {
           <GiftSolid className="h-24 w-24" />
         </div>
         <h2 className="mt-4 text-2xl font-extrabold">Setoran terkirim</h2>
-        <p className="muted mx-auto mt-2 max-w-sm">Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.</p>
+        <p className="muted mx-auto mt-2 max-w-sm">{autoApproved ? 'Setoranmu sudah disetujui otomatis.' : 'Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.'}</p>
         {token && <PantauCard token={token} />}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button type="button" className="btn-primary" onClick={reset}>Setor lagi</button>

@@ -9,8 +9,8 @@ export const revalidate = 60
 
 const SUBLINKS = [
   { href: '/goldenticket', title: 'Golden Ticket', desc: 'Hadiah berjalan, target, dan ketentuan setor konten viral' },
-  { href: '/pelatihancontent', title: 'Pelatihan Content', desc: 'Kerjakan tugas, dapat kode, ikut spin wheel' },
-  { href: '/dutateladan', title: 'Duta Teladan', desc: 'Tugas wajib Duta Teladan, kode bonus spin wheel' },
+  { href: '/pelatihancontent', title: 'Pelatihan Content', desc: 'Kerjakan tugas, kumpulkan bukti, dapat kode' },
+  { href: '/dutateladan', title: 'Duta Teladan', desc: 'Tugas wajib setiap Duta Teladan' },
   { href: '/pantau', title: 'Pantau setoran', desc: 'Lihat status disetujui/ditolak dengan link unikmu' },
   { href: '/#tutorial', title: 'Tutorial & panduan', desc: 'Cara kerja Sharein dan cara menyalin link' },
 ]
@@ -25,10 +25,10 @@ export default async function AturanPage() {
       <Panel aria-labelledby="umum">
         <PillLabel id="umum">Semua program</PillLabel>
         <ol className="mt-4 list-decimal space-y-2 pl-5">
-          <li>Gunakan nama asli dan nomor WhatsApp aktif. Hadiah hanya diberikan ke pemilik identitas yang terdaftar.</li>
+          <li>Gunakan nama asli dan nomor WhatsApp aktif. Identitas ini dipakai untuk memeriksa setoranmu.</li>
           <li>Satu orang dikenali dari nomor WhatsApp-nya. Jangan mendaftar dengan nomor orang lain.</li>
-          <li>Bukti palsu, curang, atau milik orang lain membuat seluruh kode dan hadiah dibatalkan.</li>
-          <li>Keputusan admin atas verifikasi dan hasil undian bersifat final.</li>
+          <li>Bukti palsu, curang, atau milik orang lain membuat setoran dibatalkan.</li>
+          <li>Keputusan admin atas verifikasi bersifat final.</li>
         </ol>
       </Panel>
 
@@ -37,9 +37,9 @@ export default async function AturanPage() {
         <ol className="mt-4 list-decimal space-y-2 pl-5">
           <li>Setiap tugas yang dikumpulkan memberi satu kode unik (PC-… untuk Pelatihan, DT-… untuk Duta Teladan).</li>
           <li>Satu tugas hanya bisa dikumpulkan sekali per nomor WhatsApp.</li>
-          <li>Kode masuk spin wheel setelah bukti tugas disetujui admin. Makin banyak tugas selesai, makin banyak kesempatan.</li>
-          <li>Tugas Duta Teladan bersifat wajib bagi setiap Duta Teladan; kodenya menjadi bonus undian.</li>
-          <li>Pemenang dipilih acak oleh sistem, diumumkan di halaman program, dan dihubungi lewat WhatsApp.</li>
+          <li>Status tugas (menunggu, disetujui, ditolak) bisa dipantau lewat link pantau unikmu.</li>
+          <li>Tugas Duta Teladan bersifat wajib bagi setiap Duta Teladan.</li>
+          <li>Program ini tidak berhadiah. Hadiah hanya ada di program Golden Ticket.</li>
         </ol>
       </Panel>
 

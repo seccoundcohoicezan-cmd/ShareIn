@@ -1,4 +1,4 @@
-import type { Draw, Participant, Program, Task, TaskSubmission, TaskSubmissionStatus } from '../types'
+import type { ApiKey, Participant, Program, Task, TaskSubmission, TaskSubmissionStatus } from '../types'
 import { normalizeStatus } from '../status'
 import { recordTable } from './records'
 
@@ -44,23 +44,6 @@ export const taskSubmissionsTable = recordTable<TaskSubmission>(
   (s) => ({ ...s }),
 )
 
-export const drawsTable = recordTable<Draw>(
-  'draws',
-  (r) => ({
-    id: r.id,
-    time: r.time ?? '',
-    program: program(r.program ?? ''),
-    code: (r.code ?? '').toUpperCase(),
-    submission_id: r.submission_id ?? '',
-    name: r.name ?? '',
-    identity_key: r.identity_key ?? '',
-    prize: Number(r.prize) || 0,
-    actor: r.actor ?? '',
-    status: r.status === 'void' ? 'void' : 'active',
-  }),
-  (d) => ({ ...d }),
-)
-
 export const participantsTable = recordTable<Participant>(
   'participants',
   (r) => ({
@@ -72,4 +55,18 @@ export const participantsTable = recordTable<Participant>(
     last_seen_at: r.last_seen_at ?? '',
   }),
   (p) => ({ ...p }),
+)
+
+export const apiKeysTable = recordTable<ApiKey>(
+  'api_keys',
+  (r) => ({
+    id: r.id,
+    name: r.name ?? '',
+    prefix: r.prefix ?? '',
+    key_hash: r.key_hash ?? '',
+    active: (r.active ?? '').trim().toUpperCase() === 'TRUE',
+    created_at: r.created_at ?? '',
+    created_by: r.created_by ?? '',
+  }),
+  (k) => ({ ...k }),
 )

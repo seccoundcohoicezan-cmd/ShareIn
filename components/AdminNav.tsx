@@ -13,7 +13,7 @@ export function AdminNav({ email, role }: { email: string; role: AdminRole }) {
     { href: '/admin/program/pelatihan', t: 'Pelatihan' },
     { href: '/admin/program/duta', t: 'Duta Teladan' },
     { href: '/admin/peserta', t: 'Peserta' },
-    ...(role === 'owner' ? [{ href: '/admin/spin', t: 'Spin wheel' }, { href: '/admin/pengaturan', t: 'Pengaturan' }] : []),
+    ...(role === 'owner' ? [{ href: '/admin/pengaturan', t: 'Pengaturan' }, { href: '/admin/api', t: 'API' }] : []),
     { href: '/admin/akun', t: 'Akun' },
   ]
   return (

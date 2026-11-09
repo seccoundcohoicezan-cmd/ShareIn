@@ -18,9 +18,9 @@ export const SETTING_KEYS = [
   'golden_end_at',
   'pelatihan_open',
   'duta_open',
-  'spin_prize_pelatihan',
-  'spin_prize_duta',
-  'spin_unique_winner',
+  'auto_approve_golden',
+  'auto_approve_pelatihan',
+  'auto_approve_duta',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -44,9 +44,9 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   golden_end_at: '2026-12-05T23:59:59+07:00',
   pelatihan_open: 'TRUE',
   duta_open: 'TRUE',
-  spin_prize_pelatihan: '0',
-  spin_prize_duta: '0',
-  spin_unique_winner: 'TRUE',
+  auto_approve_golden: 'FALSE',
+  auto_approve_pelatihan: 'FALSE',
+  auto_approve_duta: 'FALSE',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -84,9 +84,9 @@ export function parseSettings(raw: Map<string, string>): Settings {
     golden_end_at: toIso(get('golden_end_at'), SEED_SETTINGS.golden_end_at),
     pelatihan_open: toBool(get('pelatihan_open')),
     duta_open: toBool(get('duta_open')),
-    spin_prize_pelatihan: toInt(get('spin_prize_pelatihan'), 0),
-    spin_prize_duta: toInt(get('spin_prize_duta'), 0),
-    spin_unique_winner: toBool(get('spin_unique_winner')),
+    auto_approve_golden: toBool(get('auto_approve_golden')),
+    auto_approve_pelatihan: toBool(get('auto_approve_pelatihan')),
+    auto_approve_duta: toBool(get('auto_approve_duta')),
   }
 }
 
@@ -114,9 +114,9 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     golden_end_at: s.golden_end_at,
     pelatihan_open: s.pelatihan_open ? 'TRUE' : 'FALSE',
     duta_open: s.duta_open ? 'TRUE' : 'FALSE',
-    spin_prize_pelatihan: String(s.spin_prize_pelatihan),
-    spin_prize_duta: String(s.spin_prize_duta),
-    spin_unique_winner: s.spin_unique_winner ? 'TRUE' : 'FALSE',
+    auto_approve_golden: s.auto_approve_golden ? 'TRUE' : 'FALSE',
+    auto_approve_pelatihan: s.auto_approve_pelatihan ? 'TRUE' : 'FALSE',
+    auto_approve_duta: s.auto_approve_duta ? 'TRUE' : 'FALSE',
   }
 }
 

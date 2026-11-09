@@ -14,7 +14,7 @@ import {
 } from './repo/submissions'
 import { parseAndResolve, type Fetcher, type Resolver } from './resolve'
 import { qtyTarget } from './settings-schema'
-import type { CheckResult, Platform, Settings, Submission } from './types'
+import { AUTO_REVIEWER, type CheckResult, type Platform, type Settings, type Submission } from './types'
 import { runChecks } from './validate'
 import { normalizeWhatsapp } from './identity'
 
@@ -105,9 +105,10 @@ export async function createSubmission(
     }
     const likes = ev.likes!
     const comments = ev.comments!
+    const createdAt = new Date().toISOString()
     const sub: Submission = {
       id: newId(),
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
       period_id: settings.period_id,
       submitter_name: input.submitter_name.trim().replace(/\s+/g, ' '),
       platform: input.platform,
@@ -119,10 +120,10 @@ export async function createSubmission(
       metrics_source: input.metrics_source,
       organic_declared: true,
       screenshot_url: screenshotUrl,
-      status: 'pending',
+      status: settings.auto_approve_golden ? 'approved' : 'pending',
       reject_reason: '',
-      reviewed_by: '',
-      reviewed_at: '',
+      reviewed_by: settings.auto_approve_golden ? AUTO_REVIEWER : '',
+      reviewed_at: settings.auto_approve_golden ? createdAt : '',
       needs_review: input.metrics_source === 'api' ? false : apiDiffers(input, likes, comments),
       whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
     }

@@ -10,7 +10,7 @@ export default function Page() {
       program="pelatihan"
       pill="Pelatihan"
       title="Pelatihan Content"
-      intro="Ikuti pelatihan, selesaikan tugasnya, dan kumpulkan kode. Setiap kode yang disetujui masuk spin wheel. Yang beruntung dapat uang tunai."
+      intro="Ikuti pelatihan, selesaikan tugasnya, dan kumpulkan buktinya. Setiap tugas yang terkumpul mendapat kode, dan statusnya bisa kamu pantau."
     />
   )
 }

@@ -17,7 +17,7 @@ export function TaskForm({ program, tasks, open }: { program: Program; tasks: Ta
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ field?: string; message: string } | null>(null)
-  const [result, setResult] = useState<{ code: string; task: string; token?: string } | null>(null)
+  const [result, setResult] = useState<{ code: string; task: string; token?: string; status?: string } | null>(null)
   const me = useMe()
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function TaskForm({ program, tasks, open }: { program: Program; tasks: Ta
       }
       localStorage.setItem(ID_KEY, JSON.stringify({ name: name.trim(), wa: wa.trim() }))
       window.dispatchEvent(new CustomEvent('sharein:kode-baru'))
-      setResult({ code: data.code, task: data.task, token: data.token })
+      setResult({ code: data.code, task: data.task, token: data.token, status: data.status })
       toast('Terkirim')
     } catch {
       setError({ message: 'Tidak terhubung ke server. Periksa internet lalu coba lagi.' })
@@ -70,7 +70,7 @@ export function TaskForm({ program, tasks, open }: { program: Program; tasks: Ta
         <div className="bounce-once mx-auto w-fit"><GiftSolid className="h-20 w-20" /></div>
         <h2 id="kode-judul" className="mt-3 text-xl font-extrabold">Tugas terkumpul. Ini kodemu:</h2>
         <p id="kode-hasil" className="mx-auto mt-3 w-fit rounded-field border-2 border-dashed border-brand-orange bg-brand-amber/15 px-6 py-3 font-mono text-3xl font-extrabold tracking-widest">{result.code}</p>
-        <p className="muted mx-auto mt-3 max-w-sm text-sm">Tugas “{result.task}”. Kode masuk spin wheel setelah bukti disetujui admin. Pantau statusnya di link unikmu.</p>
+        <p className="muted mx-auto mt-3 max-w-sm text-sm">Tugas “{result.task}” {result.status === 'approved' ? 'sudah disetujui otomatis.' : 'menunggu pemeriksaan admin.'} Pantau statusnya di link unikmu.</p>
         {result.token && <PantauCard token={result.token} />}
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
@@ -118,7 +118,7 @@ export function TaskForm({ program, tasks, open }: { program: Program; tasks: Ta
         <div>
           <label htmlFor="tf-whatsapp" className="label">Nomor WhatsApp</label>
           <input id="tf-whatsapp" className="field" inputMode="tel" autoComplete="tel" placeholder="081234567890" maxLength={20} value={wa} onChange={(e) => setWa(e.target.value)} readOnly={Boolean(me)} />
-          {err('whatsapp') ?? <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu dapat link pantau unik; pemenang dihubungi lewat nomor ini.</p>}
+          {err('whatsapp') ?? <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>}
         </div>
       </div>
       <div>

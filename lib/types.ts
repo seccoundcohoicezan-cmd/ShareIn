@@ -22,9 +22,10 @@ export interface Settings {
   golden_end_at: string
   pelatihan_open: boolean
   duta_open: boolean
-  spin_prize_pelatihan: number
-  spin_prize_duta: number
-  spin_unique_winner: boolean
+  /** New submissions are approved without admin review. */
+  auto_approve_golden: boolean
+  auto_approve_pelatihan: boolean
+  auto_approve_duta: boolean
 }
 
 export interface Participant {
@@ -35,6 +36,18 @@ export interface Participant {
   whatsapp: string
   created_at: string
   last_seen_at: string
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  /** First characters, shown so admins can tell keys apart. */
+  prefix: string
+  /** SHA-256 of the key; the key itself is shown once and never stored. */
+  key_hash: string
+  active: boolean
+  created_at: string
+  created_by: string
 }
 
 export type Program = 'pelatihan' | 'duta'
@@ -69,18 +82,8 @@ export interface TaskSubmission {
   reviewed_at: string
 }
 
-export interface Draw {
-  id: string
-  time: string
-  program: Program
-  code: string
-  submission_id: string
-  name: string
-  identity_key: string
-  prize: number
-  actor: string
-  status: 'active' | 'void'
-}
+/** Value of reviewed_by on submissions approved by the auto-approve setting. */
+export const AUTO_REVIEWER = 'otomatis'
 
 export const PROGRAM_INFO: Record<Program, { label: string; path: string; prefix: string }> = {
   pelatihan: { label: 'Pelatihan Content', path: '/pelatihancontent', prefix: 'PC' },

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { invalidate } from '@/lib/cache'
 import { goldenAmount, formatRupiah } from '@/lib/golden'
 import {
-  eligibleEntries, maskName, myCodes, normalizeWhatsapp, programSummary, reviewTaskSubmissions, saveTask, spin, submitTask, voidDraw,
+  normalizeWhatsapp, programSummary, reviewTaskSubmissions, saveTask, submitTask,
 } from '@/lib/program-service'
 import { setStore } from '@/lib/repo'
 import { AppsScriptStore } from '@/lib/repo/apps-script-store'
@@ -34,10 +34,6 @@ describe('identity helpers', () => {
     for (const v of ['081234567890', '+62 812-3456-7890', '6281234567890', '81234567890']) expect(normalizeWhatsapp(v)).toBe('6281234567890')
     for (const v of ['12345', '021555123', 'abc', '']) expect(normalizeWhatsapp(v)).toBeNull()
   })
-  it('masks names for public winner lists', () => {
-    expect(maskName('Rina Utami Sari')).toBe('Rina U.')
-    expect(maskName('Budi')).toBe('Budi')
-  })
 })
 
 describe.each([
@@ -66,8 +62,6 @@ describe.each([
     const again = await submitTask('pelatihan', sub(t1.id, '6281234567890'))
     expect(again.ok).toBe(false)
     expect(!again.ok && again.message).toContain(a.ok ? a.code : '')
-    const mine = await myCodes('pelatihan', '0812-3456-7890')
-    expect(mine?.codes).toHaveLength(2)
   })
 
   it('validates identity, proof link, task, and closed program', async () => {
@@ -80,47 +74,24 @@ describe.each([
     expect((await submitTask('pelatihan', sub(t1.id))).ok).toBe(false)
   })
 
-  it('only approved codes enter the wheel; winner recorded; unique winner rule; void returns code', async () => {
+  it('auto-approve per program: new submissions are approved by the system, others still wait', async () => {
     const { t1, t2 } = await setup()
-    await submitTask('pelatihan', sub(t1.id, '081111111111', 'Andi'))
-    await submitTask('pelatihan', sub(t2.id, '081111111111', 'Andi'))
-    await submitTask('pelatihan', sub(t1.id, '082222222222', 'Budi'))
-    expect((await spin('pelatihan', 100000, 'owner@x.id')).ok).toBe(false)
-    const all = await taskSubmissionsTable.list()
-    await reviewTaskSubmissions('pelatihan', all.map((s) => s.id), 'approve', '', 'owner@x.id')
+    const first = await submitTask('pelatihan', sub(t1.id, '081111111111', 'Andi'))
+    expect(first).toMatchObject({ ok: true, status: 'pending' })
+    const s = await getSettingsFresh()
+    await saveSettings({ ...s, auto_approve_pelatihan: true })
     invalidate()
-    expect((await programSummary('pelatihan')).inWheel).toBe(3)
-    const r1 = await spin('pelatihan', 150000, 'owner@x.id')
-    if (!r1.ok) throw new Error('spin failed')
-    expect(r1.segments[r1.winnerIndex]).toBe(r1.draw.code)
-    expect(r1.draw.prize).toBe(150000)
+    const second = await submitTask('pelatihan', sub(t2.id, '081111111111', 'Andi'))
+    expect(second).toMatchObject({ ok: true, status: 'approved' })
+    const rows = await taskSubmissionsTable.list()
+    expect(rows.map((r) => [r.status, r.reviewed_by])).toEqual([['pending', ''], ['approved', 'otomatis']])
+    expect(rows[1].reviewed_at).not.toBe('')
+    // Duta has its own switch, still off.
+    const duta = await saveTask('duta', { title: 'Tugas wajib', description: '', proof_hint: '', active: true, order: 1 }, 'o')
+    expect(await submitTask('duta', sub(duta.id, '081111111111', 'Andi'))).toMatchObject({ ok: true, status: 'pending' })
+    await reviewTaskSubmissions('pelatihan', [rows[0].id], 'approve', '', 'o')
     invalidate()
-    const s1 = await programSummary('pelatihan')
-    expect(s1.winners[0]).toMatchObject({ code: r1.draw.code, prize: 150000 })
-    // Unique winner: the winner's other code is out, so only the other person remains.
-    const r2 = await spin('pelatihan', 150000, 'owner@x.id')
-    if (!r2.ok) throw new Error('spin 2 failed')
-    expect(r2.draw.identity_key).not.toBe(r1.draw.identity_key)
-    expect((await spin('pelatihan', 1000, 'owner@x.id')).ok).toBe(false)
-    await voidDraw(r2.draw.id, 'owner@x.id')
-    invalidate()
-    // Voiding returns every code of that person (Andi has 2, Budi has 1) to the wheel.
-    expect((await programSummary('pelatihan')).inWheel).toBe(r2.draw.name === 'Andi' ? 2 : 1)
-  })
-})
-
-describe('eligibleEntries', () => {
-  it('excludes pending/rejected, other programs, and past winners', () => {
-    const base = { created_at: '', task_id: 't', whatsapp: '', proof_url: '', note: '', reject_reason: '', reviewed_by: '', reviewed_at: '' }
-    const subs = [
-      { ...base, id: '1', program: 'duta', identity_key: 'a', name: 'A', code: 'DT-1', status: 'approved' },
-      { ...base, id: '2', program: 'duta', identity_key: 'b', name: 'B', code: 'DT-2', status: 'pending' },
-      { ...base, id: '3', program: 'pelatihan', identity_key: 'c', name: 'C', code: 'PC-3', status: 'approved' },
-      { ...base, id: '4', program: 'duta', identity_key: 'a', name: 'A', code: 'DT-4', status: 'approved' },
-    ] as const
-    const draws = [{ id: 'd', time: '', program: 'duta', code: 'DT-1', submission_id: '1', name: 'A', identity_key: 'a', prize: 1, actor: '', status: 'active' }] as const
-    expect(eligibleEntries('duta', [...subs], [...draws], true).map((s) => s.code)).toEqual([])
-    expect(eligibleEntries('duta', [...subs], [...draws], false).map((s) => s.code)).toEqual(['DT-4'])
+    expect(await programSummary('pelatihan')).toMatchObject({ codes: 2, approved: 2, participants: 1 })
   })
 })
 

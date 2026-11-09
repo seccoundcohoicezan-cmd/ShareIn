@@ -15,7 +15,7 @@ export const TABLES = {
     'id', 'created_at', 'program', 'task_id', 'identity_key', 'name', 'whatsapp', 'proof_url', 'note', 'code',
     'status', 'reject_reason', 'reviewed_by', 'reviewed_at',
   ],
-  draws: ['id', 'time', 'program', 'code', 'submission_id', 'name', 'identity_key', 'prize', 'actor', 'status'],
+  api_keys: ['id', 'name', 'prefix', 'key_hash', 'active', 'created_at', 'created_by'],
   participants: ['id', 'token', 'name', 'whatsapp', 'created_at', 'last_seen_at'],
 } as const
 

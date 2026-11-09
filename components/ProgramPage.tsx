@@ -1,5 +1,3 @@
-import { formatRupiah } from '@/lib/golden'
-import { formatDate } from '@/lib/format'
 import { programSummary } from '@/lib/program-service'
 import type { Program } from '@/lib/types'
 import { TaskForm } from './TaskForm'
@@ -15,7 +13,7 @@ async function load(program: Program) {
   }
 }
 
-const STEPS = ['Kerjakan tugas', 'Kumpulkan bukti, dapat kode', 'Kode disetujui masuk spin wheel', 'Yang beruntung dapat uang']
+const STEPS = ['Kerjakan tugas', 'Kumpulkan link bukti', 'Dapat kode tugas', 'Pantau statusnya']
 
 export async function ProgramPage({ program, pill, title, intro }: { program: Program; pill: string; title: string; intro: string }) {
   const data = await load(program)
@@ -36,7 +34,7 @@ export async function ProgramPage({ program, pill, title, intro }: { program: Pr
         {[
           ['Peserta', data?.participants ?? 0],
           ['Kode terkumpul', data?.codes ?? 0],
-          ['Siap diundi', data?.inWheel ?? 0],
+          ['Disetujui', data?.approved ?? 0],
         ].map(([k, v]) => (
           <div key={k} className="panel-solid !p-3">
             <p className="text-2xl font-extrabold tabular-nums text-brand-purple">{v}</p>
@@ -81,30 +79,11 @@ export async function ProgramPage({ program, pill, title, intro }: { program: Pr
       <section className="panel-solid flex flex-wrap items-center gap-3" aria-labelledby="pantau-judul">
         <div className="min-w-0 flex-1">
           <h2 id="pantau-judul" className="font-extrabold">Pantau kode & status tugasmu</h2>
-          <p className="muted text-sm">Semua kode, status disetujui/ditolak, dan kemenangan ada di link pantau unikmu.</p>
+          <p className="muted text-sm">Semua kode dan status disetujui/ditolak ada di link pantau unikmu.</p>
         </div>
         <a href="/pantau" className="btn-primary btn-sm">Buka halaman pantau</a>
       </section>
 
-      <section aria-labelledby="pemenang" className="panel-solid">
-        <PillLabel id="pemenang">Pemenang spin wheel</PillLabel>
-        {!data || data.winners.length === 0 ? (
-          <p className="muted mt-4 text-sm">Belum ada pengundian. Kumpulkan kodemu sebanyak mungkin.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-brand-purple/10">
-            {data.winners.map((w) => (
-              <li key={w.code + w.time} className="flex items-center gap-3 py-3">
-                <span className="rounded-full bg-brand-amber/30 px-2.5 py-1 font-mono text-xs font-bold">{w.code}</span>
-                <span className="font-bold">{w.name}</span>
-                <span className="ml-auto text-right">
-                  <span className="block font-extrabold text-orange-700">{formatRupiah(w.prize)}</span>
-                  <span className="muted text-xs">{formatDate(w.time)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
       <Toaster />
     </div>
   )

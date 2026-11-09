@@ -58,3 +58,13 @@ Dicatat saat build v1 (MRKT-52). Ubah bila tidak sesuai.
 | 32 | Pencarian riwayat berdasarkan nama dan cek kode berdasarkan nomor WA dihapus; diganti halaman pantau berkode. | Dulu siapa pun yang tahu nama/nomor bisa melihat setoran orang lain. |
 | 33 | Halaman pantau membaca spreadsheet tanpa cache dan polling 15 detik (berhenti saat tab disembunyikan). Status di sheet bisa diketik manual dalam bahasa Indonesia. | "preview datanya update live di spreadsheet". |
 | 34 | Lupa link → admin mengirim ulang dari `/admin/peserta` lewat WhatsApp (tidak ada pemulihan mandiri dengan nomor saja). | Pemulihan dengan nomor WA saja bisa disalahgunakan orang lain. |
+
+## Putaran 8 (9 Nov 2026)
+
+Keputusan #19–21 tentang spin wheel dibatalkan.
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 35 | Hadiah hanya di Golden Ticket. Spin wheel (halaman admin, API, tab `draws`, pengaturan hadiah) dihapus; Pelatihan & Duta tetap memberi kode tugas sebagai tanda terkumpul. | Permintaan pengguna. Belum ada data undian di spreadsheet saat dihapus. |
+| 36 | Setujui otomatis per program (`auto_approve_golden/pelatihan/duta`, bawaan mati). Hanya berlaku untuk setoran baru; `reviewed_by` = `otomatis`. Golden Ticket tetap harus lolos semua cek server. | Permintaan pengguna. |
+| 37 | API Golden Ticket hanya-baca di `/api/v1/goldenticket/*`, memakai kunci yang dibuat owner; tersimpan hanya hash SHA-256. Data memuat nomor WhatsApp, jadi harus dipanggil dari server. | "Tarik ke sistem lain". Menulis lewat API tidak diminta. |

@@ -6,7 +6,7 @@ import { toast, Toaster } from './Toast'
 
 type NumKey =
   | 'qty_tiktok' | 'qty_reels' | 'min_like_tiktok' | 'min_comment_tiktok' | 'min_like_reels' | 'min_comment_reels'
-  | 'golden_pool_start' | 'golden_pool_end' | 'spin_prize_pelatihan' | 'spin_prize_duta'
+  | 'golden_pool_start' | 'golden_pool_end'
 
 // datetime-local works in the browser's zone; the program runs on WIB, so convert explicitly.
 function toWibInput(iso: string) {
@@ -41,7 +41,7 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState(initial)
   const [nums, setNums] = useState<Record<NumKey, string>>(() => {
-    const keys: NumKey[] = ['qty_tiktok', 'qty_reels', 'min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end', 'spin_prize_pelatihan', 'spin_prize_duta']
+    const keys: NumKey[] = ['qty_tiktok', 'qty_reels', 'min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end']
     return Object.fromEntries(keys.map((k) => [k, formatNumber(initial[k])])) as Record<NumKey, string>
   })
   const [domains, setDomains] = useState(initial.sharein_domains.join(', '))
@@ -119,6 +119,16 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <Toggle id="period_open" label="Setoran dibuka" hint="Matikan untuk menutup form setoran." checked={s.period_open} onChange={(v) => setS({ ...s, period_open: v })} />
       </section>
 
+      <section className="panel-solid space-y-4">
+        <div>
+          <h2 className="font-extrabold">Setujui otomatis</h2>
+          <p className="muted text-sm">Bila aktif, setoran baru langsung berstatus Disetujui tanpa menunggu admin. Golden Ticket tetap harus lolos semua cek (like, komentar, duplikat, kuota). Setoran lama tidak berubah, dan admin tetap bisa menolak setelahnya.</p>
+        </div>
+        <Toggle id="auto_approve_golden" label="Golden Ticket" checked={s.auto_approve_golden} onChange={(v) => setS({ ...s, auto_approve_golden: v })} />
+        <Toggle id="auto_approve_pelatihan" label="Pelatihan Content" checked={s.auto_approve_pelatihan} onChange={(v) => setS({ ...s, auto_approve_pelatihan: v })} />
+        <Toggle id="auto_approve_duta" label="Duta Teladan" checked={s.auto_approve_duta} onChange={(v) => setS({ ...s, auto_approve_duta: v })} />
+      </section>
+
       <section className="panel-solid">
         <h2 className="mb-1 font-extrabold">Hadiah berjalan Golden Ticket</h2>
         <p className="muted mb-4 text-sm">Angka di halaman Golden Ticket naik sedikit demi sedikit dari nilai awal ke nilai akhir di antara dua tanggal (WIB).</p>
@@ -140,11 +150,6 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <h2 className="font-extrabold">Pelatihan Content & Duta Teladan</h2>
         <Toggle id="pelatihan_open" label="Pengumpulan Pelatihan dibuka" checked={s.pelatihan_open} onChange={(v) => setS({ ...s, pelatihan_open: v })} />
         <Toggle id="duta_open" label="Pengumpulan Duta Teladan dibuka" checked={s.duta_open} onChange={(v) => setS({ ...s, duta_open: v })} />
-        <div className="grid grid-cols-2 gap-3">
-          {num('spin_prize_pelatihan', 'Hadiah spin Pelatihan (Rp)')}
-          {num('spin_prize_duta', 'Hadiah spin Duta (Rp)')}
-        </div>
-        <Toggle id="spin_unique_winner" label="Satu orang maksimal menang sekali" hint="Per program. Matikan bila satu orang boleh menang lagi dengan kode lain." checked={s.spin_unique_winner} onChange={(v) => setS({ ...s, spin_unique_winner: v })} />
       </section>
 
       <section className="panel-solid">

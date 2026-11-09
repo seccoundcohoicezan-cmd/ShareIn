@@ -10,7 +10,7 @@ export default function Page() {
       program="duta"
       pill="Kewajiban"
       title="Duta Teladan"
-      intro="Tugas di halaman ini wajib diselesaikan setiap Duta Teladan. Setiap tugas yang selesai memberi kode bonus untuk spin wheel berhadiah uang."
+      intro="Tugas di halaman ini wajib diselesaikan setiap Duta Teladan. Setiap tugas yang terkumpul mendapat kode, dan statusnya bisa kamu pantau."
     />
   )
 }

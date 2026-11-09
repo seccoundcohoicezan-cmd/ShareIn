@@ -29,9 +29,9 @@ const schema = z.object({
   golden_end_at: z.string().datetime({ offset: true, message: 'Tanggal akhir hadiah tidak valid.' }),
   pelatihan_open: z.boolean(),
   duta_open: z.boolean(),
-  spin_prize_pelatihan: count,
-  spin_prize_duta: count,
-  spin_unique_winner: z.boolean(),
+  auto_approve_golden: z.boolean(),
+  auto_approve_pelatihan: z.boolean(),
+  auto_approve_duta: z.boolean(),
 }).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
   message: 'Tanggal akhir hadiah harus setelah tanggal mulai.',
 })

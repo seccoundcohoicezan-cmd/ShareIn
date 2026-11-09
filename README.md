@@ -1,6 +1,6 @@
 # ShareIn
 
-Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — **Golden Ticket** (setoran konten viral TikTok/Reels dengan hadiah berjalan), **Pelatihan Content**, dan **Duta Teladan** (tugas → kode → spin wheel berhadiah uang). Mobile-first, berbahasa Indonesia, database Google Sheets.
+Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — **Golden Ticket** (setoran konten viral TikTok/Reels dengan hadiah berjalan), **Pelatihan Content**, dan **Duta Teladan** (tugas → kode → status dipantau; tanpa hadiah). Mobile-first, berbahasa Indonesia, database Google Sheets.
 
 **Tumpukan:** Next.js 14 (App Router) · TypeScript · Tailwind CSS · Zod · Google Sheets lewat Apps Script (atau Sheets API service account) · bcrypt · Vercel / Docker.
 
@@ -8,10 +8,10 @@ Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — 
 
 - **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; isinya hanya tutorial interaktif yang berjalan otomatis (storyboard animasi, berhenti saat langkah diklik) (upload → bagikan link → reward) dan panduan bergambar cara menyalin link TikTok / Instagram Reels (tangkapan layar asli, titik ketuk berdenyut). Halaman program dibagikan langsung lewat link-nya. Latar: gradasi + 6 aset brand yang bergeser beda kecepatan saat scroll, diparkir di area kosong kiri/kanan (desktop) dan mengintip di tepi (HP).
 - **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), progres QTY, ketentuan. Setor di `/goldenticket/setor`, riwayat di `/goldenticket/riwayat`.
-- **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Kode yang disetujui admin masuk spin wheel. *Kode saya* (cek per nomor WA) dan daftar pemenang (nama disamarkan, mis. "Rina U.").
+- **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Status tiap tugas dipantau lewat link pantau unik. Hadiah hanya ada di Golden Ticket.
 - **`/pantau/<kode>`** — halaman pantau pribadi (seperti pelacakan aduan): 1 nomor WhatsApp = 1 peserta = 1 kode/link unik (12 karakter, mis. `ABCD-EFGH-JKLM`). Link dibuat otomatis saat pertama menyetor Golden Ticket atau mengumpulkan tugas, sekaligus berfungsi sebagai login (cookie) sehingga form terisi otomatis. Isinya semua setoran lintas program dengan status Menunggu/Disetujui/Ditolak, alasan tolak, kode undian & kemenangan, linimasa pemeriksaan, dan **diperbarui otomatis tiap 15 detik langsung dari spreadsheet** (perubahan status yang diketik admin langsung di sheet ikut tampil; kolom status punya dropdown + warna, kata "disetujui"/"ditolak" juga diterima). `/pantau` untuk memasukkan kode.
 - **`/aturan`** — aturan semua program.
-- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (tombol *Pratinjau & review*: pemutar resmi TikTok/Instagram + link Sharein di satu panel dengan Setujui/Tolak; massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/spin` (roda undian, pemenang dipilih acak di server, tercatat di sheet `draws`, bisa dibatalkan); `/admin/pengaturan` (periode/QTY/batas Golden Ticket, hadiah berjalan, buka/tutup program, hadiah spin bawaan, satu orang maks. menang sekali); `/admin/peserta` (daftar peserta + link unik, kirim ulang via WhatsApp); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
+- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (tombol *Pratinjau & review*: pemutar resmi TikTok/Instagram + link Sharein di satu panel dengan Setujui/Tolak; massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/pengaturan` (periode/QTY/batas Golden Ticket, hadiah berjalan, buka/tutup program, setujui otomatis per program); `/admin/api` (kunci API Golden Ticket, lihat `docs/API.md`); `/admin/peserta` (daftar peserta + link unik, kirim ulang via WhatsApp); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
 - **Validasi server** (diulang saat simpan): periode dibuka → format/domain URL (hanya https) → normalisasi & ikuti link pendek (HEAD, 3 dtk, hanya domain TikTok/Instagram, IP privat diblokir) → duplikat `source_key` di semua periode → minimal like/komentar (inklusif) → pernyataan organik (+ tangkapan layar bila wajib) → QTY belum penuh → simpan dengan penguncian.
 - **Latar bergerak ringan** — 1 lapisan fixed + 3 blob (4 node DOM), CSS `animation-timeline: scroll()` dengan fallback rAF; mati saat `prefers-reduced-motion`, Data Saver, atau RAM ≤ 4 GB. Admin polos.
 
@@ -34,7 +34,7 @@ Spreadsheet ShareIn sudah punya proyek Apps Script terikat (`apps-script/`, depl
 
 1. Pemilik spreadsheet membuka **Ekstensi → Apps Script**, memilih fungsi `siapkan`, lalu **Run** dan mengizinkan akses (sekali saja). Sebelum ini Web App membalas 403.
 2. Di editor yang sama, buka file `Rahasia.gs` dan salin nilai `API_SECRET`.
-3. Di Vercel → Settings → Environment Variables isi `APPS_SCRIPT_SECRET` (nilai tadi), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, lalu **Redeploy**. Tab `settings`, `submissions`, `admins`, `audit_log`, `tasks`, `task_submissions`, `draws` dibuat otomatis.
+3. Di Vercel → Settings → Environment Variables isi `APPS_SCRIPT_SECRET` (nilai tadi), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, lalu **Redeploy**. Tab `settings`, `submissions`, `admins`, `audit_log`, `tasks`, `task_submissions`, `participants`, `api_keys` dibuat otomatis.
 
 Mengubah kode Apps Script: `cd apps-script && clasp push -f && clasp deploy -i $(cat .deployment-id)`.
 
@@ -70,7 +70,7 @@ ADMIN_NEW_PASSWORD='sandi-minimal-10' npm run admin:add -- reviewer@domain.id re
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run lint` · `npm run typecheck` | ESLint · TypeScript |
-| `npm test` | Uji unit (Vitest): URL, validasi, batas inklusif, duplikat, QTY bersamaan, hadiah berjalan, kode & spin, driver Sheets palsu, dan `apps-script/Code.js` asli yang dijalankan di Node dengan spreadsheet tiruan |
+| `npm test` | Uji unit (Vitest): URL, validasi, batas inklusif, duplikat, QTY bersamaan, hadiah berjalan, kode tugas, setujui otomatis, API, driver Sheets palsu, dan `apps-script/Code.js` asli yang dijalankan di Node dengan spreadsheet tiruan |
 | `npm run test:e2e` | Uji end-to-end Playwright di profil Pixel 7 (butuh `npm run build` dulu) |
 | `npm run sheet:setup` | Buat tab + header + nilai awal |
 | `npm run admin:add` | Tambah admin |
@@ -95,11 +95,8 @@ Prefiks `/api`, JSON.
 | GET | `/admin/export.csv` | admin |
 | GET | `/programs/:program` | publik — tugas, jumlah peserta/kode, pemenang (`pelatihan` \| `duta`) |
 | POST | `/programs/:program/submit` | publik — `{ task_id, name, whatsapp, proof_url, note? }` → `{ ok, code }` |
-| GET | `/programs/:program/codes?wa=` | publik — kode milik nomor WA |
 | GET / POST | `/admin/programs/:program/tasks` · PATCH `/tasks/:id` | admin / owner |
 | GET | `/admin/programs/:program/submissions` · PATCH `/:id` · POST `/bulk` | admin |
-| GET | `/admin/programs/:program/draws` · DELETE `/draws/:id` | admin / owner |
-| POST | `/admin/programs/:program/spin` | owner — `{ prize }` |
 
 Id cek: `period_open`, `url_valid`, `not_duplicate`, `min_like`, `min_comment`, `sharein_valid`, `qty_available`, `organic`.
 

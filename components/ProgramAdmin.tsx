@@ -7,7 +7,7 @@ import { PreviewPanel } from './PreviewPanel'
 import { toast, Toaster } from './Toast'
 import { EmptyState } from './ui'
 
-type Item = TaskSubmission & { won: boolean }
+type Item = TaskSubmission
 const REASONS = ['Bukti tidak sesuai', 'Link tidak bisa dibuka', 'Tugas belum selesai', 'Duplikat']
 const STATUS = { pending: ['Menunggu', 'bg-amber-100 text-amber-900'], approved: ['Disetujui', 'bg-green-100 text-green-900'], rejected: ['Ditolak', 'bg-red-100 text-red-900'], void: ['Batal', 'bg-gray-100'] } as const
 
@@ -111,7 +111,7 @@ function Submissions({ program }: { program: Program }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono font-extrabold">{s.code}</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS[s.status][1]}`}>{STATUS[s.status][0]}</span>
-                  {s.won && <span className="rounded-full bg-brand-orange px-2.5 py-0.5 text-xs font-bold text-white">Menang</span>}
+                  {s.reviewed_by === 'otomatis' && <span className="rounded-full bg-brand-lavender px-2.5 py-0.5 text-xs font-bold text-brand-purple">Otomatis</span>}
                 </div>
                 <p className="mt-1 font-extrabold">{s.name} <span className="muted text-sm font-medium">· {s.whatsapp}</span></p>
                 <p className="text-sm">{titles.get(s.task_id) ?? s.task_id}</p>
@@ -137,7 +137,7 @@ function Submissions({ program }: { program: Program }) {
           onClose={() => setPreviewing(null)}
           details={
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-              <dt className="muted">Status</dt><dd><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS[previewing.status][1]}`}>{STATUS[previewing.status][0]}</span>{previewing.won && ' · Menang'}</dd>
+              <dt className="muted">Status</dt><dd><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS[previewing.status][1]}`}>{STATUS[previewing.status][0]}</span>{previewing.reviewed_by === 'otomatis' && ' · disetujui otomatis'}</dd>
               <dt className="muted">Tugas</dt><dd className="font-bold">{titles.get(previewing.task_id) ?? previewing.task_id}</dd>
               <dt className="muted">Peserta</dt><dd>{previewing.name}</dd>
               <dt className="muted">WhatsApp</dt><dd><a className="font-bold text-brand-purple underline" href={`https://wa.me/${previewing.whatsapp}`} target="_blank" rel="noopener noreferrer">{previewing.whatsapp}</a></dd>

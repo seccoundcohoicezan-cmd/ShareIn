@@ -90,6 +90,16 @@ describe.each([
     expect((await createSubmission(input())).ok).toBe(false)
   })
 
+  it('auto-approve on: valid submission is approved by the system, invalid is still refused', async () => {
+    const s = await getSettingsFresh()
+    await saveSettings({ ...s, auto_approve_golden: true })
+    const ok = await createSubmission(input())
+    expect(ok.ok && ok.submission).toMatchObject({ status: 'approved', reviewed_by: 'otomatis' })
+    expect(ok.ok && ok.submission.reviewed_at).not.toBe('')
+    expect((await createSubmission(input({ likes: 99999 }))).ok).toBe(false)
+    expect((await listSubmissionsFresh()).length).toBe(1)
+  })
+
   it('rejecting frees a QTY slot; history by name hides other people', async () => {
     await setQty(1)
     const a = await createSubmission(input())
@@ -162,7 +172,7 @@ describe('sheets store details', () => {
     invalidate()
     const s = await getSettingsFresh()
     expect(s.min_like_tiktok).toBe(100000)
-    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'audit_log', 'draws', 'participants', 'settings', 'submissions', 'task_submissions', 'tasks'])
+    expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'api_keys', 'audit_log', 'participants', 'settings', 'submissions', 'task_submissions', 'tasks'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
     expect(fake.tabs.get('settings')!.length).toBe(1 + 20)
     const header = fake.tabs.get('submissions')![0] as string[]

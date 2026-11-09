@@ -3,10 +3,10 @@ import { expect, test, type Page } from '@playwright/test'
 const SHOTS = process.env.E2E_SHOTS || 'test-results/shots'
 const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
 
-async function login(page: Page) {
+async function login(page: Page, password = 'rahasia-e2e-123') {
   await page.goto('/admin/login')
   await page.getByLabel('Email').fill('owner@sharein.test')
-  await page.getByLabel('Sandi').fill('rahasia-e2e-123')
+  await page.getByLabel('Sandi').fill(password)
   await page.getByRole('button', { name: 'Masuk' }).click()
   await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
 }
@@ -91,7 +91,7 @@ test('URL lama dialihkan', async ({ page }) => {
   }
 })
 
-test('pelatihan: admin buat tugas → peserta dapat kode → admin setujui → spin → pemenang tampil', async ({ page, browser }) => {
+test('pelatihan: admin buat tugas → peserta dapat kode → admin setujui → pantau, tanpa hadiah/spin', async ({ page, browser }) => {
   await login(page)
   await page.goto('/admin/program/pelatihan')
   await page.getByRole('tab', { name: 'Daftar tugas' }).click()
@@ -130,31 +130,15 @@ test('pelatihan: admin buat tugas → peserta dapat kode → admin setujui → s
   await expect(page.getByRole('status').getByText('Disetujui')).toBeVisible()
 
   await page.goto('/admin/spin')
-  await expect(page.getByText('1 kode siap diundi')).toBeVisible()
-  await page.getByLabel('Nominal hadiah').fill('150000')
-  await page.getByRole('button', { name: 'Putar' }).click()
-  await expect(page.getByText('Pemenang', { exact: true })).toBeVisible({ timeout: 10_000 })
-  await expect(page.locator('p.font-mono')).toHaveText(theCode)
-  await expect(page.locator('svg text', { hasText: theCode })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Hubungi via WhatsApp' })).toHaveAttribute('href', 'https://wa.me/6281234567890')
-  await shot(page, '14-admin-spin')
-
-  await expect
-    .poll(async () => {
-      await peserta.goto('/pelatihancontent')
-      return peserta.locator('section', { hasText: 'Pemenang spin wheel' }).textContent()
-    }, { timeout: 40_000, intervals: [2000] })
-    .toContain('Rina U.')
-  const winners = peserta.locator('section', { hasText: 'Pemenang spin wheel' })
-  await expect(winners).toContainText('Rp150.000')
-  await expect(winners).not.toContainText('Utami')
-  await shot(peserta, '15-pelatihan-pemenang')
+  await expect(page.getByRole('heading', { name: 'Spin wheel' })).toHaveCount(0)
+  await peserta.goto('/pelatihancontent')
+  await expect(peserta.getByText(/spin wheel|pemenang|hadiah|undi/i)).toHaveCount(0)
   await peserta.goto(pantauHref)
   const list = peserta.getByRole('list', { name: 'Daftar setoran' })
   await expect(list).toContainText(theCode)
   await expect(list).toContainText('Disetujui')
-  await expect(list).toContainText('Menang Rp150.000')
-  await shot(peserta, '15b-pantau-menang')
+  await expect(list).not.toContainText('Menang')
+  await shot(peserta, '15b-pantau-disetujui')
 })
 
 test('duta teladan: halaman kewajiban, kode DT-, pengumpulan bisa ditutup', async ({ page, browser }) => {
@@ -223,4 +207,53 @@ test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async 
   await page.getByLabel('Sandi').fill('sandi-baru-e2e-456')
   await page.getByRole('button', { name: 'Masuk' }).click()
   await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
+})
+
+test('setujui otomatis per program + API Golden Ticket dengan kunci', async ({ page, request, browser }) => {
+  await login(page, 'sandi-baru-e2e-456')
+  await page.goto('/admin/api')
+  await page.getByLabel('Nama kunci').fill('Sistem Uji')
+  await page.getByRole('button', { name: 'Buat kunci' }).click()
+  const key = (await page.locator('#kunci-baru').textContent())!
+  expect(key).toMatch(/^si_live_/)
+  await shot(page, '20-admin-api')
+  const auth = { Authorization: `Bearer ${key}` }
+
+  expect((await request.get('/api/v1/goldenticket/summary')).status()).toBe(401)
+  expect((await request.get('/api/v1/goldenticket/submissions', { headers: { Authorization: 'Bearer si_live_salah' } })).status()).toBe(401)
+  const sum = await (await request.get('/api/v1/goldenticket/summary', { headers: { 'X-API-Key': key } })).json()
+  expect(sum).toMatchObject({ ok: true, auto_approve: false })
+  expect(sum.prize.end).toBe(5_000_000)
+  const before = await (await request.get('/api/v1/goldenticket/submissions', { headers: auth })).json()
+  expect(before.total).toBeGreaterThan(0)
+  expect((await request.get('/api/v1/goldenticket/submissions?limit=9999', { headers: auth })).status()).toBe(400)
+
+  await page.goto('/admin/pengaturan')
+  for (const n of ['Golden Ticket', 'Pelatihan Content', 'Setoran dibuka']) await page.getByRole('switch', { name: n, exact: true }).click()
+  await page.getByLabel('QTY TikTok').fill('50')
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click()
+  await expect(page.getByText('Tersimpan')).toBeVisible()
+  await shot(page, '21-admin-otomatis')
+
+  const res = await request.post('/api/submissions', {
+    data: { submitter_name: 'Otomatis Satu', whatsapp: '081277770001', platform: 'tiktok', source_url: 'https://www.tiktok.com/@o/video/7400000000000099999', sharein_url: 'https://sharein.id/c/auto', likes: 200000, comments: 8000, organic_declared: true, checked_declared: true },
+  })
+  expect(res.status()).toBe(201)
+  const made = await res.json()
+  expect(made.status).toBe('approved')
+  const one = await (await request.get(`/api/v1/goldenticket/submissions/${made.id}`, { headers: auth })).json()
+  expect(one.item).toMatchObject({ status: 'approved', reviewed_by: 'otomatis', whatsapp: '6281277770001' })
+
+  const ctx = await browser.newContext()
+  const user = await ctx.newPage()
+  await user.goto(`/pantau/${made.token}`)
+  await expect(user.getByRole('list', { name: 'Daftar setoran' })).toContainText('Disetujui otomatis')
+  await expect(user.getByRole('list', { name: 'Daftar setoran' })).toContainText('Diperiksa sistem')
+  await ctx.close()
+
+  await page.goto('/admin/api')
+  page.once('dialog', (d) => d.accept())
+  await page.getByRole('button', { name: 'Cabut' }).click()
+  await expect(page.getByText('Dicabut', { exact: true })).toBeVisible()
+  expect((await request.get('/api/v1/goldenticket/summary', { headers: auth })).status()).toBe(401)
 })

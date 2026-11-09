@@ -55,3 +55,17 @@ export function sameOrigin(req: NextRequest): boolean {
     return false
   }
 }
+
+/** Authenticates server-to-server API calls: `Authorization: Bearer <key>` or `X-API-Key: <key>`. */
+export async function requireApiKey(req: NextRequest): Promise<NextResponse | null> {
+  const ipLimit = rateLimit(`apikey-ip:${clientIp(req)}`, 300, 60_000)
+  if (!ipLimit.ok) return NextResponse.json({ ok: false, error: 'rate_limited', retry_after: ipLimit.retryAfter }, { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfter) } })
+  const bearer = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
+  const key = (bearer ?? req.headers.get('x-api-key') ?? '').trim()
+  const { verifyApiKey } = await import('./api-key-service')
+  const found = key ? await verifyApiKey(key) : null
+  if (!found) return NextResponse.json({ ok: false, error: 'invalid_api_key' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } })
+  const limit = rateLimit(`apikey:${found.id}`, 120, 60_000)
+  if (!limit.ok) return NextResponse.json({ ok: false, error: 'rate_limited', retry_after: limit.retryAfter }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } })
+  return null
+}

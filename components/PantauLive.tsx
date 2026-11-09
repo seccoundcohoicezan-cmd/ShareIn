@@ -1,8 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { formatRupiah } from '@/lib/golden'
-import { CheckIcon, CrossIcon, ExternalIcon, GiftSolid } from './icons'
+import { CheckIcon, CrossIcon, ExternalIcon } from './icons'
 import { PantauCard } from './PantauCard'
 import { Toaster } from './Toast'
 
@@ -20,7 +19,7 @@ type Item = {
   reason: string
   created_at: string
   reviewed_at: string
-  won?: { prize: number; time: string }
+  auto: boolean
 }
 type Data = {
   name: string
@@ -45,9 +44,9 @@ function Timeline({ it }: { it: Item }) {
   const done = it.status !== 'pending'
   const steps = [
     { t: 'Diterima sistem', at: it.created_at, state: 'done' as const },
-    { t: 'Diperiksa admin', at: done ? it.reviewed_at : '', state: done ? ('done' as const) : ('now' as const) },
+    { t: it.auto ? 'Diperiksa sistem' : 'Diperiksa admin', at: done ? it.reviewed_at : '', state: done ? ('done' as const) : ('now' as const) },
     {
-      t: it.status === 'rejected' ? 'Ditolak' : it.status === 'approved' ? (it.code ? 'Disetujui · kode masuk spin wheel' : 'Disetujui') : 'Keputusan',
+      t: it.status === 'rejected' ? 'Ditolak' : it.status === 'approved' ? (it.auto ? 'Disetujui otomatis' : 'Disetujui') : 'Keputusan',
       at: done ? it.reviewed_at : '',
       state: it.status === 'approved' ? ('ok' as const) : it.status === 'rejected' ? ('bad' as const) : ('todo' as const),
     },
@@ -174,7 +173,6 @@ export function PantauLive({ token }: { token: string }) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${PROGRAM_TAG[it.program]}`}>{it.programLabel}</span>
                 <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${BADGE[it.status]}`}>{LABEL[it.status]}</span>
-                {it.won && <span className="rounded-full bg-brand-orange px-2.5 py-0.5 text-xs font-bold text-white">Menang {formatRupiah(it.won.prize)}</span>}
                 {changed.has(it.id) && <span className="text-xs font-bold text-brand-purple">Baru diperbarui</span>}
               </div>
               <p className="mt-2 font-extrabold">{it.title}</p>
@@ -185,11 +183,6 @@ export function PantauLive({ token }: { token: string }) {
                 {it.sharein && <a href={it.sharein} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Link Sharein <ExternalIcon /></a>}
               </div>
               {it.status === 'rejected' && it.reason && <p className="mt-1 rounded-field bg-red-50 px-3 py-2 text-sm text-bad">Alasan ditolak: {it.reason}</p>}
-              {it.won && (
-                <p className="mt-2 flex items-center gap-2 rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">
-                  <GiftSolid className="h-6 w-6" /> Selamat! Kode ini menang spin wheel. Admin akan menghubungimu lewat WhatsApp.
-                </p>
-              )}
               <Timeline it={it} />
             </li>
           ))}

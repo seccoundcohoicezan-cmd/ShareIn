@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto'
 import { maskWhatsapp, normalizeWhatsapp } from './identity'
 import { withLock } from './lock'
-import { drawsTable, participantsTable, taskSubmissionsTable, tasksTable } from './repo/programs'
+import { participantsTable, taskSubmissionsTable, tasksTable } from './repo/programs'
 import { strip } from './repo/records'
 import { listSubmissionsFresh } from './repo/submissions'
-import { PROGRAM_INFO, type Participant } from './types'
+import { AUTO_REVIEWER, PROGRAM_INFO, type Participant } from './types'
 
 // 12 chars from an unambiguous alphabet (~2^59): long enough to be unguessable with rate limiting,
 // short enough to read aloud or type like a complaint ticket number (shown as XXXX-XXXX-XXXX).
@@ -67,21 +67,15 @@ export interface TrackItem {
   reason: string
   created_at: string
   reviewed_at: string
-  won?: { prize: number; time: string }
+  auto: boolean
 }
 
 /** Everything one participant submitted, read fresh from the spreadsheet (no cache) for live tracking. */
 export async function tracking(token: string) {
   const me = await participantByToken(token)
   if (!me) return null
-  const [golden, subs, tasks, draws] = await Promise.all([
-    listSubmissionsFresh(),
-    taskSubmissionsTable.list(),
-    tasksTable.list(),
-    drawsTable.list(),
-  ])
+  const [golden, subs, tasks] = await Promise.all([listSubmissionsFresh(), taskSubmissionsTable.list(), tasksTable.list()])
   const titles = new Map(tasks.map((t) => [t.id, t.title]))
-  const wins = new Map(draws.filter((d) => d.status === 'active').map((d) => [d.code, d]))
   const items: TrackItem[] = [
     ...golden
       .filter((s) => s.whatsapp === me.whatsapp && s.status !== 'void')
@@ -98,25 +92,23 @@ export async function tracking(token: string) {
         reason: s.reject_reason,
         created_at: s.created_at,
         reviewed_at: s.reviewed_at,
+        auto: s.reviewed_by === AUTO_REVIEWER,
       })),
     ...subs
       .filter((s) => s.identity_key === me.whatsapp && s.status !== 'void')
-      .map((s): TrackItem => {
-        const w = wins.get(s.code)
-        return {
-          id: s.id,
-          program: s.program,
-          programLabel: PROGRAM_INFO[s.program].label,
-          title: titles.get(s.task_id) ?? 'Tugas',
-          link: s.proof_url,
-          code: s.code,
-          status: s.status as TrackItem['status'],
-          reason: s.reject_reason,
-          created_at: s.created_at,
-          reviewed_at: s.reviewed_at,
-          ...(w ? { won: { prize: w.prize, time: w.time } } : {}),
-        }
-      }),
+      .map((s): TrackItem => ({
+        id: s.id,
+        program: s.program,
+        programLabel: PROGRAM_INFO[s.program].label,
+        title: titles.get(s.task_id) ?? 'Tugas',
+        link: s.proof_url,
+        code: s.code,
+        status: s.status as TrackItem['status'],
+        reason: s.reject_reason,
+        created_at: s.created_at,
+        reviewed_at: s.reviewed_at,
+        auto: s.reviewed_by === AUTO_REVIEWER,
+      })),
   ].sort((a, b) => b.created_at.localeCompare(a.created_at))
   return {
     name: me.name,

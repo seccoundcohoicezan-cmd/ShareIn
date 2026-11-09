@@ -9,7 +9,7 @@ async function main() {
   const store = getStore()
   await store.ensureSchema()
   await seedSettings()
-  console.log(`Siap (${store.kind}). Tab: settings, submissions, admins, audit_log, tasks, task_submissions, draws.`)
+  console.log(`Siap (${store.kind}). Tab: settings, submissions, admins, audit_log, tasks, task_submissions, participants, api_keys.`)
 }
 main().catch((e) => {
   console.error(e)
