@@ -49,3 +49,18 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
     </div>
   )
 }
+
+export function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
+  return <span aria-hidden="true" className={`inline-block shrink-0 animate-spin rounded-full border-2 border-current border-r-transparent ${className}`} />
+}
+
+/** Thin indeterminate bar at the top of the screen while the admin waits for the server. */
+export function TopProgress({ active, label = 'Menyimpan…' }: { active: boolean; label?: string }) {
+  if (!active) return null
+  return (
+    <div role="status" aria-live="polite" className="fixed inset-x-0 top-0 z-[60] h-1 overflow-hidden bg-brand-purple/15">
+      <span className="sr-only">{label}</span>
+      <div className="top-progress h-full w-1/3 rounded-full bg-brand-purple" />
+    </div>
+  )
+}

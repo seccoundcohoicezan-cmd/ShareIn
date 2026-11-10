@@ -1,10 +1,11 @@
-import { cellToString, TABLES, type Row, type TableData, type TableName, type TableStore } from './store'
+import { cellToString, TABLES, type PatchRequest, type PatchResult, type Row, type TableData, type TableName, type TableStore } from './store'
 
 type Op =
   | { action: 'ensure'; tables: Record<string, readonly string[]> }
   | { action: 'read'; table: TableName }
   | { action: 'append'; table: TableName; rows: string[][]; returnRows?: boolean }
   | { action: 'update'; table: TableName; updates: { index: number; row: string[] }[] }
+  | ({ action: 'patch'; table: TableName } & Omit<PatchRequest, 'patches'> & { patches: { id: string; values: Record<string, string> }[] })
 
 export type Poster = (url: string, body: string) => Promise<{ status: number; text: string }>
 
@@ -134,6 +135,15 @@ export class AppsScriptStore implements TableStore {
     this.markVerified(table, r.table.header)
     this.recent.set(table, { at: Date.now(), data: Promise.resolve(r.table) })
     return { header: r.table.header.length ? r.table.header : [...TABLES[table]], rows: r.table.rows.map((row) => [...row]) }
+  }
+
+  async patch(table: TableName, req: PatchRequest): Promise<PatchResult> {
+    await this.ensureFor(table)
+    this.recent.delete(table)
+    if (req.log) this.recent.delete(req.log.table)
+    const r = await this.call<PatchResult>({ action: 'patch', table, ...req, patches: req.patches.map((p) => ({ id: p.id, values: Object.fromEntries(Object.entries(p.values).map(([k, v]) => [k, cellToString(v)])) })) })
+    this.recent.delete(table)
+    return r
   }
 
   async read(table: TableName): Promise<TableData> {

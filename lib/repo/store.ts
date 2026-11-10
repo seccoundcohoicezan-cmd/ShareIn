@@ -32,8 +32,24 @@ export interface TableStore {
   update(table: TableName, updates: { index: number; row: Row }[]): Promise<void>
   /** Appends and returns the table afterwards, in one round trip where the backend supports it. */
   appendAndRead?(table: TableName, rows: Row[]): Promise<TableData>
+  /** Changes some columns of rows found by key in one round trip, without reading the table first. */
+  patch?(table: TableName, req: PatchRequest): Promise<PatchResult>
   /** Drops any cached read of the table (stores that share reads). */
   forget?(table: TableName): void
+}
+
+export interface PatchRequest {
+  key: string
+  patches: { id: string; values: Record<string, Cell> }[]
+  /** Rows whose column holds one of these (lower-case) values are left alone and reported missing. */
+  skip?: Record<string, string[]>
+  /** Writes one audit row per change (changed columns before/after) in the same request. */
+  log?: { table: TableName; actor: string; action: string; time: string }
+}
+
+export interface PatchResult {
+  items: { index: number; record: Record<string, string> }[]
+  missing: string[]
 }
 
 export async function appendThenRead(store: TableStore, table: TableName, rows: Row[]): Promise<TableData> {

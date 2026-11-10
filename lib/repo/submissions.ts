@@ -2,7 +2,7 @@ import { cached, invalidate } from '../cache'
 import type { Channel, Platform, Submission, SubmissionStatus } from '../types'
 import { getStore } from './index'
 import { normalizeStatus } from '../status'
-import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell } from './store'
+import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell, type PatchResult } from './store'
 
 export interface StoredSubmission extends Submission {
   /** Data row index in the table. */
@@ -117,6 +117,36 @@ export async function updateSubmissions(items: StoredSubmission[]): Promise<void
   invalidate('submissions')
   invalidate('progress')
   invalidate('program:')
+}
+
+/**
+ * Sets review columns on submissions by id. On Apps Script this is ONE request (find rows by id,
+ * write, and log to audit_log together) instead of read + update + one append per audit row.
+ * Returns null when the store has no patch support, so the caller falls back to read + update.
+ */
+export async function patchSubmissions(
+  changes: { id: string; values: Partial<Pick<Submission, 'status' | 'reject_reason' | 'reviewed_by' | 'reviewed_at'>> }[],
+  log: { actor: string; action: string },
+): Promise<StoredSubmission[] | null> {
+  const store = getStore()
+  if (!store.patch) return null
+  let r: PatchResult
+  try {
+    r = await store.patch('submissions', {
+      key: 'id',
+      patches: changes.map((c) => ({ id: c.id, values: c.values as Record<string, Cell> })),
+      skip: { status: ['void'] },
+      log: { table: 'audit_log', actor: log.actor, action: log.action, time: new Date().toISOString() },
+    })
+  } catch (e) {
+    // An Apps Script deployment older than the patch op: use the slower read + update path.
+    if (String((e as Error).message).includes('aksi tidak dikenal')) return null
+    throw e
+  }
+  invalidate('submissions')
+  invalidate('progress')
+  invalidate('program:')
+  return r.items.map((it) => fromRecord(it.record, it.index))
 }
 
 export function isCollected(s: Submission): boolean {

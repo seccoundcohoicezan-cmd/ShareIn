@@ -149,8 +149,18 @@ test('pelatihan: kirim link seperti Golden Ticket tanpa hadiah, target mingguan,
   await card.getByRole('button', { name: 'Pratinjau & review' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: 'Setujui' })).toBeVisible()
+  // A slow spreadsheet: the admin sees a spinner and a top bar, and cannot press twice.
+  await page.route('**/api/admin/submissions/*', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500))
+    await route.continue()
+  })
   await dialog.getByRole('button', { name: 'Setujui' }).click()
+  await expect(dialog.getByRole('button', { name: 'Menyetujui…' })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Tolak' })).toBeDisabled()
+  await expect(page.getByRole('status').filter({ hasText: 'Menyimpan…' })).toBeAttached()
+  await shot(page, '15a-admin-menyetujui')
   await expect(dialog.getByRole('button', { name: 'Disetujui ✓' })).toBeDisabled()
+  await page.unroute('**/api/admin/submissions/*')
   await expect(dialog.getByRole('button', { name: 'Tolak' })).toBeEnabled()
   await shot(page, '15b-admin-preview')
   await dialog.getByRole('button', { name: 'Tutup' }).click()

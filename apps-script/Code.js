@@ -1,7 +1,7 @@
 /**
  * ShareIn — API database untuk web (Next.js).
  * Web memanggil doPost dengan rahasia bersama; hanya operasi tabel generik:
- * ensure (buat tab + header), read, append, update. Semua dijalankan di bawah
+ * ensure (buat tab + header), read, append, update, patch. Semua dijalankan di bawah
  * LockService agar penulisan dari beberapa server tidak bertabrakan.
  */
 
@@ -43,6 +43,7 @@ function jalankan_(op) {
       return res;
     }
     case 'update': return update_(op.table, op.updates || []);
+    case 'patch': return patch_(op);
     default: throw new Error('aksi tidak dikenal: ' + op.action);
   }
 }
@@ -152,6 +153,52 @@ function update_(table, updates) {
     range.setValues([u.row.map(tulis_)]);
   });
   return { updated: updates.length };
+}
+
+/**
+ * Ubah beberapa kolom pada baris yang dicari lewat kolom kunci (mis. id), tanpa perlu
+ * membaca seluruh tabel lebih dulu. Baris dengan nilai di op.skip dilewati (mis. status void).
+ * Bila op.log diisi, perubahan dicatat ke tab log dalam request yang sama.
+ */
+function patch_(op) {
+  var sh = sheet_(op.table);
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(sel_);
+  var keyCol = header.indexOf(op.key || 'id');
+  if (keyCol < 0) throw new Error('kolom kunci tidak ada: ' + op.key);
+  var keys = lastRow > 1 ? sh.getRange(2, keyCol + 1, lastRow - 1, 1).getValues().map(function (r) { return sel_(r[0]); }) : [];
+  var skip = op.skip || {};
+  var items = [];
+  var missing = [];
+  var logRows = [];
+  (op.patches || []).forEach(function (p) {
+    var i = keys.indexOf(String(p.id));
+    if (i < 0) { missing.push(p.id); return; }
+    var range = sh.getRange(i + 2, 1, 1, lastCol);
+    var row = range.getValues()[0].map(sel_);
+    var before = {};
+    header.forEach(function (h, j) { before[h] = row[j]; });
+    var skipped = Object.keys(skip).some(function (c) { return (skip[c] || []).indexOf(String(before[c]).trim().toLowerCase()) >= 0; });
+    if (skipped) { missing.push(p.id); return; }
+    Object.keys(p.values || {}).forEach(function (c) {
+      var j = header.indexOf(c);
+      if (j < 0) throw new Error('kolom tidak ada: ' + c);
+      row[j] = sel_(p.values[c]);
+    });
+    range.setNumberFormat('@');
+    range.setValues([row.map(tulis_)]);
+    var after = {};
+    header.forEach(function (h, j) { after[h] = row[j]; });
+    items.push({ index: i, record: after });
+    if (op.log) {
+      var b = {}, a = {};
+      Object.keys(p.values || {}).forEach(function (c) { b[c] = before[c]; a[c] = after[c]; });
+      logRows.push([op.log.time, op.log.actor, op.log.action, String(p.id), JSON.stringify(b), JSON.stringify(a)]);
+    }
+  });
+  if (logRows.length) append_(op.log.table || 'audit_log', logRows);
+  return { items: items, missing: missing };
 }
 
 function rahasiaCocok_(given) {

@@ -67,3 +67,43 @@ describe('submission speed', () => {
     expect(calls.sort()).toEqual(['append', 'append', 'read+read+read'])
   })
 })
+
+describe('review speed', () => {
+  it('approving costs 1 spreadsheet request (was 3): rows found by id, audit written in the same request', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore, getStore } = await import('@/lib/repo')
+    const { review } = await import('@/lib/admin-service')
+    const { listSubmissionsFresh, updateSubmissions } = await import('@/lib/repo/submissions')
+    const { createBatch } = await import('@/lib/service')
+    const sim = createAppsScriptSim(SECRET)
+    setStore(new AppsScriptStore('https://sim', SECRET, sim.poster))
+    invalidate()
+    const base = { submitter_name: 'A', whatsapp: '081234567890', platform: 'tiktok' as const, sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const, program: 'golden' as const }
+    await createBatch([1, 2, 3].map((i) => ({ ...base, source_url: `https://www.tiktok.com/@a/video/740000000000004000${i}` })))
+    const [a, b, c] = await listSubmissionsFresh()
+    await updateSubmissions([{ ...c, status: 'void' }])
+    // Someone deletes a row by hand in the sheet: the id lookup still hits the right row.
+    sim.sheets.get('submissions')!.grid.splice(1, 1)
+
+    const calls: string[] = []
+    setStore(new AppsScriptStore('https://sim', SECRET, async (u, body) => {
+      calls.push((JSON.parse(body).ops as { action: string }[]).map((o) => o.action).join('+'))
+      return sim.poster(u, body)
+    }))
+    invalidate()
+    await listSubmissionsFresh() // the admin list was loaded before clicking
+    calls.length = 0
+    const out = await review([b.id, c.id, 'sub_tidak_ada'], 'reject', 'Bukan dari FYP', 'admin@x')
+    expect(calls).toEqual(['patch'])
+    expect(out.map((s) => [s.id, s.status, s.reject_reason, s.reviewed_by])).toEqual([[b.id, 'rejected', 'Bukan dari FYP', 'admin@x']])
+
+    const after = await listSubmissionsFresh()
+    expect(after.map((s) => [s.id, s.status])).toEqual([[b.id, 'rejected'], [c.id, 'void']])
+    expect(after.find((s) => s.id === a.id)).toBeUndefined()
+    const log = await getStore().read('audit_log')
+    const last = log.rows[log.rows.length - 1]
+    expect(last.slice(1, 4)).toEqual(['admin@x', 'submission.reject', b.id])
+    expect(JSON.parse(last[4]).status).toBe('pending')
+    expect(JSON.parse(last[5])).toMatchObject({ status: 'rejected', reject_reason: 'Bukan dari FYP' })
+  })
+})

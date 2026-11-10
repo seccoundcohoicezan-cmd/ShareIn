@@ -2,11 +2,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { countOrDash, formatDateTime, formatNumber, metricsText } from '@/lib/format'
 import { CHANNEL_INFO, type Channel, type Submission } from '@/lib/types'
-import { DecisionButtons } from './DecisionButtons'
+import { DecisionButtons, type Decision } from './DecisionButtons'
 import { ExternalIcon } from './icons'
 import { PreviewPanel } from './PreviewPanel'
 import { toast, Toaster } from './Toast'
-import { EmptyState, PlatformTag, StatusBadge } from './ui'
+import { EmptyState, PlatformTag, Spinner, StatusBadge, TopProgress } from './ui'
 
 const QUICK_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid']
 
@@ -19,7 +19,7 @@ function query(f: Filters, program?: Channel) {
   return p.toString()
 }
 
-function RejectDialog({ target, onClose, onDone }: { target: Submission; onClose: () => void; onDone: (s: Submission) => void }) {
+function RejectDialog({ target, onClose, onDone, onBusy }: { target: Submission; onClose: () => void; onDone: (s: Submission) => void; onBusy: (b: boolean) => void }) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -39,25 +39,27 @@ function RejectDialog({ target, onClose, onDone }: { target: Submission; onClose
         <textarea id="alasan" autoFocus rows={2} maxLength={200} className="field py-3" value={reason} onChange={(e) => setReason(e.target.value)} />
         {error && <p role="alert" className="mt-2 text-sm font-bold text-bad">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" className="btn-ghost" onClick={onClose}>Batal</button>
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Batal</button>
           <button
             type="button"
             className="btn bg-bad text-white"
             disabled={busy || reason.trim().length < 3}
             onClick={async () => {
               setBusy(true)
+              onBusy(true)
               const res = await fetch(`/api/admin/submissions/${target.id}`, {
                 method: 'PATCH',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ action: 'reject', reason }),
               })
-              const data = await res.json()
+              const data = await res.json().catch(() => ({ error: 'Tidak terhubung ke server.' }))
               setBusy(false)
+              onBusy(false)
               if (!res.ok) return setError(data.error ?? 'Gagal menolak.')
               onDone(data.item)
             }}
           >
-            Tolak setoran
+            {busy ? <><Spinner /> Menolak…</> : 'Tolak setoran'}
           </button>
         </div>
       </div>
@@ -74,6 +76,18 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   const [previewing, setPreviewing] = useState<Submission | null>(null)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  // Reviews being saved, by submission id: the row shows a spinner and its buttons are locked.
+  const [saving, setSaving] = useState<Record<string, Decision>>({})
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [rejectBusy, setRejectBusy] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const mark = (id: string, d: Decision | null) =>
+    setSaving((m) => {
+      const n = { ...m }
+      if (d) n[id] = d
+      else delete n[id]
+      return n
+    })
 
   useEffect(() => {
     const p = new URLSearchParams(location.search)
@@ -83,6 +97,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
 
   const load = useCallback(async (f: Filters) => {
     setError('')
+    setLoading(true)
     try {
       const res = await fetch(`/api/admin/submissions?${query(f, program)}`)
       if (res.status === 401) return location.assign('/admin/login')
@@ -93,6 +108,8 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
       setSelected(new Set())
     } catch (e) {
       setError((e as Error).message || 'Data belum termuat.')
+    } finally {
+      setLoading(false)
     }
   }, [program])
 
@@ -112,12 +129,22 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   }
 
   async function act(s: Submission, action: 'approve' | 'reset') {
-    const res = await fetch(`/api/admin/submissions/${s.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action }),
-    })
-    const data = await res.json()
+    if (saving[s.id]) return
+    mark(s.id, action)
+    let res: Response
+    let data: { error?: string; item: Submission }
+    try {
+      res = await fetch(`/api/admin/submissions/${s.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      data = await res.json()
+    } catch {
+      mark(s.id, null)
+      return toast('Tidak terhubung ke server. Coba lagi.', 'bad')
+    }
+    mark(s.id, null)
     if (!res.ok) return toast(data.error ?? 'Gagal.', 'bad')
     replace(data.item)
     setPreviewing((p) => (p && p.id === data.item.id ? data.item : p))
@@ -126,12 +153,26 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
 
   async function bulkApprove() {
     const ids = Array.from(selected)
-    const res = await fetch('/api/admin/submissions/bulk', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ids, action: 'approve' }),
-    })
-    const data = await res.json()
+    setBulkBusy(true)
+    ids.forEach((id) => mark(id, 'approve'))
+    const done = () => {
+      setBulkBusy(false)
+      ids.forEach((id) => mark(id, null))
+    }
+    let res: Response
+    let data: { error?: string; count: number }
+    try {
+      res = await fetch('/api/admin/submissions/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids, action: 'approve' }),
+      })
+      data = await res.json()
+    } catch {
+      done()
+      return toast('Tidak terhubung ke server. Coba lagi.', 'bad')
+    }
+    done()
     if (!res.ok) return toast(data.error ?? 'Gagal.', 'bad')
     toast(`${data.count} setoran disetujui`)
     load(filters)
@@ -143,7 +184,12 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   const undo = (s: Submission) =>
-    s.status !== 'pending' && <button type="button" className="btn-ghost btn-sm" title="Kembalikan ke menunggu" onClick={() => act(s, 'reset')}>Batalkan</button>
+    s.status !== 'pending' && (
+      <button type="button" className="btn-ghost btn-sm gap-2" title="Kembalikan ke menunggu" disabled={Boolean(saving[s.id])} onClick={() => act(s, 'reset')}>
+        {saving[s.id] === 'reset' ? <><Spinner /> Membatalkan…</> : 'Batalkan'}
+      </button>
+    )
+  const rowBusy = (s: Submission) => saving[s.id] ?? (rejecting?.id === s.id && rejectBusy ? 'reject' : null)
 
   // Viewing tools on top, the decision row always last.
   const actions = (s: Submission) => (
@@ -154,7 +200,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
         {s.screenshot_url && <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Bukti</a>}
         {undo(s)}
       </div>
-      <DecisionButtons size="sm" status={s.status} onApprove={() => act(s, 'approve')} onReject={() => setRejecting(s)} />
+      <DecisionButtons size="sm" status={s.status} busy={rowBusy(s)} onApprove={() => act(s, 'approve')} onReject={() => setRejecting(s)} />
     </div>
   )
 
@@ -202,8 +248,8 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
             <input type="checkbox" className="h-5 w-5 accent-[#6C2BD9]" checked={allPicked} onChange={() => setSelected(allPicked ? new Set() : new Set(pendingIds))} />
             Pilih semua yang menunggu
           </label>
-          <button type="button" className="btn btn-sm bg-ok text-white" disabled={selected.size === 0} onClick={bulkApprove}>
-            Setujui terpilih ({selected.size})
+          <button type="button" className="btn btn-sm gap-2 bg-ok text-white" disabled={selected.size === 0 || bulkBusy} onClick={bulkApprove}>
+            {bulkBusy ? <><Spinner /> Menyetujui {selected.size} setoran…</> : `Setujui terpilih (${selected.size})`}
           </button>
         </div>
       )}
@@ -297,7 +343,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
           actions={
             <div className="space-y-2">
               {previewing.status !== 'pending' && <div className="flex justify-end">{undo(previewing)}</div>}
-              <DecisionButtons status={previewing.status} onApprove={() => act(previewing, 'approve')} onReject={() => setRejecting(previewing)} />
+              <DecisionButtons status={previewing.status} busy={rowBusy(previewing)} onApprove={() => act(previewing, 'approve')} onReject={() => setRejecting(previewing)} />
             </div>
           }
         />
@@ -306,6 +352,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
         <RejectDialog
           target={rejecting}
           onClose={() => setRejecting(null)}
+          onBusy={setRejectBusy}
           onDone={(s) => {
             setRejecting(null)
             setPreviewing((p) => (p && p.id === s.id ? s : p))
@@ -314,6 +361,8 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
           }}
         />
       )}
+      <TopProgress active={Object.keys(saving).length > 0 || rejectBusy || bulkBusy} />
+      <TopProgress active={loading && items !== null && Object.keys(saving).length === 0 && !rejectBusy && !bulkBusy} label="Memuat…" />
       <Toaster />
     </div>
   )

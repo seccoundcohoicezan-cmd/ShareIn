@@ -4,7 +4,7 @@ import { normalizeName } from './format'
 import { withLock } from './lock'
 import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
-import { listSubmissionsCached, listSubmissionsFresh, updateSubmissions, type StoredSubmission } from './repo/submissions'
+import { listSubmissionsCached, listSubmissionsFresh, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
 import type { Submission } from './types'
 
 export const REJECT_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid'] as const
@@ -72,23 +72,23 @@ export const reviewSchema = z
 
 export async function review(ids: string[], action: 'approve' | 'reject' | 'reset', reason: string, actor: string) {
   return withLock('submissions', async () => {
-    const all = await listSubmissionsFresh()
-    const targets = all.filter((s) => ids.includes(s.id) && s.status !== 'void')
     const now = new Date().toISOString()
-    const updated = targets.map((s) => ({
-      ...s,
+    const values = {
       status: action === 'approve' ? ('approved' as const) : action === 'reject' ? ('rejected' as const) : ('pending' as const),
       reject_reason: action === 'reject' ? reason : '',
       reviewed_by: action === 'reset' ? '' : actor,
       reviewed_at: action === 'reset' ? '' : now,
-    }))
-    await updateSubmissions(updated)
-    for (let i = 0; i < targets.length; i++) {
-      await audit(actor, `submission.${action}`, targets[i].id, { status: targets[i].status }, {
-        status: updated[i].status,
-        reason: updated[i].reject_reason || undefined,
-      })
     }
+    const patched = await patchSubmissions(ids.map((id) => ({ id, values })), { actor, action: `submission.${action}` })
+    if (patched) return patched.map(strip)
+
+    const all = await listSubmissionsFresh()
+    const targets = all.filter((s) => ids.includes(s.id) && s.status !== 'void')
+    const updated = targets.map((s) => ({ ...s, ...values }))
+    await updateSubmissions(updated)
+    await Promise.all(
+      targets.map((t) => audit(actor, `submission.${action}`, t.id, { status: t.status }, { status: values.status, reason: values.reject_reason || undefined })),
+    )
     return updated.map(strip)
   })
 }
