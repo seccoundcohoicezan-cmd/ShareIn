@@ -44,3 +44,13 @@ export function formatDateTime(iso: string): string {
 export function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLowerCase()
 }
+
+/** Like/comment line; 0 means the participant did not enter numbers (they only paste the link). */
+export function metricsText(likes: number, comments: number): string {
+  if (!likes && !comments) return 'Like & komentar: cek di link'
+  return `${formatNumber(likes)} like · ${formatNumber(comments)} komentar`
+}
+
+export function countOrDash(n: number): string {
+  return n ? formatNumber(n) : '–'
+}

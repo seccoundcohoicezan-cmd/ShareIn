@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { countOrDash, formatDateTime, formatNumber, metricsText } from '@/lib/format'
 import type { Submission } from '@/lib/types'
 import { ExternalIcon } from './icons'
 import { PreviewPanel } from './PreviewPanel'
@@ -152,7 +152,7 @@ export function SubmissionsAdmin() {
     <div className="flex flex-wrap gap-2">
       <button type="button" className="btn-primary btn-sm" onClick={() => setPreviewing(s)}>Pratinjau & review</button>
       <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Buka link <ExternalIcon /></a>
-      <a href={s.sharein_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Sharein <ExternalIcon /></a>
+      {s.sharein_url && <a href={s.sharein_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Sharein <ExternalIcon /></a>}
       {s.screenshot_url && <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Bukti</a>}
       {s.status !== 'approved' && <button type="button" className="btn btn-sm bg-ok text-white" onClick={() => act(s, 'approve')}>Setujui</button>}
       {s.status !== 'rejected' && <button type="button" className="btn btn-sm bg-bad text-white" onClick={() => setRejecting(s)}>Tolak</button>}
@@ -228,7 +228,7 @@ export function SubmissionsAdmin() {
                       {s.needs_review && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Selisih angka API</span>}
                     </div>
                     <p className="mt-2 font-extrabold">{s.submitter_name}</p>
-                    <p className="text-sm tabular-nums">{formatNumber(s.likes)} like · {formatNumber(s.comments)} komentar</p>
+                    <p className="text-sm tabular-nums">{metricsText(s.likes, s.comments)}</p>
                     <p className="muted text-xs">{formatDateTime(s.created_at)} · {s.period_id} · {s.metrics_source === 'api' ? 'angka API' : 'cek manual'}</p>
                     {s.reject_reason && <p className="mt-1 text-sm text-bad">Alasan: {s.reject_reason}</p>}
                   </div>
@@ -261,8 +261,8 @@ export function SubmissionsAdmin() {
                       <p className="muted text-xs">{formatDateTime(s.created_at)} · {s.period_id}</p>
                     </td>
                     <td className="px-3 py-3"><PlatformTag platform={s.platform} /></td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatNumber(s.likes)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatNumber(s.comments)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{countOrDash(s.likes)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{countOrDash(s.comments)}</td>
                     <td className="px-3 py-3">
                       <StatusBadge status={s.status} />
                       {s.needs_review && <p className="mt-1 text-xs font-bold text-amber-800">Selisih angka API</p>}
@@ -281,15 +281,15 @@ export function SubmissionsAdmin() {
           title={`${previewing.submitter_name} · ${previewing.platform === 'tiktok' ? 'TikTok' : 'Reels'}`}
           tabs={[
             { label: previewing.platform === 'tiktok' ? 'Konten TikTok' : 'Konten Reels', url: previewing.source_url },
-            { label: 'Link Sharein', url: previewing.sharein_url },
+            ...(previewing.sharein_url ? [{ label: 'Link Sharein', url: previewing.sharein_url }] : []),
           ]}
           onClose={() => setPreviewing(null)}
           details={
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
               <dt className="muted">Status</dt><dd><StatusBadge status={previewing.status} />{previewing.reviewed_by === 'otomatis' && ' · disetujui otomatis'}</dd>
               <dt className="muted">WhatsApp</dt><dd>{previewing.whatsapp ? <a className="font-bold text-brand-purple underline" href={`https://wa.me/${previewing.whatsapp}`} target="_blank" rel="noopener noreferrer">{previewing.whatsapp}</a> : '-'}</dd>
-              <dt className="muted">Like</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.likes)}</dd>
-              <dt className="muted">Komentar</dt><dd className="font-bold tabular-nums">{formatNumber(previewing.comments)}</dd>
+              <dt className="muted">Like</dt><dd className="font-bold tabular-nums">{previewing.likes ? formatNumber(previewing.likes) : 'Tidak diisi, cek di pratinjau'}</dd>
+              <dt className="muted">Komentar</dt><dd className="font-bold tabular-nums">{previewing.comments ? formatNumber(previewing.comments) : 'Tidak diisi, cek di pratinjau'}</dd>
               <dt className="muted">Sumber angka</dt><dd>{previewing.metrics_source === 'api' ? 'Adapter API' : 'Cek manual penyetor'}{previewing.needs_review ? ' · selisih dengan API' : ''}</dd>
               <dt className="muted">Disetor</dt><dd>{formatDateTime(previewing.created_at)} · {previewing.period_id}</dd>
               <dt className="muted">Organik</dt><dd>{previewing.organic_declared ? 'Dinyatakan muncul di FYP/Beranda' : '-'}</dd>

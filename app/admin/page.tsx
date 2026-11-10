@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PlatformTag, StatusBadge, EmptyState } from '@/components/ui'
 import { dashboard } from '@/lib/admin-service'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, metricsText } from '@/lib/format'
 import { programSummary } from '@/lib/program-service'
 import { getProgress } from '@/lib/service'
 import { isDemoStore } from '@/lib/repo'
@@ -83,7 +83,7 @@ export default async function AdminHome() {
               <li key={s.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
                 <PlatformTag platform={s.platform} />
                 <span className="font-bold">{s.submitter_name}</span>
-                <span className="muted tabular-nums">{formatNumber(s.likes)} like · {formatNumber(s.comments)} komentar</span>
+                <span className="muted tabular-nums">{metricsText(s.likes, s.comments)}</span>
                 <span className="ml-auto flex items-center gap-2">
                   <span className="muted text-xs">{formatDateTime(s.created_at)}</span>
                   <StatusBadge status={s.status} />

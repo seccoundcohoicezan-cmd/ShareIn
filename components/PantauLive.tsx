@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, metricsText } from '@/lib/format'
 import { CheckIcon, CrossIcon, ExternalIcon } from './icons'
 import { PantauCard } from './PantauCard'
 import { Toaster } from './Toast'
@@ -177,7 +177,7 @@ export function PantauLive({ token }: { token: string }) {
               </div>
               <p className="mt-2 font-extrabold">{it.title}</p>
               {it.code && <p className="font-mono text-sm font-bold tracking-wider">Kode {it.code}</p>}
-              {typeof it.likes === 'number' && <p className="text-sm tabular-nums">{formatNumber(it.likes)} like · {formatNumber(it.comments ?? 0)} komentar</p>}
+              {typeof it.likes === 'number' && <p className="text-sm tabular-nums">{metricsText(it.likes, it.comments ?? 0)}</p>}
               <div className="mt-1 flex flex-wrap gap-x-4 text-sm font-bold">
                 <a href={it.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">{it.program === 'goldenticket' ? 'Konten asal' : 'Bukti tugas'} <ExternalIcon /></a>
                 {it.sharein && <a href={it.sharein} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Link Sharein <ExternalIcon /></a>}

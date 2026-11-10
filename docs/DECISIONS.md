@@ -83,3 +83,11 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 |---|-----------|--------|
 | 41 | Golden Ticket tanpa target/QTY ("banyak-banyakan"): pengaturan QTY, cek kuota, dan progres dihapus. Pengganti progres: jumlah link terkumpul. | Permintaan pengguna. |
 | 42 | `/goldenticket` menampilkan link terkumpul (menunggu + disetujui), terbaru dulu, nama disingkat, tanpa nomor WA. Pemutar resmi hanya dimuat saat "Putar di sini" ditekan. | Permintaan pratinjau; memuat banyak iframe sekaligus membuat halaman berat. |
+
+## Putaran 11 (10 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 43 | Form setor hanya meminta link. Kolom like/komentar dihapus; batas minimal tetap ditampilkan sebagai syarat dan dinyatakan lewat centang, admin memeriksa di pratinjau. Server tetap menolak angka di bawah batas bila angka dikirim (API). | Permintaan pengguna. |
+| 44 | Link Sharein tidak wajib (tersembunyi di tombol "opsional"); bila diisi tetap dicek domainnya. | Peserta baru belum punya akun/link Sharein. |
+| 45 | Panduan "konten pro & kontra" berisi 12 contoh topik debat ringan dan larangan SARA/hoaks/konten dewasa. | Permintaan pengguna; contoh dibuat aman untuk kampanye kampus. |

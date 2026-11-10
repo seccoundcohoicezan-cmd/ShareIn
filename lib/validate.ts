@@ -41,7 +41,8 @@ function linkCheck(input: CheckInput, link: CheckContext['link']): Check {
 
 function thresholdCheck(id: 'min_like' | 'min_comment', value: number | null, min: number, platform: Platform): Check {
   const noun = id === 'min_like' ? 'Like' : 'Komentar'
-  if (value === null) return { id, pass: false, message: `Isi jumlah ${noun.toLowerCase()} hasil cek manual, contoh 120000.` }
+  // Numbers are optional (participants only paste the link); the minimum is a stated rule checked by admin.
+  if (value === null) return { id, pass: true }
   if (value < min)
     return {
       id,
@@ -83,11 +84,12 @@ export function runChecks(input: CheckInput, ctx: CheckContext): CheckResult {
     domain: `Link ShareIn harus dari ${settings.sharein_domains.join(' atau ')}. Salin dari halaman konten di ShareIn.`,
     no_path: 'Itu alamat beranda ShareIn. Tempel link halaman konten yang kamu unggah.',
   }
-  checks.push(share.ok ? { id: 'sharein_valid', pass: true } : { id: 'sharein_valid', pass: false, message: shareMsg[share.reason!] })
+  // The ShareIn link is optional: first-time participants have not uploaded anything yet.
+  checks.push(share.ok || share.reason === 'empty' ? { id: 'sharein_valid', pass: true } : { id: 'sharein_valid', pass: false, message: shareMsg[share.reason!] })
 
   let organic: Check = { id: 'organic', pass: true }
   if (!input.organic_declared) organic = { id: 'organic', pass: false, message: 'Centang pernyataan bahwa konten muncul organik di FYP/Beranda kamu.' }
-  else if (!input.checked_declared) organic = { id: 'organic', pass: false, message: 'Centang pernyataan bahwa kamu sudah membuka link dan memeriksa angkanya.' }
+  else if (!input.checked_declared) organic = { id: 'organic', pass: false, message: 'Centang pernyataan bahwa kamu sudah membuka link dan kontennya memenuhi minimal like & komentar.' }
   else if (settings.require_screenshot && !input.has_screenshot)
     organic = { id: 'organic', pass: false, message: 'Lampirkan tangkapan layar konten di FYP/Beranda (JPG/PNG/WebP, maks 2 MB).' }
   checks.push(organic)

@@ -275,9 +275,6 @@ test('setor banyak: tambah (+) sampai 10, link salah merah dan tidak bisa kirim,
   for (let i = 0; i < 3; i++) {
     const c = page.getByRole('region', { name: `Konten ${i + 1}`, exact: true })
     await c.getByLabel('Link konten').fill(links[i])
-    await c.getByLabel('Like', { exact: true }).fill('150000')
-    await c.getByLabel('Komentar', { exact: true }).fill('9000')
-    await c.getByLabel('Link Sharein').fill(`https://sharein.id/c/banyak${i}`)
   }
   await page.getByLabel(/muncul organik/).check()
   await page.getByLabel(/sudah membuka link/).check()

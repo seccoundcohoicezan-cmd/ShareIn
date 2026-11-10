@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { embedUrl } from '@/lib/embed'
-import { formatDate, formatNumber } from '@/lib/format'
+import { formatDate, formatNumber, metricsText } from '@/lib/format'
 import type { CollectedFeed as Feed, CollectedItem } from '@/lib/service'
 import { ExternalIcon } from './icons'
 import { PillLabel, PlatformTag } from './ui'
@@ -16,7 +16,7 @@ function Card({ item, playing, onPlay }: { item: CollectedItem; playing: boolean
         <span className="muted ml-auto text-xs">{formatDate(item.created_at)}</span>
       </div>
       <p className="mt-2 font-extrabold">{item.name}</p>
-      <p className="text-sm tabular-nums">{formatNumber(item.likes)} like · {formatNumber(item.comments)} komentar</p>
+      <p className="text-sm tabular-nums">{metricsText(item.likes, item.comments)}</p>
       <p className="muted truncate text-xs">{item.source_url.replace('https://www.', '')}</p>
       {playing && embed && (
         <iframe

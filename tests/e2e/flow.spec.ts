@@ -19,14 +19,15 @@ async function login(page: Page) {
 const waFor = (name: string) => '0812' + String([...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1e8, 7)).padStart(8, '1')
 let rinaToken = ''
 
-async function fillForm(page: Page, o: { name: string; url: string; likes: string; comments: string; sharein?: string }) {
+async function fillForm(page: Page, o: { name: string; url: string; sharein?: string }) {
   await page.goto('/goldenticket/setor')
   await page.getByLabel('Nama penyetor').fill(o.name)
   await page.getByLabel('Nomor WhatsApp').fill(waFor(o.name))
   await page.getByLabel('Link konten').fill(o.url)
-  await page.getByLabel('Like', { exact: true }).fill(o.likes)
-  await page.getByLabel('Komentar', { exact: true }).fill(o.comments)
-  await page.getByLabel('Link Sharein').fill(o.sharein ?? 'https://sharein.id/c/abc123')
+  if (o.sharein) {
+    await page.getByRole('button', { name: /Sudah upload ke Sharein/ }).click()
+    await page.getByLabel(/Link Sharein/).fill(o.sharein)
+  }
   await page.getByLabel(/muncul organik/).check()
   await page.getByLabel(/sudah membuka link/).check()
 }
@@ -56,20 +57,21 @@ test('latar mati saat prefers-reduced-motion', async ({ browser }) => {
   await ctx.close()
 })
 
-test('setor: 99.999 like ditolak, 100.000 lolos, kirim, sukses, riwayat', async ({ page }) => {
-  await fillForm(page, { name: 'Rina Uji', url: vid(1), likes: '99999', comments: '5000' })
-  await page.getByLabel('Like', { exact: true }).blur()
-  await expect(page.getByLabel('Like', { exact: true })).toHaveValue('99.999')
-  await expect(page.getByText('Kurang 1 dari 100.000')).toBeVisible()
+test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minimal tetap tampil', async ({ page }) => {
+  await fillForm(page, { name: 'Rina Uji', url: vid(1) })
+  await expect(page.getByLabel('Like', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Komentar', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel(/Link Sharein/)).toHaveCount(0)
+  const syarat = page.locator('section', { hasText: 'Syarat konten' })
+  await expect(syarat).toContainText('Like min. 100.000')
+  await expect(syarat).toContainText('Komentar min. 5.000')
+  await expect(syarat).toContainText('Komentar min. 3.000')
+  await expect(syarat).toContainText('Bumi itu bulat atau datar?')
   await expect(page.getByText('Link valid · TikTok')).toBeVisible()
+  await expect(page.getByText(/Syarat TikTok: minimal 100\.000 like dan 5\.000 komentar/)).toBeVisible()
+  await shot(page, '02-setor-sederhana')
   const send = page.getByRole('button', { name: 'Kirim setoran' })
   await expect(send).toBeDisabled()
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText('Like 99.999 belum cukup. TikTok minimal 100.000.')).toBeVisible()
-  await expect(send).toBeDisabled()
-  await shot(page, '02-setor-gagal')
-
-  await page.getByLabel('Like', { exact: true }).fill('100000')
   await page.getByRole('button', { name: 'Cek setoran' }).click()
   await expect(page.getByText('Lolos semua cek')).toBeVisible()
   await expect(send).toBeEnabled()
@@ -97,13 +99,13 @@ test('setor: 99.999 like ditolak, 100.000 lolos, kirim, sukses, riwayat', async 
 })
 
 test('duplikat ditolak walau parameter berbeda', async ({ page }) => {
-  await fillForm(page, { name: 'Budi', url: vid(1).replace('is_from_webapp=1', 'utm_source=wa'), likes: '150000', comments: '9000' })
+  await fillForm(page, { name: 'Budi', url: vid(1).replace('is_from_webapp=1', 'utm_source=wa') })
   await page.getByRole('button', { name: 'Cek setoran' }).click()
   await expect(page.getByText(/Link ini sudah pernah disetor pada/)).toBeVisible()
 })
 
-test('link bukan TikTok/Reels dan domain Sharein salah dijelaskan', async ({ page }) => {
-  await fillForm(page, { name: 'Sari', url: 'https://youtube.com/shorts/abc', likes: '150000', comments: '9000', sharein: 'https://contoh.com/x' })
+test('link bukan TikTok/Reels merah; link Sharein opsional tapi kalau diisi harus domain benar', async ({ page }) => {
+  await fillForm(page, { name: 'Sari', url: 'https://youtube.com/shorts/abc', sharein: 'https://contoh.com/x' })
   await expect(page.getByText('Link harus dari tiktok.com atau instagram.com/reel/. Tempel link dari tombol Bagikan.')).toBeVisible()
   await expect(page.getByLabel('Link konten')).toHaveAttribute('aria-invalid', 'true')
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
@@ -111,12 +113,10 @@ test('link bukan TikTok/Reels dan domain Sharein salah dijelaskan', async ({ pag
   await expect(page.getByText(/Link harus dari sharein.id atau sharein.app/)).toBeVisible()
 })
 
-test('reels: komentar 2.999 ditolak, 3.000 lolos; platform terdeteksi otomatis', async ({ page }) => {
-  await fillForm(page, { name: 'Dewi', url: 'https://www.instagram.com/reel/C9zYxW8vUtS/?igsh=abc', likes: '100000', comments: '2999' })
+test('reels: platform terdeteksi otomatis, syarat Reels 3.000 komentar tampil', async ({ page }) => {
+  await fillForm(page, { name: 'Dewi', url: 'https://www.instagram.com/reel/C9zYxW8vUtS/?igsh=abc' })
   await expect(page.getByText('Link valid · Instagram Reels')).toBeVisible()
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText('Komentar 2.999 belum cukup. Reels minimal 3.000.')).toBeVisible()
-  await page.getByLabel('Komentar', { exact: true }).fill('3000')
+  await expect(page.getByText(/Syarat Instagram Reels: minimal 100\.000 like dan 3\.000 komentar/)).toBeVisible()
   await page.getByRole('button', { name: 'Cek setoran' }).click()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeEnabled()
 })
@@ -163,8 +163,9 @@ test('admin: tolak wajib alasan, setujui, ekspor CSV; halaman pantau ikut beruba
   await card.getByRole('button', { name: 'Pratinjau & review' }).click()
   const panel = page.getByRole('dialog', { name: /Rina Uji/ })
   await expect(panel.locator('iframe')).toHaveAttribute('src', /^https:\/\/www\.tiktok\.com\/embed\/v2\/74000000000000/)
-  await panel.getByRole('tab', { name: 'Link Sharein' }).click()
-  await expect(panel.locator('iframe')).toHaveAttribute('src', 'https://sharein.id/c/abc123')
+  // No ShareIn link was given, so there is no ShareIn tab and numbers say "cek di pratinjau".
+  await expect(panel.getByRole('tab', { name: 'Link Sharein' })).toHaveCount(0)
+  await expect(panel.getByText('Tidak diisi, cek di pratinjau').first()).toBeVisible()
   await shot(page, '08a-admin-pratinjau')
   await panel.getByRole('button', { name: 'Tolak' }).click()
   const dialog = page.getByRole('dialog', { name: /Tolak setoran/ })

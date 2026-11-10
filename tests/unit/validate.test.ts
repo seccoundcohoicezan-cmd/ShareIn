@@ -47,7 +47,8 @@ describe('runChecks', () => {
   it('uses the documented messages', () => {
     expect(byId(check('tiktok', { likes: 80000 }), 'min_like').message).toBe('Like 80.000 belum cukup. TikTok minimal 100.000.')
     expect(byId(check('reels', { comments: 2000 }), 'min_comment').message).toBe('Komentar 2.000 belum cukup. Reels minimal 3.000.')
-    expect(byId(check('tiktok', { sharein_url: '' }), 'sharein_valid').message).toBe('Unggah kontennya ke ShareIn dulu, lalu tempel link-nya di sini.')
+    expect(byId(check('tiktok', { sharein_url: '' }), 'sharein_valid').pass).toBe(true) // optional for first-time participants
+    expect(byId(check('tiktok', { sharein_url: 'https://contoh.com/x' }), 'sharein_valid').pass).toBe(false)
     expect(byId(check('tiktok', {}, { duplicate: { created_at: '2026-11-03T05:00:00Z' } }), 'not_duplicate').message).toBe(
       'Link ini sudah pernah disetor pada 3 Nov. Cari konten lain.',
     )
@@ -77,7 +78,9 @@ describe('runChecks', () => {
     expect(byId(runChecks(input('tiktok'), { settings: strict, ...base }), 'organic').pass).toBe(false)
     expect(byId(runChecks(input('tiktok', { has_screenshot: true }), { settings: strict, ...base }), 'organic').pass).toBe(true)
   })
-  it('rejects missing numbers with a fix hint', () => {
-    expect(byId(check('tiktok', { likes: null }), 'min_like').message).toMatch(/Isi jumlah like/)
+  it('numbers and ShareIn link are optional', () => {
+    // Participants only paste the link: no numbers = not checked here (admin verifies).
+    expect(byId(check('tiktok', { likes: null, comments: null }), 'min_like').pass).toBe(true)
+    expect(check('tiktok', { likes: null, comments: null }).ok).toBe(true)
   })
 })

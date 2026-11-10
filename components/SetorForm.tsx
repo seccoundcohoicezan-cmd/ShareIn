@@ -45,16 +45,47 @@ async function pasteInto(set: (v: string) => void) {
 }
 
 const MAX_ITEMS = 10
+
+const PRO_KONTRA = [
+  'Bumi itu bulat atau datar?',
+  'Bubur ayam diaduk atau tidak diaduk?',
+  'Tim kopi atau tim teh?',
+  'Nasi + mi instan: wajar atau aneh?',
+  'Kuliah penting atau skill lebih penting?',
+  'Menikah muda atau mapan dulu?',
+  'Kerja kantoran atau freelance / WFH?',
+  'Anak kecil boleh pegang HP atau tidak?',
+  'Hidup di kota atau di desa?',
+  'AI bakal menggantikan pekerjaan manusia?',
+  'Kejar passion atau kejar gaji?',
+  'Durian: enak atau bau?',
+]
+
+/** Guide to the content the campaign looks for: topics that split opinions. */
+function ProKontra() {
+  return (
+    <div className="rounded-field border border-brand-orange/30 bg-brand-amber/10 p-4 text-sm">
+      <p className="font-extrabold">Cari konten yang memicu pro &amp; kontra</p>
+      <p className="mt-1">Konten yang bikin penonton terbelah dan ramai berdebat di kolom komentar. Contoh topiknya:</p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {PRO_KONTRA.map((t) => (
+          <li key={t} className="rounded-full bg-white px-3 py-1 font-bold">{t}</li>
+        ))}
+      </ul>
+      <p className="muted mt-2 text-xs">Hindari konten SARA, ujaran kebencian, hoaks yang membahayakan, atau konten dewasa. Konten seperti itu akan ditolak.</p>
+    </div>
+  )
+}
 // Reported once for the whole form rather than on every content card.
 const GLOBAL_CHECKS: CheckId[] = ['period_open', 'identity', 'organic']
 
-type Item = { key: number; url: string; likes: string; comments: string; sharein: string; api: { likes: number; comments: number } | null }
+type Item = { key: number; url: string; sharein: string }
 type ItemResult = { ok: boolean; checks: Check[] }
 
 let nextKey = 1
-const blankItem = (): Item => ({ key: nextKey++, url: '', likes: '', comments: '', sharein: '', api: null })
+const blankItem = (): Item => ({ key: nextKey++, url: '', sharein: '' })
 // Fixed key: the first card is server-rendered, so its field ids must match on hydration.
-const FIRST_ITEM: Item = { key: 0, url: '', likes: '', comments: '', sharein: '', api: null }
+const FIRST_ITEM: Item = { key: 0, url: '', sharein: '' }
 
 function linkState(url: string) {
   if (!url.trim()) return { state: 'empty' as const }
@@ -74,33 +105,15 @@ function ContentCard({
   onChange: (patch: Partial<Item>) => void
   onRemove: () => void
 }) {
-  const [fetching, setFetching] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const link = linkState(item.url)
   const platform: Platform = detectPlatform(item.url) ?? 'tiktok'
   const rule = rules?.rules[platform]
-  const likesN = parseCount(item.likes)
-  const commentsN = parseCount(item.comments)
   const share = item.sharein.trim() && rules ? checkShareinUrl(item.sharein, rules.sharein_domains) : null
   const id = (n: string) => `${n}-${item.key}`
   const failed = result?.checks.filter((c) => !c.pass && !GLOBAL_CHECKS.includes(c.id)) ?? []
   // A wrong link also fails the duplicate check; one message is enough.
   const shown = failed.some((c) => c.id === 'url_valid') ? failed.filter((c) => c.id !== 'not_duplicate') : failed
-
-  async function fetchMetrics() {
-    setFetching(true)
-    try {
-      const res = await fetch('/api/metrics/fetch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: item.url }) })
-      const data = await res.json()
-      if (data.ok) {
-        onChange({ api: { likes: data.likes, comments: data.comments }, likes: formatNumber(data.likes), comments: formatNumber(data.comments) })
-        toast('Angka terisi otomatis')
-      } else toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
-    } catch {
-      toast('Angka otomatis belum tersedia. Isi manual hasil cekmu.', 'bad')
-    } finally {
-      setFetching(false)
-    }
-  }
 
   return (
     <section className="panel-solid space-y-4" aria-label={`Konten ${index + 1}`}>
@@ -151,51 +164,19 @@ function ContentCard({
         )}
       </div>
 
-      {rules && rules.metrics_adapter !== 'off' && (
-        <button type="button" className="btn-ghost btn-sm" disabled={fetching || link.state === 'empty' || link.state === 'bad'} onClick={fetchMetrics}>
-          {fetching ? 'Mengambil angka…' : 'Ambil angka otomatis'}
-        </button>
+      {(link.state === 'ok' || link.state === 'short') && rule && (
+        <p className="rounded-field bg-brand-lavender px-3 py-2 text-sm">
+          Syarat {PLATFORM_LABEL[link.parsed.platform]}: minimal <b>{formatNumber(rule.min_like)} like</b> dan <b>{formatNumber(rule.min_comment)} komentar</b>. Pastikan angkanya sudah memenuhi sebelum menyetor.
+        </p>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        {([
-          { k: 'like', label: 'Like', field: 'likes', value: item.likes, n: likesN, min: rule?.min_like },
-          { k: 'komentar', label: 'Komentar', field: 'comments', value: item.comments, n: commentsN, min: rule?.min_comment },
-        ] as const).map((f) => (
-          <div key={f.k}>
-            <label htmlFor={id(f.k)} className="label">{f.label}</label>
-            <input
-              id={id(f.k)}
-              className="field tabular-nums"
-              inputMode="numeric"
-              autoComplete="off"
-              value={f.value}
-              placeholder={f.min ? formatNumber(f.min) : ''}
-              onChange={(e) => onChange({ [f.field]: e.target.value.replace(/[^\d.,rbkjtRBKJT ]/g, '') })}
-              onBlur={() => {
-                const n = parseCount(f.value)
-                if (n !== null) onChange({ [f.field]: formatNumber(n) })
-              }}
-              aria-describedby={id(`${f.k}-status`)}
-            />
-            <div id={id(`${f.k}-status`)} aria-live="polite">
-              {f.min === undefined ? (
-                <Status ok={null}>Memuat batas…</Status>
-              ) : !f.value.trim() ? (
-                <Status ok={null}>Minimal {formatNumber(f.min)}</Status>
-              ) : f.n === null ? (
-                <Status ok={false}>Tulis angka saja, contoh 120000.</Status>
-              ) : f.n >= f.min ? (
-                <Status ok>Memenuhi (≥ {formatNumber(f.min)})</Status>
-              ) : (
-                <Status ok={false}>Kurang {formatNumber(f.min - f.n)} dari {formatNumber(f.min)}</Status>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
 
+      {!showShare && !item.sharein ? (
+        <button type="button" className="inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-4" onClick={() => setShowShare(true)}>
+          + Sudah upload ke Sharein? Tambahkan link-nya (opsional)
+        </button>
+      ) : (
       <div>
-        <label htmlFor={id('sharein')} className="label">Link Sharein</label>
+        <label htmlFor={id('sharein')} className="label">Link Sharein <span className="muted font-medium">(opsional)</span></label>
         <div className="relative">
           <input
             id={id('sharein')}
@@ -216,7 +197,7 @@ function ContentCard({
         </div>
         <div id={id('sharein-status')} aria-live="polite">
           {!share ? (
-            <Status ok={null}>Unggah kontennya ke Sharein dulu, lalu tempel link-nya di sini.</Status>
+            <Status ok={null}>Boleh dikosongkan bila belum punya.</Status>
           ) : share.ok ? (
             <Status ok>Link Sharein valid</Status>
           ) : (
@@ -232,6 +213,7 @@ function ContentCard({
           )}
         </div>
       </div>
+      )}
 
       {result && (
         failed.length === 0 ? (
@@ -287,7 +269,7 @@ export function SetorForm() {
   }, [])
 
   const formKey = useMemo(
-    () => JSON.stringify([name.trim(), wa.trim(), items.map((i) => [i.url.trim(), parseCount(i.likes), parseCount(i.comments), i.sharein.trim()]), organic, checked, file?.name ?? '', file?.size ?? 0]),
+    () => JSON.stringify([name.trim(), wa.trim(), items.map((i) => [i.url.trim(), i.sharein.trim()]), organic, checked, file?.name ?? '', file?.size ?? 0]),
     [name, wa, items, organic, checked, file],
   )
   const fresh = results !== null && checkedKey === formKey
@@ -310,20 +292,14 @@ export function SetorForm() {
       organic_declared: organic,
       checked_declared: checked,
       has_screenshot: Boolean(file),
-      items: items.map((i) => {
-        const likes = parseCount(i.likes)
-        const comments = parseCount(i.comments)
-        return {
-          platform: detectPlatform(i.url) ?? 'tiktok',
-          source_url: i.url,
-          sharein_url: i.sharein,
-          likes,
-          comments,
-          metrics_source: i.api && i.api.likes === likes && i.api.comments === comments ? 'api' : 'manual',
-          api_likes: i.api?.likes ?? null,
-          api_comments: i.api?.comments ?? null,
-        }
-      }),
+      items: items.map((i) => ({
+        platform: detectPlatform(i.url) ?? 'tiktok',
+        source_url: i.url,
+        sharein_url: i.sharein,
+        likes: null,
+        comments: null,
+        metrics_source: 'manual',
+      })),
     }
   }
 
@@ -486,6 +462,21 @@ export function SetorForm() {
         <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
       </section>
 
+      <section className="panel-solid space-y-3" aria-labelledby="syarat">
+        <PillLabel id="syarat">Syarat konten</PillLabel>
+        <p className="text-sm">Cukup tempel link-nya. Sebelum menyetor, buka kontennya dan pastikan angkanya sudah memenuhi:</p>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {(['tiktok', 'reels'] as Platform[]).map((p) => (
+            <div key={p} className="rounded-field bg-brand-lavender p-3">
+              <p className="font-extrabold">{p === 'tiktok' ? 'TikTok' : 'Instagram Reels'}</p>
+              <p className="tabular-nums">Like min. <b>{rules ? formatNumber(rules.rules[p].min_like) : '…'}</b></p>
+              <p className="tabular-nums">Komentar min. <b>{rules ? formatNumber(rules.rules[p].min_comment) : '…'}</b></p>
+            </div>
+          ))}
+        </div>
+        <ProKontra />
+      </section>
+
       {items.map((it, i) => (
         <ContentCard
           key={it.key}
@@ -507,7 +498,7 @@ export function SetorForm() {
         <PillLabel id="pernyataan">Pernyataan</PillLabel>
         {[
           { id: 'organik', v: organic, set: setOrganic, t: 'Konten ini muncul organik di FYP TikTok / Beranda Reels saya.' },
-          { id: 'sudah-cek', v: checked, set: setChecked, t: 'Saya sudah membuka link dan memeriksa angkanya.' },
+          { id: 'sudah-cek', v: checked, set: setChecked, t: 'Saya sudah membuka link dan kontennya memenuhi minimal like & komentar.' },
         ].map((c) => (
           <label key={c.id} htmlFor={c.id} className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-field bg-brand-lavender/70 p-3">
             <input id={c.id} type="checkbox" checked={c.v} onChange={(e) => c.set(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#6C2BD9]" />
