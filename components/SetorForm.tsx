@@ -154,7 +154,7 @@ function ContentCard({
             </>
           )}
           {link.state === 'bad' && <Status ok={false}>{link.message}</Status>}
-          {link.state === 'short' && <Status ok={null}>Link pendek {PLATFORM_LABEL[link.parsed.platform]} terdeteksi. Server akan membukanya saat kamu menekan Cek setoran.</Status>}
+          {link.state === 'short' && <Status ok={null}>Link pendek {PLATFORM_LABEL[link.parsed.platform]} terdeteksi. Server akan membukanya saat kamu menekan Kirim.</Status>}
           {link.state === 'ok' && <Status ok>Link valid · {PLATFORM_LABEL[link.parsed.platform]}</Status>}
         </div>
         {(link.state === 'ok' || link.state === 'short') && (
@@ -248,7 +248,7 @@ export function SetorForm() {
   const [fileError, setFileError] = useState('')
   const [results, setResults] = useState<ItemResult[] | null>(null)
   const [checkedKey, setCheckedKey] = useState('')
-  const [busy, setBusy] = useState<'check' | 'send' | null>(null)
+  const [busy, setBusy] = useState<'send' | null>(null)
   const [formError, setFormError] = useState('')
   const [done, setDone] = useState<{ saved: number; total: number; token: string; auto: boolean; failed: string[] } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -274,7 +274,6 @@ export function SetorForm() {
   )
   const fresh = results !== null && checkedKey === formKey
   const anyRedLink = items.some((i) => linkState(i.url).state === 'bad')
-  const canSend = fresh && !anyRedLink && results.every((r) => r.ok)
   const globalFails = results ? Array.from(new Map(results.flatMap((r) => r.checks).filter((c) => !c.pass && GLOBAL_CHECKS.includes(c.id)).map((c) => [c.id, c])).values()) : []
 
   const update = (key: number, patch: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...patch } : x)))
@@ -303,8 +302,18 @@ export function SetorForm() {
     }
   }
 
-  async function runCheck() {
+  // One step: the server checks everything and saves only when every item passes.
+  async function send() {
     setFormError('')
+    if (anyRedLink) {
+      setFormError('Ada link yang merah. Perbaiki atau hapus dulu sebelum mengirim.')
+      return
+    }
+    if (items.every((i) => !i.url.trim())) {
+      setFormError('Tempel minimal satu link konten.')
+      document.getElementById(`link-${items[0].key}`)?.focus()
+      return
+    }
     if (name.trim().length < 2) {
       setFormError('Isi nama penyetor minimal 2 huruf.')
       document.getElementById('nama')?.focus()
@@ -315,29 +324,12 @@ export function SetorForm() {
       document.getElementById('wa')?.focus()
       return
     }
-    setBusy('check')
-    try {
-      const res = await fetch('/api/submissions/batch/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload()) })
-      const data = await res.json()
-      if (!res.ok) {
-        setFormError(data.error ?? 'Cek gagal. Coba lagi.')
-        setResults(null)
-        return
-      }
-      setResults(data.items)
-      setCheckedKey(formKey)
-      if (!data.ok) setFormError('Ada yang belum lolos. Perbaiki bagian yang merah lalu cek lagi.')
-    } catch {
-      setFormError('Tidak terhubung ke server. Periksa internet lalu coba lagi.')
-    } finally {
-      setBusy(null)
+    if (!organic || !checked) {
+      setFormError('Centang kedua pernyataan di bagian Pernyataan dulu.')
+      document.getElementById(organic ? 'sudah-cek' : 'organik')?.focus()
+      return
     }
-  }
-
-  async function send() {
-    if (!canSend) return
     setBusy('send')
-    setFormError('')
     try {
       const fd = new FormData()
       fd.set('data', JSON.stringify(payload()))
@@ -356,7 +348,7 @@ export function SetorForm() {
         setResults(data.items)
         setCheckedKey(formKey)
       }
-      setFormError(data.error ?? 'Setoran belum bisa dikirim. Perbaiki poin yang merah lalu cek lagi.')
+      setFormError(data.error ?? 'Setoran belum bisa dikirim. Perbaiki bagian yang merah lalu tekan Kirim lagi.')
     } catch {
       setFormError('Tidak terhubung ke server. Periksa internet lalu coba lagi.')
     } finally {
@@ -431,8 +423,7 @@ export function SetorForm() {
       noValidate
       onSubmit={(e) => {
         e.preventDefault()
-        if (canSend) send()
-        else runCheck()
+        send()
       }}
     >
       {closed && (
@@ -529,7 +520,6 @@ export function SetorForm() {
           {globalFails.map((c) => <li key={c.id}>{c.message}</li>)}
         </ul>
       )}
-      {results && !fresh && <p className="text-center text-sm font-bold text-amber-800">Ada perubahan setelah dicek. Tekan Cek setoran lagi.</p>}
 
       {formError && (
         <p role="alert" className="rounded-field bg-red-50 p-3 text-sm font-bold text-bad">
@@ -537,19 +527,14 @@ export function SetorForm() {
         </p>
       )}
 
-      <div className="sticky bottom-3 z-10 grid grid-cols-2 gap-3 rounded-panel border border-brand-purple/10 bg-white/90 p-2 backdrop-blur">
-        <button type="button" className="btn-ghost" onClick={runCheck} disabled={busy !== null || !rules || Boolean(closed)}>
-          {busy === 'check' ? 'Mengecek…' : 'Cek setoran'}
-        </button>
-        <button type="button" className="btn-primary" onClick={send} disabled={!canSend || busy !== null || Boolean(closed)} aria-describedby={canSend ? undefined : 'kirim-hint'}>
-          {busy === 'send' ? 'Mengirim…' : items.length > 1 ? `Kirim ${items.length} setoran` : 'Kirim setoran'}
+      <div className="sticky bottom-3 z-10 rounded-panel border border-brand-purple/10 bg-white/90 p-2 backdrop-blur">
+        <button type="button" className="btn-primary w-full" onClick={send} disabled={busy !== null || !rules || Boolean(closed) || anyRedLink} aria-describedby="kirim-hint">
+          {busy === 'send' ? 'Memeriksa & mengirim…' : items.length > 1 ? `Kirim ${items.length} setoran` : 'Kirim setoran'}
         </button>
       </div>
-      {!canSend && (
-        <p id="kirim-hint" className="muted -mt-2 text-center text-xs">
-          {anyRedLink ? 'Ada link yang merah. Perbaiki atau hapus dulu sebelum mengirim.' : 'Tombol Kirim setoran aktif setelah semua cek lolos.'}
-        </p>
-      )}
+      <p id="kirim-hint" className={`-mt-2 text-center text-xs ${anyRedLink ? 'font-bold text-bad' : 'muted'}`}>
+        {anyRedLink ? 'Ada link yang merah. Perbaiki atau hapus dulu sebelum mengirim.' : 'Link akan dicek otomatis saat dikirim.'}
+      </p>
     </form>
   )
 }

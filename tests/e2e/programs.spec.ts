@@ -282,15 +282,12 @@ test('setor banyak: tambah (+) sampai 10, link salah merah dan tidak bisa kirim,
   // Third link is an Instagram post, not a reel: red, and the form cannot be sent.
   const third = page.getByRole('region', { name: 'Konten 3', exact: true })
   await expect(third.getByLabel('Link konten')).toHaveAttribute('aria-invalid', 'true')
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(third.locator('ul').getByText(/Link harus dari tiktok\.com/)).toBeVisible()
-  await expect(third.locator('ul li')).toHaveCount(1)
+  await expect(third.getByText(/Link harus dari tiktok\.com/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim 3 setoran' })).toBeDisabled()
+  await expect(page.getByText('Ada link yang merah. Perbaiki atau hapus dulu sebelum mengirim.')).toBeVisible()
   await shot(page, '22-setor-banyak-merah')
 
   await page.getByRole('button', { name: 'Hapus konten 3' }).click()
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText(/Lolos semua cek/)).toHaveCount(2)
   await page.getByRole('button', { name: 'Kirim 2 setoran' }).click()
   await expect(page.getByRole('heading', { name: '2 setoran terkirim' })).toBeVisible()
   await shot(page, '23-setor-banyak-sukses')

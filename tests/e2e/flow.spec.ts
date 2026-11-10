@@ -70,12 +70,10 @@ test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minima
   await expect(page.getByText('Link valid · TikTok')).toBeVisible()
   await expect(page.getByText(/Syarat TikTok: minimal 100\.000 like dan 5\.000 komentar/)).toBeVisible()
   await shot(page, '02-setor-sederhana')
+  // One button: check + send in one step, enabled as soon as the link is valid.
+  await expect(page.getByRole('button', { name: 'Cek setoran' })).toHaveCount(0)
   const send = page.getByRole('button', { name: 'Kirim setoran' })
-  await expect(send).toBeDisabled()
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
-  await expect(page.getByText('Lolos semua cek')).toBeVisible()
   await expect(send).toBeEnabled()
-  await shot(page, '03-setor-lolos')
   await send.click()
   await expect(page.getByRole('heading', { name: 'Setoran terkirim' })).toBeVisible()
   await expect(page.getByText('Terkirim', { exact: true })).toBeVisible()
@@ -100,7 +98,8 @@ test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minima
 
 test('duplikat ditolak walau parameter berbeda', async ({ page }) => {
   await fillForm(page, { name: 'Budi', url: vid(1).replace('is_from_webapp=1', 'utm_source=wa') })
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
+  await page.getByRole('button', { name: 'Kirim setoran' }).click()
+  await expect(page.getByRole('heading', { name: /setoran terkirim/ })).toHaveCount(0)
   await expect(page.getByText(/Link ini sudah pernah disetor pada/)).toBeVisible()
 })
 
@@ -117,8 +116,17 @@ test('reels: platform terdeteksi otomatis, syarat Reels 3.000 komentar tampil', 
   await fillForm(page, { name: 'Dewi', url: 'https://www.instagram.com/reel/C9zYxW8vUtS/?igsh=abc' })
   await expect(page.getByText('Link valid · Instagram Reels')).toBeVisible()
   await expect(page.getByText(/Syarat Instagram Reels: minimal 100\.000 like dan 3\.000 komentar/)).toBeVisible()
-  await page.getByRole('button', { name: 'Cek setoran' }).click()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeEnabled()
+})
+
+test('lupa centang pernyataan: pesan jelas, tidak terkirim', async ({ page }) => {
+  await page.goto('/goldenticket/setor')
+  await page.getByLabel('Nama penyetor').fill('Lupa Centang')
+  await page.getByLabel('Nomor WhatsApp').fill('081233334444')
+  await page.getByLabel('Link konten').fill(vid(77))
+  await page.getByRole('button', { name: 'Kirim setoran' }).click()
+  await expect(page.getByText('Centang kedua pernyataan di bagian Pernyataan dulu.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /setoran terkirim/ })).toHaveCount(0)
 })
 
 test('admin: login; link terkumpul tampil publik tanpa nomor WA, bisa diputar di halaman', async ({ page }) => {
@@ -208,7 +216,6 @@ test('periode ditutup: form menampilkan pesan dan tombol nonaktif', async ({ pag
   await page.goto('/goldenticket/setor')
   await expect(page.getByText('Setoran sedang ditutup. Pantau beranda untuk periode berikutnya.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Cek setoran' })).toBeDisabled()
   await shot(page, '10-setor-ditutup')
 })
 
