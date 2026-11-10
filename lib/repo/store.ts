@@ -35,6 +35,14 @@ export interface TableStore {
   append(table: TableName, rows: Row[]): Promise<void>
   /** Writes whole rows at the given data indexes. */
   update(table: TableName, updates: { index: number; row: Row }[]): Promise<void>
+  /** Appends and returns the table afterwards, in one round trip where the backend supports it. */
+  appendAndRead?(table: TableName, rows: Row[]): Promise<TableData>
+}
+
+export async function appendThenRead(store: TableStore, table: TableName, rows: Row[]): Promise<TableData> {
+  if (store.appendAndRead) return store.appendAndRead(table, rows)
+  await store.append(table, rows)
+  return store.read(table)
 }
 
 export function cellToString(v: unknown): string {

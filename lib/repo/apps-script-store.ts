@@ -3,7 +3,7 @@ import { cellToString, TABLES, type Row, type TableData, type TableName, type Ta
 type Op =
   | { action: 'ensure'; tables: Record<string, readonly string[]> }
   | { action: 'read'; table: TableName }
-  | { action: 'append'; table: TableName; rows: string[][] }
+  | { action: 'append'; table: TableName; rows: string[][]; returnRows?: boolean }
   | { action: 'update'; table: TableName; updates: { index: number; row: string[] }[] }
 
 export type Poster = (url: string, body: string) => Promise<{ status: number; text: string }>
@@ -32,6 +32,8 @@ export class AppsScriptStore implements TableStore {
   readonly kind = 'apps_script' as const
   static READ_TTL_MS = 3000
   private ensured: Promise<void> | null = null
+  /** Tables whose sheet header already has every column: writes to them can skip the schema check. */
+  private verified = new Set<TableName>()
   private recent = new Map<TableName, { at: number; data: Promise<ReadResult> }>()
   private queue: { table: TableName; resolve: (r: ReadResult) => void; reject: (e: unknown) => void }[] = []
 
@@ -83,6 +85,7 @@ export class AppsScriptStore implements TableStore {
         results = await this.send<ReadResult>(tables.map((table) => ({ action: 'read', table })))
       }
       const byTable = new Map(tables.map((t, i) => [t, results[i]]))
+      byTable.forEach((r, t) => this.markVerified(t, r.header))
       for (const b of batch) b.resolve(byTable.get(b.table)!)
     } catch (e) {
       for (const b of batch) b.reject(e)
@@ -111,13 +114,30 @@ export class AppsScriptStore implements TableStore {
     return this.ensured
   }
 
+  private markVerified(table: TableName, header: string[]) {
+    if ((TABLES[table] as readonly string[]).every((c) => header.includes(c))) this.verified.add(table)
+  }
+
+  private async ensureFor(table: TableName) {
+    if (!this.verified.has(table)) await this.ensureSchema()
+  }
+
+  async appendAndRead(table: TableName, rows: Row[]): Promise<TableData> {
+    await this.ensureFor(table)
+    this.recent.delete(table)
+    const r = await this.call<{ table: ReadResult }>({ action: 'append', table, rows: rows.map((x) => x.map(cellToString)), returnRows: true })
+    this.markVerified(table, r.table.header)
+    this.recent.set(table, { at: Date.now(), data: Promise.resolve(r.table) })
+    return { header: r.table.header.length ? r.table.header : [...TABLES[table]], rows: r.table.rows.map((row) => [...row]) }
+  }
+
   async read(table: TableName): Promise<TableData> {
     const r = await this.readRaw(table)
     return { header: r.header.length ? r.header : [...TABLES[table]], rows: r.rows.map((row) => [...row]) }
   }
 
   async append(table: TableName, rows: Row[]) {
-    await this.ensureSchema()
+    await this.ensureFor(table)
     this.recent.delete(table)
     await this.call({ action: 'append', table, rows: rows.map((r) => r.map(cellToString)) })
     this.recent.delete(table)
@@ -125,7 +145,7 @@ export class AppsScriptStore implements TableStore {
 
   async update(table: TableName, updates: { index: number; row: Row }[]) {
     if (!updates.length) return
-    await this.ensureSchema()
+    await this.ensureFor(table)
     this.recent.delete(table)
     await this.call({ action: 'update', table, updates: updates.map((u) => ({ index: u.index, row: u.row.map(cellToString) })) })
     this.recent.delete(table)

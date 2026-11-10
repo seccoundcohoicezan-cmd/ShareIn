@@ -38,9 +38,8 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
     while (taken.has(token)) token = newToken()
     const now = new Date().toISOString()
     const p: Participant = { id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: name.trim().replace(/\s+/g, ' '), whatsapp: wa, created_at: now, last_seen_at: '' }
-    await participantsTable.append([p])
     // Another server may have registered the same number at the same moment: earliest row wins.
-    const after = await participantsTable.list()
+    const after = await participantsTable.appendAndList([p])
     return strip(after.find((x) => x.whatsapp === wa) ?? { ...p, _index: -1 })
   })
 }

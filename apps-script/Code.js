@@ -37,7 +37,11 @@ function jalankan_(op) {
   switch (op.action) {
     case 'ensure': return ensure_(op.tables || {});
     case 'read': return read_(op.table);
-    case 'append': return append_(op.table, op.rows || []);
+    case 'append': {
+      var res = append_(op.table, op.rows || []);
+      if (op.returnRows) { SpreadsheetApp.flush(); res.table = read_(op.table); }
+      return res;
+    }
     case 'update': return update_(op.table, op.updates || []);
     default: throw new Error('aksi tidak dikenal: ' + op.action);
   }

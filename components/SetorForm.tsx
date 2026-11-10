@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatNumber, parseCount } from '@/lib/format'
 import type { Check, CheckId, Platform } from '@/lib/types'
 import { PLATFORM_LABEL } from '@/lib/types'
-import { checkShareinUrl, detectPlatform, LINK_RULE_MESSAGE, parseSourceUrl } from '@/lib/url'
+import { detectPlatform, LINK_RULE_MESSAGE, parseSourceUrl } from '@/lib/url'
 import { CheckIcon, CrossIcon, GiftSolid } from './icons'
 import { PantauCard } from './PantauCard'
 import { toast } from './Toast'
-import { localWa, useMe } from './useMe'
+import { localWa, useMe, type Me } from './useMe'
 import { PillLabel } from './ui'
 
 interface Rules {
@@ -46,6 +46,8 @@ async function pasteInto(set: (v: string) => void) {
 
 const MAX_ITEMS = 10
 
+const maskWa = (wa: string) => (wa.length > 7 ? `${wa.slice(0, 4)}••••${wa.slice(-3)}` : wa)
+
 const PRO_KONTRA = [
   'Bumi itu bulat atau datar?',
   'Bubur ayam diaduk atau tidak diaduk?',
@@ -79,13 +81,13 @@ function ProKontra() {
 // Reported once for the whole form rather than on every content card.
 const GLOBAL_CHECKS: CheckId[] = ['period_open', 'identity', 'organic']
 
-type Item = { key: number; url: string; sharein: string }
+type Item = { key: number; url: string }
 type ItemResult = { ok: boolean; checks: Check[] }
 
 let nextKey = 1
-const blankItem = (): Item => ({ key: nextKey++, url: '', sharein: '' })
+const blankItem = (): Item => ({ key: nextKey++, url: '' })
 // Fixed key: the first card is server-rendered, so its field ids must match on hydration.
-const FIRST_ITEM: Item = { key: 0, url: '', sharein: '' }
+const FIRST_ITEM: Item = { key: 0, url: '' }
 
 function linkState(url: string) {
   if (!url.trim()) return { state: 'empty' as const }
@@ -105,11 +107,9 @@ function ContentCard({
   onChange: (patch: Partial<Item>) => void
   onRemove: () => void
 }) {
-  const [showShare, setShowShare] = useState(false)
   const link = linkState(item.url)
   const platform: Platform = detectPlatform(item.url) ?? 'tiktok'
   const rule = rules?.rules[platform]
-  const share = item.sharein.trim() && rules ? checkShareinUrl(item.sharein, rules.sharein_domains) : null
   const id = (n: string) => `${n}-${item.key}`
   const failed = result?.checks.filter((c) => !c.pass && !GLOBAL_CHECKS.includes(c.id)) ?? []
   // A wrong link also fails the duplicate check; one message is enough.
@@ -170,51 +170,6 @@ function ContentCard({
         </p>
       )}
 
-      {!showShare && !item.sharein ? (
-        <button type="button" className="inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-4" onClick={() => setShowShare(true)}>
-          + Sudah upload ke Sharein? Tambahkan link-nya (opsional)
-        </button>
-      ) : (
-      <div>
-        <label htmlFor={id('sharein')} className="label">Link Sharein <span className="muted font-medium">(opsional)</span></label>
-        <div className="relative">
-          <input
-            id={id('sharein')}
-            className={`field pr-24 ${share && !share.ok ? '!border-bad !bg-red-50 !text-bad' : ''}`}
-            inputMode="url"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={item.sharein}
-            aria-invalid={Boolean(share && !share.ok)}
-            onChange={(e) => onChange({ sharein: e.target.value })}
-            placeholder={`https://${rules?.sharein_domains[0] ?? 'sharein.id'}/…`}
-            aria-describedby={id('sharein-status')}
-          />
-          <button type="button" className="absolute right-1.5 top-1/2 min-h-[38px] -translate-y-1/2 rounded-[12px] bg-brand-purple/10 px-3 text-sm font-bold text-brand-purple hover:bg-brand-purple/20" onClick={() => pasteInto((v) => onChange({ sharein: v }))}>
-            Tempel
-          </button>
-        </div>
-        <div id={id('sharein-status')} aria-live="polite">
-          {!share ? (
-            <Status ok={null}>Boleh dikosongkan bila belum punya.</Status>
-          ) : share.ok ? (
-            <Status ok>Link Sharein valid</Status>
-          ) : (
-            <Status ok={false}>
-              {share.reason === 'domain'
-                ? `Link harus dari ${rules?.sharein_domains.join(' atau ')}.`
-                : share.reason === 'no_path'
-                  ? 'Tempel link halaman konten, bukan beranda Sharein.'
-                  : share.reason === 'not_https'
-                    ? 'Link Sharein harus diawali https://.'
-                    : 'Link Sharein tidak terbaca. Salin ulang dari Sharein.'}
-            </Status>
-          )}
-        </div>
-      </div>
-      )}
-
       {result && (
         failed.length === 0 ? (
           <p className="flex items-center gap-2 rounded-field bg-green-50 px-3 py-2 text-sm font-bold text-green-900">
@@ -240,7 +195,35 @@ export function SetorForm() {
   const [loadError, setLoadError] = useState(false)
   const [name, setName] = useState('')
   const [wa, setWa] = useState('')
-  const me = useMe()
+  const [me, setMe] = useState<Me | null | undefined>(undefined)
+  const loaded = useMe()
+  useEffect(() => setMe(loaded), [loaded])
+  const [pantauLink, setPantauLink] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  async function loginWithLink() {
+    setLoginError('')
+    setLoggingIn(true)
+    try {
+      const res = await fetch('/api/me/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ link: pantauLink }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setMe(data.user)
+      toast(`Halo, ${data.user.name}`)
+    } catch (e) {
+      setLoginError((e as Error).message || 'Link pantau tidak dikenali.')
+    } finally {
+      setLoggingIn(false)
+    }
+  }
+
+  async function logout() {
+    await fetch('/api/me/logout', { method: 'POST' })
+    setMe(null)
+    setName('')
+    setWa('')
+  }
   const [items, setItems] = useState<Item[]>([FIRST_ITEM])
   const [organic, setOrganic] = useState(false)
   const [checked, setChecked] = useState(false)
@@ -269,7 +252,7 @@ export function SetorForm() {
   }, [])
 
   const formKey = useMemo(
-    () => JSON.stringify([name.trim(), wa.trim(), items.map((i) => [i.url.trim(), i.sharein.trim()]), organic, checked, file?.name ?? '', file?.size ?? 0]),
+    () => JSON.stringify([name.trim(), wa.trim(), items.map((i) => i.url.trim()), organic, checked, file?.name ?? '', file?.size ?? 0]),
     [name, wa, items, organic, checked, file],
   )
   const fresh = results !== null && checkedKey === formKey
@@ -294,7 +277,7 @@ export function SetorForm() {
       items: items.map((i) => ({
         platform: detectPlatform(i.url) ?? 'tiktok',
         source_url: i.url,
-        sharein_url: i.sharein,
+        sharein_url: '',
         likes: null,
         comments: null,
         metrics_source: 'manual',
@@ -314,12 +297,12 @@ export function SetorForm() {
       document.getElementById(`link-${items[0].key}`)?.focus()
       return
     }
-    if (name.trim().length < 2) {
-      setFormError('Isi nama penyetor minimal 2 huruf.')
+    if (!me && name.trim().length < 2) {
+      setFormError('Isi nama penyetor minimal 2 huruf, atau tempel link pantaumu bila sudah pernah setor.')
       document.getElementById('nama')?.focus()
       return
     }
-    if (wa.replace(/\D/g, '').length < 9) {
+    if (!me && wa.replace(/\D/g, '').length < 9) {
       setFormError('Isi nomor WhatsApp aktif, contoh 081234567890.')
       document.getElementById('wa')?.focus()
       return
@@ -434,22 +417,39 @@ export function SetorForm() {
 
       <section className="panel-solid space-y-5" aria-labelledby="data-diri">
         <PillLabel id="data-diri">Penyetor</PillLabel>
-        {me && (
-          <p className="rounded-field bg-green-50 p-3 text-sm font-bold text-green-900">
-            Masuk sebagai {me.name}. <a href={`/pantau/${me.token}`} className="underline">Lihat halaman pantau</a>
-          </p>
+        {me ? (
+          <div className="rounded-field bg-green-50 p-3 text-sm text-green-900">
+            <p className="font-bold">Masuk sebagai {me.name} · {maskWa(me.whatsapp)}</p>
+            <p className="mt-1">Nama dan WhatsApp tidak perlu diisi lagi.</p>
+            <div className="mt-2 flex flex-wrap gap-x-4">
+              <a href={`/pantau/${me.token}`} className="inline-flex min-h-[44px] items-center font-bold underline">Lihat halaman pantau</a>
+              <button type="button" className="inline-flex min-h-[44px] items-center font-bold underline" onClick={logout}>Bukan saya</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-field border border-brand-purple/20 bg-brand-lavender/60 p-3">
+              <label htmlFor="link-pantau" className="label">Sudah pernah setor? Tempel link pantaumu</label>
+              <div className="flex gap-2">
+                <input id="link-pantau" className="field" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="https://…/pantau/ABCD-EFGH-JKLM" value={pantauLink} onChange={(e) => setPantauLink(e.target.value)} />
+                <button type="button" className="btn-primary shrink-0" disabled={loggingIn || !pantauLink.trim()} onClick={loginWithLink}>{loggingIn ? 'Masuk…' : 'Masuk'}</button>
+              </div>
+              {loginError ? <p role="alert" className="mt-1.5 text-sm font-bold text-bad">{loginError}</p> : <p className="muted mt-1.5 text-xs">Tidak perlu isi nama dan WhatsApp lagi.</p>}
+            </div>
+            <p className="muted text-center text-xs font-bold">atau, kalau baru pertama kali</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="nama" className="label">Nama penyetor</label>
+                <input id="nama" className="field" autoComplete="name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama lengkap" />
+              </div>
+              <div>
+                <label htmlFor="wa" className="label">Nomor WhatsApp</label>
+                <input id="wa" className="field" inputMode="tel" autoComplete="tel" maxLength={20} value={wa} onChange={(e) => setWa(e.target.value)} placeholder="081234567890" />
+                <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>
+              </div>
+            </div>
+          </>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="nama" className="label">Nama penyetor</label>
-            <input id="nama" className="field" autoComplete="name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama lengkap" />
-          </div>
-          <div>
-            <label htmlFor="wa" className="label">Nomor WhatsApp</label>
-            <input id="wa" className="field" inputMode="tel" autoComplete="tel" maxLength={20} value={wa} onChange={(e) => setWa(e.target.value)} placeholder="081234567890" readOnly={Boolean(me)} />
-            <p className="muted mt-1.5 text-xs">1 nomor = 1 akun. Kamu akan dapat link pantau unik.</p>
-          </div>
-        </div>
         <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
       </section>
 

@@ -91,3 +91,11 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 43 | Form setor hanya meminta link. Kolom like/komentar dihapus; batas minimal tetap ditampilkan sebagai syarat dan dinyatakan lewat centang, admin memeriksa di pratinjau. Server tetap menolak angka di bawah batas bila angka dikirim (API). | Permintaan pengguna. |
 | 44 | Link Sharein tidak wajib (tersembunyi di tombol "opsional"); bila diisi tetap dicek domainnya. | Peserta baru belum punya akun/link Sharein. |
 | 45 | Panduan "konten pro & kontra" berisi 12 contoh topik debat ringan dan larangan SARA/hoaks/konten dewasa. | Permintaan pengguna; contoh dibuat aman untuk kampanye kampus. |
+
+## Putaran 12 (10 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 46 | Kolom link Sharein dihapus dari form dan pengaturan (server tetap menerima bila dikirim lewat API). | Membingungkan; peserta sempat menempel link pantau di kolom itu. |
+| 47 | Link pantau = login di /setor: tempel link → masuk, nama & WA tidak ditanya lagi; identitas diambil dari akun di server, bukan dari isian form. Halaman pantau punya CTA "+ Setor konten lagi". | Permintaan pengguna. |
+| 48 | Kirim setoran: semua baca dikirim dalam satu request, append mengembalikan isi tabel (Apps Script v4), pendaftaran peserta paralel, pemeriksaan skema dilewati bila kolom sudah lengkap. 9 → 3 request ke spreadsheet. | Pengiriman sebelumnya >15 detik. |

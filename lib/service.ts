@@ -5,7 +5,7 @@ import { normalizeName, parseCount } from './format'
 import { withLock } from './lock'
 import { getSettings, getSettingsFresh } from './repo/settings'
 import {
-  appendSubmissions,
+  appendSubmissionsAndList,
   countCollected,
   findDuplicate,
   listSubmissionsCached,
@@ -175,9 +175,7 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
         whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
       }
     })
-    await appendSubmissions(subs)
-
-    const after = await listSubmissionsFresh()
+    const after = await appendSubmissionsAndList(subs)
     const voids: StoredSubmission[] = []
     const results = subs.map((sub): CreateResult => {
       const mine = after.find((s) => s.id === sub.id)

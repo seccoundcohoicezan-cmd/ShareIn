@@ -19,15 +19,11 @@ async function login(page: Page) {
 const waFor = (name: string) => '0812' + String([...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1e8, 7)).padStart(8, '1')
 let rinaToken = ''
 
-async function fillForm(page: Page, o: { name: string; url: string; sharein?: string }) {
+async function fillForm(page: Page, o: { name: string; url: string }) {
   await page.goto('/goldenticket/setor')
   await page.getByLabel('Nama penyetor').fill(o.name)
   await page.getByLabel('Nomor WhatsApp').fill(waFor(o.name))
   await page.getByLabel('Link konten').fill(o.url)
-  if (o.sharein) {
-    await page.getByRole('button', { name: /Sudah upload ke Sharein/ }).click()
-    await page.getByLabel(/Link Sharein/).fill(o.sharein)
-  }
   await page.getByLabel(/muncul organik/).check()
   await page.getByLabel(/sudah membuka link/).check()
 }
@@ -61,7 +57,6 @@ test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minima
   await fillForm(page, { name: 'Rina Uji', url: vid(1) })
   await expect(page.getByLabel('Like', { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Komentar', { exact: true })).toHaveCount(0)
-  await expect(page.getByLabel(/Link Sharein/)).toHaveCount(0)
   const syarat = page.locator('section', { hasText: 'Syarat konten' })
   await expect(syarat).toContainText('Like min. 100.000')
   await expect(syarat).toContainText('Komentar min. 5.000')
@@ -91,9 +86,10 @@ test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minima
   await expect(page.getByText(/Langsung dari spreadsheet/)).toBeVisible()
   await shot(page, '05-pantau')
   // Logged in: the form now knows who you are.
-  await page.goto('/goldenticket/setor')
-  await expect(page.getByText('Masuk sebagai Rina Uji.')).toBeVisible()
-  await expect(page.getByLabel('Nomor WhatsApp')).toHaveValue(waFor('Rina Uji'))
+  await expect(page.getByRole('link', { name: '+ Setor konten lagi' })).toBeVisible()
+  await page.getByRole('link', { name: '+ Setor konten lagi' }).click()
+  await expect(page.getByText('Masuk sebagai Rina Uji')).toBeVisible()
+  await expect(page.getByLabel('Nomor WhatsApp')).toHaveCount(0)
 })
 
 test('duplikat ditolak walau parameter berbeda', async ({ page }) => {
@@ -103,13 +99,14 @@ test('duplikat ditolak walau parameter berbeda', async ({ page }) => {
   await expect(page.getByText(/Link ini sudah pernah disetor pada/)).toBeVisible()
 })
 
-test('link bukan TikTok/Reels merah; link Sharein opsional tapi kalau diisi harus domain benar', async ({ page }) => {
-  await fillForm(page, { name: 'Sari', url: 'https://youtube.com/shorts/abc', sharein: 'https://contoh.com/x' })
+test('link bukan TikTok/Reels merah, tidak ada kolom link Sharein', async ({ page }) => {
+  await fillForm(page, { name: 'Sari', url: 'https://youtube.com/shorts/abc' })
   await expect(page.getByText('Link harus dari tiktok.com atau instagram.com/reel/. Tempel link dari tombol Bagikan.')).toBeVisible()
   await expect(page.getByLabel('Link konten')).toHaveAttribute('aria-invalid', 'true')
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
   await expect(page.getByText('Ada link yang merah.')).toBeVisible()
-  await expect(page.getByText(/Link harus dari sharein.id atau sharein.app/)).toBeVisible()
+  await expect(page.getByLabel(/Link Sharein/)).toHaveCount(0)
+  await expect(page.getByText(/Sharein\?/)).toHaveCount(0)
 })
 
 test('reels: platform terdeteksi otomatis, syarat Reels 3.000 komentar tampil', async ({ page }) => {
@@ -117,6 +114,28 @@ test('reels: platform terdeteksi otomatis, syarat Reels 3.000 komentar tampil', 
   await expect(page.getByText('Link valid · Instagram Reels')).toBeVisible()
   await expect(page.getByText(/Syarat Instagram Reels: minimal 100\.000 like dan 3\.000 komentar/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeEnabled()
+})
+
+test('sudah pernah setor: tempel link pantau di /setor, tidak perlu isi nama & WA lagi', async ({ browser }) => {
+  const ctx = await browser.newContext()
+  const page = await ctx.newPage()
+  await page.goto('/goldenticket/setor')
+  await page.getByLabel('Sudah pernah setor? Tempel link pantaumu').fill('https://contoh.app/pantau/ZZZZ-ZZZZ-ZZZZ')
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click()
+  await expect(page.getByText('Link pantau tidak dikenali.', { exact: false })).toBeVisible()
+  await page.getByLabel('Sudah pernah setor? Tempel link pantaumu').fill(`http://localhost:3123/pantau/${rinaToken}`)
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click()
+  await expect(page.getByText('Masuk sebagai Rina Uji')).toBeVisible()
+  await expect(page.getByLabel('Nama penyetor')).toHaveCount(0)
+  await page.getByLabel('Link konten').fill(vid(88))
+  await page.getByLabel(/muncul organik/).check()
+  await page.getByLabel(/sudah membuka link/).check()
+  await shot(page, '04b-setor-pakai-link-pantau')
+  await page.getByRole('button', { name: 'Kirim setoran' }).click()
+  await expect(page.getByRole('heading', { name: 'Setoran terkirim' })).toBeVisible()
+  await page.goto(`/pantau/${rinaToken}`)
+  await expect(page.getByRole('list', { name: 'Daftar setoran' }).getByRole('listitem').filter({ hasText: 'Golden Ticket' })).toHaveCount(2)
+  await ctx.close()
 })
 
 test('lupa centang pernyataan: pesan jelas, tidak terkirim', async ({ page }) => {
@@ -166,7 +185,7 @@ test('admin: tolak wajib alasan, setujui, ekspor CSV; halaman pantau ikut beruba
   await expect(userPage.getByRole('list', { name: 'Daftar setoran' })).toContainText('Menunggu')
   await login(page)
   await page.goto('/admin/setoran?status=pending')
-  const card = page.locator('li', { hasText: 'Rina Uji' })
+  const card = page.locator('li', { hasText: 'Rina Uji' }).first()
   // Live preview panel: official TikTok embed + ShareIn tab, decisions next to it.
   await card.getByRole('button', { name: 'Pratinjau & review' }).click()
   const panel = page.getByRole('dialog', { name: /Rina Uji/ })
@@ -189,7 +208,7 @@ test('admin: tolak wajib alasan, setujui, ekspor CSV; halaman pantau ikut beruba
   await expect(userPage.getByText('Baru diperbarui')).toBeVisible()
   await shot(userPage, '09b-pantau-live')
   await userCtx.close()
-  await expect(page.locator('li', { hasText: 'Rina Uji' })).toHaveCount(0)
+  await expect(page.locator('li', { hasText: 'Rina Uji' })).toHaveCount(1) // the other Rina submission still waits
 
   await page.locator('li', { hasText: 'Paralel' }).first().getByRole('button', { name: 'Setujui' }).click()
   await expect(page.getByRole('status').getByText('Disetujui', { exact: true })).toBeVisible()

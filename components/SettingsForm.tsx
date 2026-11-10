@@ -164,11 +164,6 @@ export function SettingsForm({ initial }: { initial: Settings }) {
 
       <section className="panel-solid space-y-4">
         <h2 className="font-extrabold">Validasi</h2>
-        <div>
-          <label htmlFor="domains" className="label">Domain Sharein yang valid</label>
-          <input id="domains" className="field" value={domains} onChange={(e) => setDomains(e.target.value)} placeholder="sharein.id, sharein.app" />
-          <p className="muted mt-1 text-sm">Pisahkan dengan koma. Subdomain ikut diterima.</p>
-        </div>
         <Toggle id="require_screenshot" label="Wajib tangkapan layar" hint="Penyetor harus melampirkan bukti FYP/Beranda." checked={s.require_screenshot} onChange={(v) => setS({ ...s, require_screenshot: v })} />
         <fieldset>
           <legend className="label">Adapter metrik otomatis</legend>

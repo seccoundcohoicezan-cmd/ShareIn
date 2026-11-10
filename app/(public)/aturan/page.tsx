@@ -84,7 +84,6 @@ export default async function AturanPage() {
           <li>Kamu cukup menempel link. Sebelum menyetor, buka link-nya dan pastikan jumlah like dan komentar memenuhi batas minimal. Admin akan memeriksa ulang.</li>
           <li>Jangan setor konten yang tidak memenuhi ketentuan. Setoran yang tidak sesuai akan ditolak admin.</li>
           <li>Konten yang dicari adalah konten yang memicu <b>pro &amp; kontra</b>, misalnya perdebatan bumi bulat atau datar.</li>
-          <li>Link Sharein tidak wajib saat menyetor. Bila sudah mengunggah ke Sharein, boleh ditambahkan.</li>
           <li>Link konten wajib dari <b>tiktok.com</b> atau <b>instagram.com/reel/</b>. Link lain ditolak.</li>
           <li>Makin banyak konten yang kamu submit, makin besar peluang rewardmu. Sekali kirim bisa sampai 10 konten.</li>
           <li>Satu konten hanya boleh disetor satu kali di seluruh periode. Link yang sama akan ditolak sebagai duplikat.</li>

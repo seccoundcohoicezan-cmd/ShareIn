@@ -1,6 +1,6 @@
 import { invalidate } from '../cache'
 import { getStore } from './index'
-import { recordToRow, rowToRecord, type Cell, type TableName } from './store'
+import { appendThenRead, recordToRow, rowToRecord, type Cell, type TableName } from './store'
 
 export type Stored<T> = T & { _index: number }
 
@@ -28,6 +28,14 @@ export function recordTable<T extends { id: string }>(
       const h = await head()
       await getStore().append(table, items.map((v) => recordToRow(h, to(v))))
       invalidate(table)
+    },
+    /** Appends and returns the refreshed list (one round trip on Apps Script). */
+    async appendAndList(items: T[]): Promise<Stored<T>[]> {
+      const h = await head()
+      const data = await appendThenRead(getStore(), table, items.map((v) => recordToRow(h, to(v))))
+      invalidate(table)
+      header = data.header
+      return data.rows.map((r, i) => ({ ...from(rowToRecord(data.header, r)), _index: i })).filter((x) => x.id)
     },
     async update(items: Stored<T>[]) {
       const h = await head()

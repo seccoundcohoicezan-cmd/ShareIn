@@ -40,3 +40,30 @@ describe('AppsScriptStore round trips', () => {
     expect(rows).toHaveLength(2) // fresh after write
   })
 })
+
+describe('submission speed', () => {
+  it('a new participant submitting costs 3 spreadsheet requests (was 9), the two writes in parallel', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore } = await import('@/lib/repo')
+    const { ensureParticipant } = await import('@/lib/participant-service')
+    const { participantsTable } = await import('@/lib/repo/programs')
+    const { getSettingsFresh } = await import('@/lib/repo/settings')
+    const { listSubmissionsFresh } = await import('@/lib/repo/submissions')
+    const { createBatch } = await import('@/lib/service')
+    const sim = createAppsScriptSim(SECRET)
+    setStore(new AppsScriptStore('https://sim', SECRET, sim.poster))
+    invalidate()
+    await getSettingsFresh() // sheet already set up, as in production
+    const calls: string[] = []
+    setStore(new AppsScriptStore('https://sim', SECRET, async (u, b) => {
+      calls.push((JSON.parse(b).ops as { action: string }[]).map((o) => o.action).join('+'))
+      return sim.poster(u, b)
+    }))
+    invalidate()
+    const input = { submitter_name: 'A', whatsapp: '081234567890', platform: 'tiktok' as const, source_url: 'https://www.tiktok.com/@a/video/7400000000000012345', sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const }
+    await Promise.all([participantsTable.list(), getSettingsFresh(), listSubmissionsFresh()])
+    const [r] = await Promise.all([createBatch([input]), ensureParticipant('A', '081234567890')])
+    expect(r.ok).toBe(true)
+    expect(calls.sort()).toEqual(['append', 'append', 'read+read+read'])
+  })
+})

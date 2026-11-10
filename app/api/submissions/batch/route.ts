@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429 } from '@/lib/http'
-import { ensureParticipant } from '@/lib/participant-service'
+import { ensureParticipant, participantByToken } from '@/lib/participant-service'
+import { getSettingsFresh } from '@/lib/repo/settings'
+import { participantsTable } from '@/lib/repo/programs'
+import { listSubmissionsFresh } from '@/lib/repo/submissions'
 import { revalidatePublic } from '@/lib/revalidate'
 import { batchSchema, checkBatch, createBatch, expandBatch } from '@/lib/service'
 import { MAX_SCREENSHOT_BYTES, saveScreenshot, sniffImage } from '@/lib/storage'
-import { setUserCookie } from '@/lib/user-session'
+import { setUserCookie, USER_COOKIE } from '@/lib/user-session'
 
 export const maxDuration = 60
 
@@ -21,7 +24,18 @@ export async function POST(req: NextRequest) {
   }
   const f = form.get('screenshot')
   const file = f && typeof f !== 'string' && f.size > 0 ? f : null
-  const parsed = batchSchema.safeParse(raw)
+  // Every read this request needs is issued in the same tick, so they travel in ONE spreadsheet request;
+  // createBatch then reuses them (shared for a few seconds) instead of asking again.
+  const token = req.cookies.get(USER_COOKIE)?.value
+  const [me] = await Promise.all([
+    token ? participantByToken(token) : participantsTable.list().then(() => null),
+    getSettingsFresh(),
+    listSubmissionsFresh(),
+  ])
+
+  // Logged in with the unique link: identity comes from the account, not from the form.
+  const body = me && raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), submitter_name: me.name, whatsapp: me.whatsapp } : raw
+  const parsed = batchSchema.safeParse(body)
   if (!parsed.success) return jsonError(400, parsed.error.issues[0]?.message ?? 'Data tidak lengkap.')
   const inputs = expandBatch({ ...parsed.data, has_screenshot: Boolean(file) })
 
@@ -34,12 +48,11 @@ export async function POST(req: NextRequest) {
     if (!mime) return jsonError(400, 'Tangkapan layar harus JPG, PNG, atau WebP.')
   }
 
-  // Avoid storing a screenshot for a batch that is going to be refused.
-  const pre = await checkBatch(inputs)
-  if (!pre.ok) return NextResponse.json({ ok: false, items: pre.items }, { status: 422 })
-
   let screenshotUrl = ''
   if (buf && mime) {
+    // Avoid storing a screenshot for a batch that is going to be refused.
+    const pre = await checkBatch(inputs)
+    if (!pre.ok) return NextResponse.json({ ok: false, items: pre.items }, { status: 422 })
     try {
       screenshotUrl = await saveScreenshot(buf, mime)
     } catch (e) {
@@ -48,20 +61,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await createBatch(inputs, undefined, screenshotUrl)
+  // Saving the content and registering the participant run side by side.
+  const [result, account] = await Promise.all([
+    createBatch(inputs, undefined, screenshotUrl),
+    me ? Promise.resolve(me) : ensureParticipant(inputs[0].submitter_name, inputs[0].whatsapp),
+  ])
   if (!result.ok) return NextResponse.json({ ok: false, items: result.items }, { status: 422 })
   revalidatePublic()
   const saved = result.results.flatMap((r) => (r.ok ? [r.submission] : []))
-  const me = saved.length ? await ensureParticipant(saved[0].submitter_name, saved[0].whatsapp) : null
+  const user = saved.length ? account : null
   const res = NextResponse.json(
     {
       ok: true,
       saved: saved.length,
       status: saved[0]?.status,
-      token: me?.token,
+      token: user?.token,
       results: result.results.map((r) => (r.ok ? { ok: true, id: r.submission.id } : { ok: false, checks: r.checks })),
     },
     { status: saved.length ? 201 : 409 },
   )
-  return me ? setUserCookie(res, me.token) : res
+  return user ? setUserCookie(res, user.token) : res
 }

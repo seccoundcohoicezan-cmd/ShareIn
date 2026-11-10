@@ -2,7 +2,7 @@ import { cached, invalidate } from '../cache'
 import type { Platform, Submission, SubmissionStatus } from '../types'
 import { getStore } from './index'
 import { normalizeStatus } from '../status'
-import { recordToRow, rowToRecord, type Cell } from './store'
+import { appendThenRead, recordToRow, rowToRecord, type Cell } from './store'
 
 export interface StoredSubmission extends Submission {
   /** Data row index in the table. */
@@ -86,6 +86,16 @@ export async function appendSubmissions(items: Submission[]): Promise<void> {
   await getStore().append('submissions', items.map((s) => recordToRow(h, toRecord(s))))
   invalidate('submissions')
   invalidate('progress')
+}
+
+/** Appends and returns the fresh list in one round trip (used to settle races right after writing). */
+export async function appendSubmissionsAndList(items: Submission[]): Promise<StoredSubmission[]> {
+  const h = await header()
+  const data = await appendThenRead(getStore(), 'submissions', items.map((s) => recordToRow(h, toRecord(s))))
+  invalidate('submissions')
+  invalidate('progress')
+  lastHeader = data.header
+  return data.rows.map((r, i) => fromRecord(rowToRecord(data.header, r), i)).filter((s) => s.id)
 }
 
 export async function updateSubmissions(items: StoredSubmission[]): Promise<void> {

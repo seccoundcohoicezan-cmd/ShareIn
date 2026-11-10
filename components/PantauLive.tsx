@@ -146,6 +146,9 @@ export function PantauLive({ token }: { token: string }) {
         </p>
       </section>
 
+      <a href="/goldenticket/setor" className="btn-secondary w-full text-lg">+ Setor konten lagi</a>
+      <p className="muted -mt-2 text-center text-xs">Kamu sudah masuk lewat link ini, jadi tidak perlu isi nama dan WhatsApp lagi.</p>
+
       <div role="tablist" aria-label="Saring status" className="grid grid-cols-4 gap-1 rounded-field bg-white p-1">
         {tabs.map(([k, label, n]) => (
           <button key={k} role="tab" type="button" aria-selected={filter === k} onClick={() => setFilter(k)} className={`min-h-[48px] rounded-[12px] text-xs font-bold leading-tight ${filter === k ? 'bg-brand-purple text-white' : 'text-brand-purple'}`}>

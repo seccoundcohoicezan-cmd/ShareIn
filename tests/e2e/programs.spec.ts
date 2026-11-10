@@ -230,7 +230,11 @@ test('setujui otomatis per program + API Golden Ticket dengan kunci', async ({ p
   expect((await request.get('/api/v1/goldenticket/submissions?limit=9999', { headers: auth })).status()).toBe(400)
 
   await page.goto('/admin/pengaturan')
-  for (const n of ['Golden Ticket', 'Pelatihan Content', 'Setoran dibuka']) await page.getByRole('switch', { name: n, exact: true }).click()
+  for (const n of ['Golden Ticket', 'Pelatihan Content', 'Setoran dibuka']) {
+    const sw = page.getByRole('switch', { name: n, exact: true })
+    if ((await sw.getAttribute('aria-checked')) !== 'true') await sw.click()
+    await expect(sw).toHaveAttribute('aria-checked', 'true')
+  }
   await page.getByRole('button', { name: 'Simpan perubahan' }).click()
   await expect(page.getByText('Tersimpan')).toBeVisible()
   await shot(page, '21-admin-otomatis')
