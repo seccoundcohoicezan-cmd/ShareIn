@@ -233,7 +233,7 @@ test('periode ditutup: form menampilkan pesan dan tombol nonaktif', async ({ pag
   await page.getByRole('button', { name: 'Simpan perubahan' }).click()
   await expect(page.getByText('Tersimpan')).toBeVisible()
   await page.goto('/goldenticket/setor')
-  await expect(page.getByText('Setoran sedang ditutup. Pantau beranda untuk periode berikutnya.')).toBeVisible()
+  await expect(page.getByText('Setoran Golden Ticket sedang ditutup. Pantau halamannya untuk info berikutnya.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeDisabled()
   await shot(page, '10-setor-ditutup')
 })

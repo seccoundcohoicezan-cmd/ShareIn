@@ -24,6 +24,9 @@ export interface Settings {
   auto_approve_golden: boolean
   auto_approve_pelatihan: boolean
   auto_approve_duta: boolean
+  /** Links each participant must send per week (Monday–Sunday WIB); 0 = no target. */
+  weekly_min_pelatihan: number
+  weekly_min_duta: number
 }
 
 export interface Participant {
@@ -34,6 +37,8 @@ export interface Participant {
   whatsapp: string
   created_at: string
   last_seen_at: string
+  /** MyTopstar account id (OIDC `sub`) once the participant signed in through MyTopstar. */
+  sso_sub: string
 }
 
 export interface ApiKey {
@@ -49,44 +54,18 @@ export interface ApiKey {
 }
 
 export type Program = 'pelatihan' | 'duta'
-export type TaskSubmissionStatus = 'pending' | 'approved' | 'rejected' | 'void'
-
-export interface Task {
-  id: string
-  program: Program
-  title: string
-  description: string
-  proof_hint: string
-  active: boolean
-  order: number
-  created_at: string
-}
-
-export interface TaskSubmission {
-  id: string
-  created_at: string
-  program: Program
-  task_id: string
-  /** Normalized WhatsApp number (62…): one identity. */
-  identity_key: string
-  name: string
-  whatsapp: string
-  proof_url: string
-  note: string
-  code: string
-  status: TaskSubmissionStatus
-  reject_reason: string
-  reviewed_by: string
-  reviewed_at: string
-}
+/** Every link-collection program: Golden Ticket (with prize) plus the two obligation programs. */
+export type Channel = 'golden' | Program
 
 /** Value of reviewed_by on submissions approved by the auto-approve setting. */
 export const AUTO_REVIEWER = 'otomatis'
 
-export const PROGRAM_INFO: Record<Program, { label: string; path: string; prefix: string }> = {
-  pelatihan: { label: 'Pelatihan Content', path: '/pelatihancontent', prefix: 'PC' },
-  duta: { label: 'Duta Teladan', path: '/dutateladan', prefix: 'DT' },
+export const CHANNEL_INFO: Record<Channel, { label: string; path: string }> = {
+  golden: { label: 'Golden Ticket', path: '/goldenticket' },
+  pelatihan: { label: 'Pelatihan Content', path: '/pelatihancontent' },
+  duta: { label: 'Duta Teladan', path: '/dutateladan' },
 }
+export const PROGRAM_INFO: Record<Program, { label: string; path: string }> = { pelatihan: CHANNEL_INFO.pelatihan, duta: CHANNEL_INFO.duta }
 
 export interface Submission {
   id: string
@@ -109,6 +88,8 @@ export interface Submission {
   needs_review: boolean
   /** Normalized WhatsApp (628…); empty for submissions made before identities existed. */
   whatsapp: string
+  /** Program the link was sent to; empty cells in the sheet mean Golden Ticket. */
+  program: Channel
 }
 
 export interface Admin {

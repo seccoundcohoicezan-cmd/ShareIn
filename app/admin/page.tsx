@@ -2,28 +2,24 @@ import Link from 'next/link'
 import { PlatformTag, StatusBadge, EmptyState } from '@/components/ui'
 import { dashboard } from '@/lib/admin-service'
 import { formatDateTime, formatNumber, metricsText } from '@/lib/format'
-import { programSummary } from '@/lib/program-service'
+import { programSummary } from '@/lib/weekly'
 import { getProgress } from '@/lib/service'
 import { isDemoStore } from '@/lib/repo'
-import { taskSubmissionsTable } from '@/lib/repo/programs'
-import { cached } from '@/lib/cache'
 import { AdminShell, requirePageSession } from './shell'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminHome() {
   const session = await requirePageSession()
-  const [{ stats, recent, settings }, { progress }, pel, dut, subs] = await Promise.all([
+  const [{ stats, recent, settings, pendingByProgram }, { progress }, pel, dut] = await Promise.all([
     dashboard(),
     getProgress(),
     programSummary('pelatihan'),
     programSummary('duta'),
-    cached('task_submissions', () => taskSubmissionsTable.list()),
   ])
-  const pendingTasks = (p: string) => subs.filter((x) => x.program === p && x.status === 'pending').length
   const programs = [
-    { key: 'pelatihan', label: 'Pelatihan Content', s: pel },
-    { key: 'duta', label: 'Duta Teladan', s: dut },
+    { key: 'pelatihan' as const, label: 'Pelatihan Content', s: pel },
+    { key: 'duta' as const, label: 'Duta Teladan', s: dut },
   ]
   const cards = [
     { t: 'Golden Ticket menunggu', v: stats.pending, href: '/admin/setoran?status=pending', tone: 'text-warn' },
@@ -57,7 +53,7 @@ export default async function AdminHome() {
           <Link key={p.key} href={`/admin/program/${p.key}`} className="panel-solid !p-4 hover:border-brand-violet">
             <p className="font-extrabold">{p.label}</p>
             <p className="muted mt-1 text-sm">
-              <b className="text-warn">{pendingTasks(p.key)}</b> menunggu review · {p.s.codes} kode · {p.s.approved} disetujui
+              <b className="text-warn">{pendingByProgram[p.key]}</b> menunggu review · minggu ini {p.s.met}/{p.s.active} capai target {p.s.min} link
             </p>
           </Link>
         ))}

@@ -6,17 +6,12 @@ export const TABLES = {
   submissions: [
     'id', 'created_at', 'period_id', 'submitter_name', 'platform', 'source_url', 'source_key', 'sharein_url',
     'likes', 'comments', 'metrics_source', 'organic_declared', 'screenshot_url', 'status', 'reject_reason',
-    'reviewed_by', 'reviewed_at', 'needs_review', 'whatsapp',
+    'reviewed_by', 'reviewed_at', 'needs_review', 'whatsapp', 'program',
   ],
   admins: ['email', 'password_hash', 'role', 'active'],
   audit_log: ['time', 'actor', 'action', 'target', 'before', 'after'],
-  tasks: ['id', 'program', 'title', 'description', 'proof_hint', 'active', 'order', 'created_at'],
-  task_submissions: [
-    'id', 'created_at', 'program', 'task_id', 'identity_key', 'name', 'whatsapp', 'proof_url', 'note', 'code',
-    'status', 'reject_reason', 'reviewed_by', 'reviewed_at',
-  ],
   api_keys: ['id', 'name', 'prefix', 'key_hash', 'active', 'created_at', 'created_by'],
-  participants: ['id', 'token', 'name', 'whatsapp', 'created_at', 'last_seen_at'],
+  participants: ['id', 'token', 'name', 'whatsapp', 'created_at', 'last_seen_at', 'sso_sub'],
 } as const
 
 export type TableName = keyof typeof TABLES
@@ -37,12 +32,25 @@ export interface TableStore {
   update(table: TableName, updates: { index: number; row: Row }[]): Promise<void>
   /** Appends and returns the table afterwards, in one round trip where the backend supports it. */
   appendAndRead?(table: TableName, rows: Row[]): Promise<TableData>
+  /** Drops any cached read of the table (stores that share reads). */
+  forget?(table: TableName): void
 }
 
 export async function appendThenRead(store: TableStore, table: TableName, rows: Row[]): Promise<TableData> {
   if (store.appendAndRead) return store.appendAndRead(table, rows)
   await store.append(table, rows)
   return store.read(table)
+}
+
+/**
+ * Header to write rows with. A header read before a new column was added would silently drop that
+ * column's values, so the schema is brought up to date first.
+ */
+export async function writeHeader(store: TableStore, table: TableName, known: string[] | null): Promise<string[]> {
+  if (known && (TABLES[table] as readonly string[]).every((c) => known.includes(c))) return known
+  await store.ensureSchema()
+  store.forget?.(table)
+  return (await store.read(table)).header
 }
 
 export function cellToString(v: unknown): string {

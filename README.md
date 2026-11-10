@@ -8,10 +8,10 @@ Web kampanye ShareIn: landing dengan tutorial interaktif, lalu tiga program — 
 
 - **Landing `/`** — menu hanya *Tutorial* dan *Aturan*; isinya hanya tutorial interaktif yang berjalan otomatis (storyboard animasi, berhenti saat langkah diklik) (upload → bagikan link → reward) dan panduan bergambar cara menyalin link TikTok / Instagram Reels (tangkapan layar asli, titik ketuk berdenyut). Halaman program dibagikan langsung lewat link-nya. Latar: gradasi + 6 aset brand yang bergeser beda kecepatan saat scroll, diparkir di area kosong kiri/kanan (desktop) dan mengintip di tepi (HP).
 - **`/goldenticket`** — hadiah berjalan (bawaan Rp2.000.000 naik sedikit demi sedikit sampai Rp5.000.000 pada 5 Desember 23.59 WIB, angka berbasis waktu sehingga sama untuk semua orang), link terkumpul, ketentuan. Setor di `/goldenticket/setor` (sampai 10 konten sekali kirim, link wajib dari `tiktok.com` atau `instagram.com/reel/`), riwayat di `/goldenticket/riwayat`.
-- **`/pelatihancontent`** dan **`/dutateladan`** — daftar tugas dari admin; peserta isi nama + nomor WhatsApp (identitas) + link bukti → langsung dapat kode unik (`PC-XXXXXX` / `DT-XXXXXX`). Satu tugas sekali per nomor WA. Status tiap tugas dipantau lewat link pantau unik. Hadiah hanya ada di Golden Ticket.
+- **`/pelatihancontent`** dan **`/dutateladan`** — sistem kirim link yang sama dengan Golden Ticket (form `/<program>/setor` sampai 10 link, link terkumpul publik, pratinjau & review admin), tanpa hadiah. Kewajiban mingguan: minimal *N* link per orang per minggu (Senin–Minggu WIB, diatur di Pengaturan); peserta melihat progres "Minggu ini x/N", admin melihat rekap siapa yang belum + tombol ingatkan via WA. Duplikat dicek per program. Duta bisa **masuk lewat MyTopstar** (SSO OIDC) dan langsung tiba di form kirim link.
 - **`/pantau/<kode>`** — halaman pantau pribadi (seperti pelacakan aduan): 1 nomor WhatsApp = 1 peserta = 1 kode/link unik (12 karakter, mis. `ABCD-EFGH-JKLM`). Link dibuat otomatis saat pertama menyetor Golden Ticket atau mengumpulkan tugas, sekaligus berfungsi sebagai login (cookie) sehingga form terisi otomatis. Isinya semua setoran lintas program dengan status Menunggu/Disetujui/Ditolak, alasan tolak, kode undian & kemenangan, linimasa pemeriksaan, dan **diperbarui otomatis tiap 15 detik langsung dari spreadsheet** (perubahan status yang diketik admin langsung di sheet ikut tampil; kolom status punya dropdown + warna, kata "disetujui"/"ditolak" juga diterima). `/pantau` untuk memasukkan kode.
 - **`/aturan`** — aturan semua program.
-- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (tombol *Pratinjau & review*: pemutar resmi TikTok/Instagram + link Sharein di satu panel dengan Setujui/Tolak; massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (kelola tugas + review setoran tugas); `/admin/pengaturan` (periode/batas Golden Ticket, hadiah berjalan, buka/tutup program, setujui otomatis per program); `/admin/api` (kunci API Golden Ticket, lihat `docs/API.md`); `/admin/peserta` (daftar peserta + link unik, kirim ulang via WhatsApp); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
+- **Admin** — `/admin` dasbor; `/admin/setoran` review Golden Ticket (tombol *Pratinjau & review*: pemutar resmi TikTok/Instagram + link Sharein di satu panel dengan Setujui/Tolak; massal, ekspor CSV); `/admin/program/pelatihan` dan `/admin/program/duta` (review link + rekap mingguan); `/admin/pengaturan` (periode/batas Golden Ticket, hadiah berjalan, buka/tutup program, setujui otomatis per program); `/admin/api` (kunci API Golden Ticket, lihat `docs/API.md`); `/admin/peserta` (daftar peserta + link unik, kirim ulang via WhatsApp); `/admin/akun` (ganti sandi sendiri; owner menambah admin, mengubah peran, menonaktifkan, mengatur ulang sandi — minimal satu owner aktif). Peran `owner` (semua) dan `reviewer` (dasbor + review).
 - **Validasi server** (diulang saat simpan): periode dibuka → format/domain URL (hanya https) → normalisasi & ikuti link pendek (HEAD, 3 dtk, hanya domain TikTok/Instagram, IP privat diblokir) → duplikat `source_key` di semua periode → minimal like/komentar (inklusif) → pernyataan organik (+ tangkapan layar bila wajib) → QTY belum penuh → simpan dengan penguncian.
 - **Latar bergerak ringan** — 1 lapisan fixed + 3 blob (4 node DOM), CSS `animation-timeline: scroll()` dengan fallback rAF; mati saat `prefers-reduced-motion`, Data Saver, atau RAM ≤ 4 GB. Admin polos.
 
@@ -34,7 +34,7 @@ Spreadsheet ShareIn sudah punya proyek Apps Script terikat (`apps-script/`, depl
 
 1. Pemilik spreadsheet membuka **Ekstensi → Apps Script**, memilih fungsi `siapkan`, lalu **Run** dan mengizinkan akses (sekali saja). Sebelum ini Web App membalas 403.
 2. Di editor yang sama, buka file `Rahasia.gs` dan salin nilai `API_SECRET`.
-3. Di Vercel → Settings → Environment Variables isi `APPS_SCRIPT_SECRET` (nilai tadi), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, lalu **Redeploy**. Tab `settings`, `submissions`, `admins`, `audit_log`, `tasks`, `task_submissions`, `participants`, `api_keys` dibuat otomatis.
+3. Di Vercel → Settings → Environment Variables isi `APPS_SCRIPT_SECRET` (nilai tadi), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, lalu **Redeploy**. Tab `settings`, `submissions`, `admins`, `audit_log`, `participants`, `api_keys` dibuat otomatis.
 
 Mengubah kode Apps Script: `cd apps-script && clasp push -f && clasp deploy -i $(cat .deployment-id)`.
 
@@ -61,6 +61,8 @@ ADMIN_NEW_PASSWORD='sandi-minimal-10' npm run admin:add -- reviewer@domain.id re
 **Vercel** — repo sudah terhubung (proyek `share-in`). Env minimal: `APPS_SCRIPT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (`SESSION_SECRET` opsional, diturunkan dari rahasia Apps Script). Tanpa env database, web berjalan dalam **mode demo** (data di /tmp, hilang saat server berganti) dan dasbor admin menampilkan peringatan.
 
 **Dokploy (produksi utama)** — proyek *ShareIn / production*, aplikasi *ShareIn Web* di server KVM 8, sumber GitHub `main` dengan auto-deploy setiap push, build `Dockerfile`, volume `sharein-data` → `/data`, domain HTTPS `https://sharein.194-238-23-221.sslip.io` (Let's Encrypt). Env: `APPS_SCRIPT_SECRET`, `NODE_ENV=production`, `DATA_DIR=/data`. Domain sendiri (mis. `sharein.domainanda.id`) cukup diarahkan (A record) ke `194.238.23.221` lalu ditambahkan di tab Domains.
+
+**Login MyTopstar (Duta Teladan)** — daftarkan ShareIn sebagai *SSO Client* di dashboard MyTopstar: Redirect URI `https://<domain>/auth/sso/callback`, Initiate Login URI `https://<domain>/auth/sso/login`, scope `openid profile email`, Required Profile Fields `phone`, beri akses divisi Duta (*Manage access → Divisions*). Lalu isi env `MYTOPSTAR_CLIENT_ID` (+ `MYTOPSTAR_CLIENT_SECRET` bila client confidential; opsional `MYTOPSTAR_ISSUER`, bawaan `https://my.topstar.id/oidc`, dan `MYTOPSTAR_REDIRECT_URI` bila domain di balik proxy). Tanpa `MYTOPSTAR_CLIENT_ID` tombol MyTopstar disembunyikan. Akun dicocokkan dengan `sub` MyTopstar, lalu nomor HP (peserta lama tetap memakai link pantaunya).
 
 **Docker lain** — `docker build -t sharein .` lalu jalankan dengan env yang sama dan volume `/data`. Port 3000.
 
@@ -93,10 +95,13 @@ Prefiks `/api`, JSON.
 | POST | `/admin/submissions/bulk` | admin — setujui massal |
 | GET / PUT | `/admin/settings` | admin / owner |
 | GET | `/admin/export.csv` | admin |
-| GET | `/programs/:program` | publik — tugas, jumlah peserta/kode, pemenang (`pelatihan` \| `duta`) |
-| POST | `/programs/:program/submit` | publik — `{ task_id, name, whatsapp, proof_url, note? }` → `{ ok, code }` |
-| GET / POST | `/admin/programs/:program/tasks` · PATCH `/tasks/:id` | admin / owner |
-| GET | `/admin/programs/:program/submissions` · PATCH `/:id` · POST `/bulk` | admin |
+| GET | `/programs/:program` | publik — ringkasan mingguan (`pelatihan` \| `duta`): target, aktif, capai target, link minggu ini |
+| GET | `/collected?program=golden\|pelatihan\|duta&offset=` | publik — link terkumpul (nama disingkat) |
+| GET | `/me?program=` | peserta (cookie) — akun + progres minggu ini |
+| GET | `/admin/weekly?program=&semua=1` | admin — rekap kewajiban mingguan |
+| GET | `/auth/sso/login` · `/auth/sso/callback` | login MyTopstar (bukan di bawah `/api`) |
+
+`/submissions/batch` menerima `program` (`golden` bawaan, `pelatihan`, `duta`); filter admin `?program=`.
 
 Id cek: `period_open`, `url_valid`, `not_duplicate`, `min_like`, `min_comment`, `sharein_valid`, `qty_available`, `organic`.
 

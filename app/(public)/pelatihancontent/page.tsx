@@ -9,8 +9,7 @@ export default function Page() {
     <ProgramPage
       program="pelatihan"
       pill="Pelatihan"
-      title="Pelatihan Content"
-      intro="Ikuti pelatihan, selesaikan tugasnya, dan kumpulkan buktinya. Setiap tugas yang terkumpul mendapat kode, dan statusnya bisa kamu pantau."
+      intro="Peserta pelatihan wajib mengirim link konten TikTok atau Reels setiap minggu sesuai target di bawah. Cara kirimnya sama seperti Golden Ticket, dan statusnya bisa kamu pantau."
     />
   )
 }

@@ -99,3 +99,15 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 46 | Kolom link Sharein dihapus dari form dan pengaturan (server tetap menerima bila dikirim lewat API). | Membingungkan; peserta sempat menempel link pantau di kolom itu. |
 | 47 | Link pantau = login di /setor: tempel link → masuk, nama & WA tidak ditanya lagi; identitas diambil dari akun di server, bukan dari isian form. Halaman pantau punya CTA "+ Setor konten lagi". | Permintaan pengguna. |
 | 48 | Kirim setoran: semua baca dikirim dalam satu request, append mengembalikan isi tabel (Apps Script v4), pendaftaran peserta paralel, pemeriksaan skema dilewati bila kolom sudah lengkap. 9 → 3 request ke spreadsheet. | Pengiriman sebelumnya >15 detik. |
+
+## Putaran 14 (10 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 49 | Setujui & Tolak selalu satu baris paling bawah (Setujui kiri, Tolak kanan) di kartu, tabel, dan panel pratinjau; keputusan yang sedang berlaku tampil sebagai tombol nonaktif ("Disetujui ✓"/"Ditolak") alih-alih hilang. "Batalkan" pindah ke baris alat di atas. | Permintaan pengguna: posisi sebelumnya berpindah-pindah. |
+| 50 | Pelatihan & Duta memakai sistem link Golden Ticket: tabel `submissions` dengan kolom baru `program` (kosong = golden). Sistem tugas→kode (`tasks`, `task_submissions`) dihapus dari aplikasi; tab lama di sheet dibiarkan (3 baris tugas duta, 0 setoran). | "Sama sistemnya seperti Golden Ticket". |
+| 51 | Duplikat dicek per program: video yang sama boleh masuk Golden dan Duta, tapi tidak dua kali di program yang sama. | Kewajiban Duta tidak boleh terhalang setoran Golden orang lain, tetap mencegah setor ulang. |
+| 52 | Minimal mingguan `weekly_min_pelatihan` / `weekly_min_duta` (bawaan 3, 0 = tanpa target), minggu Senin 00.00–Minggu 23.59 WIB; yang dihitung link menunggu + disetujui (ditolak tidak). Syarat isi (like/komentar/organik) sama dengan Golden. | Angka bawaan asumsi; diubah admin di Pengaturan. |
+| 53 | Login MyTopstar: ShareIn jadi relying party OIDC (authorization code + PKCE, profil dari userinfo), rute `/auth/sso/login` (juga Initiate Login URI untuk peluncuran dari daftar aplikasi MyTopstar) dan `/auth/sso/callback`. Peserta dicocokkan `sso_sub` lalu nomor HP; tanpa nomor HP login ditolak dengan pesan. Aktif hanya bila env `MYTOPSTAR_CLIENT_ID` diisi. | Kredensial client harus didaftarkan pemilik MyTopstar; tidak dibuat sendiri. |
+| 54 | Sebelum menulis, header tab dipastikan memuat semua kolom terbaru (ensure lalu baca ulang). | Tanpa ini, setoran Duta pertama di sheet lama akan tersimpan tanpa kolom `program` = terbaca Golden. |
+| 55 | Form membaca `/api/rules` tanpa cache browser. | Program yang baru ditutup admin masih tampil terbuka di tab yang pernah dibuka. |

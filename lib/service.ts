@@ -8,13 +8,15 @@ import {
   appendSubmissionsAndList,
   countCollected,
   findDuplicate,
+  isCollected,
   listSubmissionsCached,
   listSubmissionsFresh,
   updateSubmissions,
   type StoredSubmission,
 } from './repo/submissions'
 import { parseAndResolve, type Fetcher, type Resolver } from './resolve'
-import { AUTO_REVIEWER, type CheckResult, type Platform, type Settings, type Submission } from './types'
+import { autoApprove, channelOpen } from './settings-schema'
+import { AUTO_REVIEWER, type Channel, type CheckResult, type Platform, type Settings, type Submission } from './types'
 import { runChecks } from './validate'
 import { maskName, normalizeWhatsapp } from './identity'
 import type { ParsedLink } from './url'
@@ -33,6 +35,7 @@ export const submissionSchema = z.object({
   metrics_source: z.enum(['manual', 'api']).optional().default('manual'),
   api_likes: z.number().nullable().optional(),
   api_comments: z.number().nullable().optional(),
+  program: z.enum(['golden', 'pelatihan', 'duta']).default('golden'),
 })
 
 export type SubmissionInput = z.infer<typeof submissionSchema>
@@ -47,7 +50,7 @@ type Link = Awaited<ReturnType<typeof parseAndResolve>>
 function evaluate(input: SubmissionInput, settings: Settings, all: Submission[], link: Link) {
   const likes = parseCount(input.likes)
   const comments = parseCount(input.comments)
-  const duplicate = typeof link !== 'string' && link.source_key ? findDuplicate(all, link.source_key) : null
+  const duplicate = typeof link !== 'string' && link.source_key ? findDuplicate(all, link.source_key, input.program) : null
   const result = runChecks(
     {
       platform: input.platform,
@@ -58,7 +61,7 @@ function evaluate(input: SubmissionInput, settings: Settings, all: Submission[],
       checked_declared: input.checked_declared,
       has_screenshot: input.has_screenshot,
     },
-    { settings, link, duplicate },
+    { settings, link, duplicate, open: channelOpen(settings, input.program) },
   )
   // One person = one WhatsApp number; it keys the personal monitoring link.
   if (!normalizeWhatsapp(input.whatsapp)) {
@@ -89,7 +92,7 @@ function apiDiffers(input: SubmissionInput, likes: number, comments: number) {
 
 export const MAX_BATCH = 10
 
-const sharedFields = submissionSchema.pick({ submitter_name: true, whatsapp: true, organic_declared: true, checked_declared: true, has_screenshot: true })
+const sharedFields = submissionSchema.pick({ submitter_name: true, whatsapp: true, organic_declared: true, checked_declared: true, has_screenshot: true, program: true })
 const itemFields = submissionSchema.pick({ platform: true, source_url: true, sharein_url: true, likes: true, comments: true, metrics_source: true, api_likes: true, api_comments: true })
 
 export const batchSchema = sharedFields.extend({
@@ -148,7 +151,8 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
     if (!evs.every((e) => e.result.ok)) return { ok: false, items: evs.map((e) => e.result) }
 
     const createdAt = new Date().toISOString()
-    const auto = settings.auto_approve_golden
+    const program = inputs[0].program
+    const auto = autoApprove(settings, program)
     const subs = inputs.map((input, i): Submission => {
       const link = links[i] as ParsedLink
       const likes = evs[i].likes!
@@ -173,6 +177,7 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
         reviewed_at: auto ? createdAt : '',
         needs_review: input.metrics_source === 'api' ? false : apiDiffers(input, likes, comments),
         whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
+        program,
       }
     })
     const after = await appendSubmissionsAndList(subs)
@@ -180,7 +185,7 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
     const results = subs.map((sub): CreateResult => {
       const mine = after.find((s) => s.id === sub.id)
       if (!mine) return { ok: true, submission: sub }
-      const firstSame = after.find((s) => s.source_key === sub.source_key && s.status !== 'void')
+      const firstSame = after.find((s) => s.program === program && s.source_key === sub.source_key && s.status !== 'void')
       if (firstSame && firstSame.id !== sub.id) {
         voids.push({ ...mine, status: 'void', reject_reason: 'Duplikat bersamaan (otomatis)' })
         return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini baru saja disetor orang lain. Cari konten lain.' }] }
@@ -232,9 +237,9 @@ export interface CollectedFeed {
   items: CollectedItem[]
 }
 
-/** Public list of collected links, newest first. Names are shortened; WhatsApp numbers never leave the server. */
-export async function collectedFeed(offset = 0, limit = 12): Promise<CollectedFeed> {
-  const all = (await listSubmissionsCached()).filter((s) => s.status === 'pending' || s.status === 'approved')
+/** Public list of a program's collected links, newest first. Names are shortened; WhatsApp numbers never leave the server. */
+export async function collectedFeed(offset = 0, limit = 12, program: Channel = 'golden'): Promise<CollectedFeed> {
+  const all = (await listSubmissionsCached()).filter((s) => s.program === program && isCollected(s))
   const sorted = [...all].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))
   return {
     total: sorted.length,

@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { invalidate } from '@/lib/cache'
 import { ensureParticipant, formatToken, normalizeToken, participantByToken, tracking } from '@/lib/participant-service'
-import { reviewTaskSubmissions, saveTask, submitTask } from '@/lib/program-service'
+import { review } from '@/lib/admin-service'
 import { setStore } from '@/lib/repo'
 import { AppsScriptStore } from '@/lib/repo/apps-script-store'
 import { LocalStore } from '@/lib/repo/memory-store'
-import { taskSubmissionsTable } from '@/lib/repo/programs'
 import { listSubmissionsFresh, updateSubmissions } from '@/lib/repo/submissions'
-import { getStore } from '@/lib/repo'
 import type { TableStore } from '@/lib/repo/store'
 import { createSubmission } from '@/lib/service'
 import { normalizeStatus } from '@/lib/status'
@@ -52,39 +50,34 @@ describe.each([
   })
 
   it('tracking shows all programs live, including edits made directly in the sheet', async () => {
-    const r = await createSubmission({
-      submitter_name: 'Rina Utami', whatsapp: '081234567890', platform: 'tiktok',
-      source_url: 'https://www.tiktok.com/@a/video/7400000000000000777', sharein_url: 'https://sharein.id/c/x',
-      likes: 120000, comments: 6000, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual',
-    })
+    const base = { submitter_name: 'Rina Utami', whatsapp: '081234567890', platform: 'tiktok' as const, sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const }
+    const r = await createSubmission({ ...base, source_url: 'https://www.tiktok.com/@a/video/7400000000000000777', program: 'golden' })
     expect(r.ok).toBe(true)
-    const task = await saveTask('pelatihan', { title: 'Video 30 detik', description: '', proof_hint: '', active: true, order: 1 }, 'o')
-    const t = await submitTask('pelatihan', { task_id: task.id, name: 'Rina Utami', whatsapp: '0812-3456-7890', proof_url: 'https://www.tiktok.com/@a/video/1', note: '' })
+    const t = await createSubmission({ ...base, whatsapp: '0812-3456-7890', source_url: 'https://www.tiktok.com/@a/video/7400000000000000778', program: 'pelatihan' })
     expect(t.ok).toBe(true)
     // Someone else's submission must not appear.
-    await submitTask('pelatihan', { task_id: task.id, name: 'Budi', whatsapp: '081298765432', proof_url: 'https://x.y/z', note: '' })
+    await createSubmission({ ...base, submitter_name: 'Budi', whatsapp: '081298765432', source_url: 'https://www.tiktok.com/@a/video/7400000000000000779', program: 'pelatihan' })
     const me = await ensureParticipant('Rina Utami', '081234567890')
     let view = await tracking(me!.token)
-    expect(view!.items.map((i) => i.program).sort()).toEqual(['goldenticket', 'pelatihan'])
+    expect(view!.items.map((i) => i.program).sort()).toEqual(['golden', 'pelatihan'])
     expect(view!.counts).toMatchObject({ total: 2, pending: 2 })
     expect(view!.whatsapp).toBe('6281••••890')
+    expect(view!.weekly).toEqual([expect.objectContaining({ program: 'pelatihan', sent: 1, min: 3, met: false })])
 
     // Admin edits the sheet by hand: Indonesian words in the status column.
-    const [g] = await listSubmissionsFresh()
-    await updateSubmissions([{ ...g, status: 'approved' }])
-    const subs = await taskSubmissionsTable.list()
-    const mine = subs.find((s) => s.identity_key === '6281234567890')!
-    const { header, rows } = await getStore().read('task_submissions')
-    const row = [...rows[mine._index]]
-    row[header.indexOf('status')] = 'Ditolak'
-    row[header.indexOf('reject_reason')] = 'Bukti tidak sesuai'
-    await getStore().update('task_submissions', [{ index: mine._index, row }])
+    const all = await listSubmissionsFresh()
+    const g = all.find((s) => s.program === 'golden')!
+    const p = all.find((s) => s.program === 'pelatihan' && s.whatsapp === '6281234567890')!
+    await updateSubmissions([{ ...g, status: 'approved' }, { ...p, status: normalizeStatus('Ditolak'), reject_reason: 'Bukan konten pro-kontra' }])
     view = await tracking(me!.token)
     expect(view!.counts).toMatchObject({ approved: 1, rejected: 1, pending: 0 })
-    expect(view!.items.find((i) => i.program === 'pelatihan')!.reason).toBe('Bukti tidak sesuai')
-    await reviewTaskSubmissions('pelatihan', [mine.id], 'approve', '', 'o')
+    expect(view!.items.find((i) => i.program === 'pelatihan')!.reason).toBe('Bukan konten pro-kontra')
+    // A rejected link does not count toward the weekly minimum.
+    expect(view!.weekly[0].sent).toBe(0)
+    await review([p.id], 'approve', '', 'o')
     view = await tracking(me!.token)
     expect(view!.counts.approved).toBe(2)
+    expect(view!.weekly[0]).toMatchObject({ sent: 1, approved: 1 })
   })
 
   it('unknown code → null', async () => {

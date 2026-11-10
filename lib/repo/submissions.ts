@@ -1,8 +1,8 @@
 import { cached, invalidate } from '../cache'
-import type { Platform, Submission, SubmissionStatus } from '../types'
+import type { Channel, Platform, Submission, SubmissionStatus } from '../types'
 import { getStore } from './index'
 import { normalizeStatus } from '../status'
-import { appendThenRead, recordToRow, rowToRecord, type Cell } from './store'
+import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell } from './store'
 
 export interface StoredSubmission extends Submission {
   /** Data row index in the table. */
@@ -37,6 +37,7 @@ function fromRecord(rec: Record<string, string>, index: number): StoredSubmissio
     reviewed_at: rec.reviewed_at,
     needs_review: toBool(rec.needs_review ?? ''),
     whatsapp: rec.whatsapp ?? '',
+    program: channel(rec.program),
   }
 }
 
@@ -61,6 +62,7 @@ function toRecord(s: Submission): Record<string, Cell> {
     reviewed_at: s.reviewed_at,
     needs_review: s.needs_review,
     whatsapp: s.whatsapp,
+    program: s.program,
   }
 }
 
@@ -78,7 +80,13 @@ export function listSubmissionsCached(): Promise<StoredSubmission[]> {
 
 async function header() {
   if (!lastHeader) await listSubmissionsFresh()
-  return lastHeader!
+  lastHeader = await writeHeader(getStore(), 'submissions', lastHeader)
+  return lastHeader
+}
+
+function channel(v: string | undefined): Channel {
+  const c = String(v ?? '').trim().toLowerCase()
+  return c === 'pelatihan' || c === 'duta' ? c : 'golden'
 }
 
 export async function appendSubmissions(items: Submission[]): Promise<void> {
@@ -86,6 +94,7 @@ export async function appendSubmissions(items: Submission[]): Promise<void> {
   await getStore().append('submissions', items.map((s) => recordToRow(h, toRecord(s))))
   invalidate('submissions')
   invalidate('progress')
+  invalidate('program:')
 }
 
 /** Appends and returns the fresh list in one round trip (used to settle races right after writing). */
@@ -94,6 +103,7 @@ export async function appendSubmissionsAndList(items: Submission[]): Promise<Sto
   const data = await appendThenRead(getStore(), 'submissions', items.map((s) => recordToRow(h, toRecord(s))))
   invalidate('submissions')
   invalidate('progress')
+  invalidate('program:')
   lastHeader = data.header
   return data.rows.map((r, i) => fromRecord(rowToRecord(data.header, r), i)).filter((s) => s.id)
 }
@@ -106,13 +116,19 @@ export async function updateSubmissions(items: StoredSubmission[]): Promise<void
   )
   invalidate('submissions')
   invalidate('progress')
+  invalidate('program:')
 }
 
-/** Links counted as collected for a platform (pending + approved). */
-export function countCollected(all: Submission[], platform: Platform): number {
-  return all.filter((s) => s.platform === platform && (s.status === 'pending' || s.status === 'approved')).length
+export function isCollected(s: Submission): boolean {
+  return s.status === 'pending' || s.status === 'approved'
 }
 
-export function findDuplicate(all: Submission[], sourceKey: string): Submission | null {
-  return all.find((s) => s.source_key === sourceKey && s.status !== 'void') ?? null
+/** Links counted as collected for a platform in a program (pending + approved). */
+export function countCollected(all: Submission[], platform: Platform, program: Channel = 'golden'): number {
+  return all.filter((s) => s.program === program && s.platform === platform && isCollected(s)).length
+}
+
+/** Each program collects its own links: the same video may count once per program. */
+export function findDuplicate(all: Submission[], sourceKey: string, program: Channel = 'golden'): Submission | null {
+  return all.find((s) => s.program === program && s.source_key === sourceKey && s.status !== 'void') ?? null
 }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { embedUrl } from '@/lib/embed'
 import { formatDate, formatNumber, metricsText } from '@/lib/format'
 import type { CollectedFeed as Feed, CollectedItem } from '@/lib/service'
+import type { Channel } from '@/lib/types'
 import { ExternalIcon } from './icons'
 import { PillLabel, PlatformTag } from './ui'
 
@@ -39,8 +40,8 @@ function Card({ item, playing, onPlay }: { item: CollectedItem; playing: boolean
   )
 }
 
-/** Public preview of collected Golden Ticket links. Players load only when asked, to keep the page light. */
-export function CollectedFeed({ initial }: { initial: Feed }) {
+/** Public preview of a program's collected links. Players load only when asked, to keep the page light. */
+export function CollectedFeed({ initial, program = 'golden' }: { initial: Feed; program?: Channel }) {
   const [feed, setFeed] = useState(initial)
   const [playing, setPlaying] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -50,7 +51,7 @@ export function CollectedFeed({ initial }: { initial: Feed }) {
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`/api/goldenticket/collected?offset=${feed.items.length}`)
+      const res = await fetch(`/api/collected?program=${program}&offset=${feed.items.length}`)
       if (!res.ok) throw new Error()
       const next: Feed = await res.json()
       const known = new Set(feed.items.map((i) => i.id))
@@ -67,7 +68,7 @@ export function CollectedFeed({ initial }: { initial: Feed }) {
       <PillLabel id="terkumpul">Link terkumpul</PillLabel>
       <p className="mt-3 text-sm"><b className="text-2xl font-extrabold tabular-nums text-brand-purple">{formatNumber(feed.total)}</b> link · {formatNumber(feed.tiktok)} TikTok · {formatNumber(feed.reels)} Reels</p>
       {feed.items.length === 0 ? (
-        <p className="muted mt-3 text-sm">Belum ada link terkumpul. Jadilah yang pertama menyetor.</p>
+        <p className="muted mt-3 text-sm">Belum ada link terkumpul. Jadilah yang pertama mengirim.</p>
       ) : (
         <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Daftar link terkumpul">
           {feed.items.map((i) => <Card key={i.id} item={i} playing={playing === i.id} onPlay={() => setPlaying(i.id)} />)}

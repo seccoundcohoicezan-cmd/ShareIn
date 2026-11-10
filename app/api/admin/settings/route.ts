@@ -30,6 +30,8 @@ const schema = z.object({
   auto_approve_golden: z.boolean(),
   auto_approve_pelatihan: z.boolean(),
   auto_approve_duta: z.boolean(),
+  weekly_min_pelatihan: z.number().int().min(0).max(100, 'Minimal mingguan maksimal 100 link.'),
+  weekly_min_duta: z.number().int().min(0).max(100, 'Minimal mingguan maksimal 100 link.'),
 }).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
   message: 'Tanggal akhir hadiah harus setelah tanggal mulai.',
 })

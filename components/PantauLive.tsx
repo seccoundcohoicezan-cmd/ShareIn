@@ -4,15 +4,15 @@ import { formatDateTime, metricsText } from '@/lib/format'
 import { CheckIcon, CrossIcon, ExternalIcon } from './icons'
 import { PantauCard } from './PantauCard'
 import { Toaster } from './Toast'
+import { CHANNEL_INFO, type Channel, type Program } from '@/lib/types'
 
 type Item = {
   id: string
-  program: 'goldenticket' | 'pelatihan' | 'duta'
+  program: Channel
   programLabel: string
   title: string
   link: string
   sharein?: string
-  code?: string
   likes?: number
   comments?: number
   status: 'pending' | 'approved' | 'rejected'
@@ -26,6 +26,7 @@ type Data = {
   whatsapp: string
   token: string
   items: Item[]
+  weekly: { program: Program; min: number; sent: number; approved: number; met: boolean }[]
   counts: { total: number; pending: number; approved: number; rejected: number }
   checkedAt: string
 }
@@ -37,7 +38,7 @@ const BADGE = {
   approved: 'bg-green-100 text-green-900 border-green-300',
   rejected: 'bg-red-100 text-red-900 border-red-300',
 } as const
-const PROGRAM_TAG = { goldenticket: 'bg-gradient-to-r from-brand-amber to-brand-orange text-ink', pelatihan: 'bg-brand-purple text-white', duta: 'bg-ink text-white' } as const
+const PROGRAM_TAG = { golden: 'bg-gradient-to-r from-brand-amber to-brand-orange text-ink', pelatihan: 'bg-brand-purple text-white', duta: 'bg-ink text-white' } as const
 const clock = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' })
 
 function Timeline({ it }: { it: Item }) {
@@ -146,7 +147,20 @@ export function PantauLive({ token }: { token: string }) {
         </p>
       </section>
 
-      <a href="/goldenticket/setor" className="btn-secondary w-full text-lg">+ Setor konten lagi</a>
+      {(data.weekly ?? []).map((w) => (
+        <section key={w.program} className={`rounded-panel p-4 ${w.met ? 'bg-green-50 text-green-900' : 'bg-white'}`} aria-label={`Target mingguan ${CHANNEL_INFO[w.program].label}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.15em]">{CHANNEL_INFO[w.program].label} · minggu ini</p>
+              <p className="text-2xl font-extrabold tabular-nums">{w.sent}<span className="text-base">/{w.min} link</span></p>
+              <p className="text-sm">{w.min === 0 ? 'Tidak ada target minimal.' : w.met ? 'Target tercapai.' : `Kurang ${w.min - w.sent} link lagi.`}</p>
+            </div>
+            <a href={`${CHANNEL_INFO[w.program].path}/setor`} className="btn-primary btn-sm shrink-0">Kirim link</a>
+          </div>
+        </section>
+      ))}
+
+      <a href={`${CHANNEL_INFO[data.items[0]?.program ?? 'golden'].path}/setor`} className="btn-secondary w-full text-lg">+ Setor konten lagi</a>
       <p className="muted -mt-2 text-center text-xs">Kamu sudah masuk lewat link ini, jadi tidak perlu isi nama dan WhatsApp lagi.</p>
 
       <div role="tablist" aria-label="Saring status" className="grid grid-cols-4 gap-1 rounded-field bg-white p-1">
@@ -164,8 +178,8 @@ export function PantauLive({ token }: { token: string }) {
           {data.counts.total === 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm">
               <a href="/goldenticket/setor" className="btn-primary btn-sm">Setor Golden Ticket</a>
-              <a href="/pelatihancontent" className="btn-ghost btn-sm">Pelatihan</a>
-              <a href="/dutateladan" className="btn-ghost btn-sm">Duta Teladan</a>
+              <a href="/pelatihancontent/setor" className="btn-ghost btn-sm">Kirim Pelatihan</a>
+              <a href="/dutateladan/setor" className="btn-ghost btn-sm">Kirim Duta Teladan</a>
             </div>
           )}
         </div>
@@ -179,10 +193,9 @@ export function PantauLive({ token }: { token: string }) {
                 {changed.has(it.id) && <span className="text-xs font-bold text-brand-purple">Baru diperbarui</span>}
               </div>
               <p className="mt-2 font-extrabold">{it.title}</p>
-              {it.code && <p className="font-mono text-sm font-bold tracking-wider">Kode {it.code}</p>}
               {typeof it.likes === 'number' && <p className="text-sm tabular-nums">{metricsText(it.likes, it.comments ?? 0)}</p>}
               <div className="mt-1 flex flex-wrap gap-x-4 text-sm font-bold">
-                <a href={it.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">{it.program === 'goldenticket' ? 'Konten asal' : 'Bukti tugas'} <ExternalIcon /></a>
+                <a href={it.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Konten asal <ExternalIcon /></a>
                 {it.sharein && <a href={it.sharein} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Link Sharein <ExternalIcon /></a>}
               </div>
               {it.status === 'rejected' && it.reason && <p className="mt-1 rounded-field bg-red-50 px-3 py-2 text-sm text-bad">Alasan ditolak: {it.reason}</p>}

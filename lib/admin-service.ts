@@ -14,13 +14,14 @@ export const filterSchema = z.object({
   platform: z.enum(['tiktok', 'reels', 'all']).default('all'),
   period: z.string().trim().max(40).default(''),
   name: z.string().trim().max(60).default(''),
+  program: z.enum(['golden', 'pelatihan', 'duta']).default('golden'),
 })
 export type Filters = z.infer<typeof filterSchema>
 
 export function applyFilters(all: Submission[], f: Filters): Submission[] {
   const name = normalizeName(f.name)
   return all
-    .filter((s) => s.status !== 'void')
+    .filter((s) => s.status !== 'void' && s.program === f.program)
     .filter((s) => f.status === 'all' || s.status === f.status)
     .filter((s) => f.platform === 'all' || s.platform === f.platform)
     .filter((s) => !f.period || s.period_id === f.period)
@@ -36,14 +37,15 @@ function strip(s: StoredSubmission): Submission {
 
 export async function adminList(f: Filters) {
   const all = (await listSubmissionsFresh()).map(strip)
-  const periods = Array.from(new Set(all.map((s) => s.period_id))).filter(Boolean).sort().reverse()
+  const periods = Array.from(new Set(all.filter((s) => s.program === f.program).map((s) => s.period_id))).filter(Boolean).sort().reverse()
   return { items: applyFilters(all, f), periods }
 }
 
 export async function dashboard() {
   // Dashboard numbers: 60 s cache (cleared on every write from the web) keeps it instant.
   const [settings, raw] = await Promise.all([getSettings(), listSubmissionsCached()])
-  const all = raw.map(strip).filter((s) => s.status !== 'void')
+  const every = raw.map(strip).filter((s) => s.status !== 'void')
+  const all = every.filter((s) => s.program === 'golden')
   const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
   const inPeriod = all.filter((s) => s.period_id === settings.period_id)
   const reviewedToday = (s: Submission) =>
@@ -56,6 +58,7 @@ export async function dashboard() {
       rejected: inPeriod.filter((s) => s.status === 'rejected').length,
       totalPeriod: inPeriod.length,
     },
+    pendingByProgram: { pelatihan: every.filter((s) => s.program === 'pelatihan' && s.status === 'pending').length, duta: every.filter((s) => s.program === 'duta' && s.status === 'pending').length },
     recent: [...all].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5),
   }
 }
@@ -101,7 +104,7 @@ export function toCsv(items: Submission[]): string {
   const cols: (keyof Submission)[] = [
     'id', 'created_at', 'period_id', 'submitter_name', 'platform', 'source_url', 'source_key', 'sharein_url', 'likes',
     'comments', 'metrics_source', 'organic_declared', 'screenshot_url', 'status', 'reject_reason', 'reviewed_by',
-    'reviewed_at', 'needs_review',
+    'reviewed_at', 'needs_review', 'whatsapp', 'program',
   ]
   return '﻿' + [cols.join(','), ...items.map((s) => cols.map((c) => csvCell(s[c])).join(','))].join('\r\n') + '\r\n'
 }

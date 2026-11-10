@@ -1,7 +1,8 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { countOrDash, formatDateTime, formatNumber, metricsText } from '@/lib/format'
-import type { Submission } from '@/lib/types'
+import { CHANNEL_INFO, type Channel, type Submission } from '@/lib/types'
+import { DecisionButtons } from './DecisionButtons'
 import { ExternalIcon } from './icons'
 import { PreviewPanel } from './PreviewPanel'
 import { toast, Toaster } from './Toast'
@@ -11,8 +12,9 @@ const QUICK_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link
 
 type Filters = { status: string; platform: string; period: string; name: string }
 
-function query(f: Filters) {
+function query(f: Filters, program?: Channel) {
   const p = new URLSearchParams()
+  if (program && program !== 'golden') p.set('program', program)
   Object.entries(f).forEach(([k, v]) => v && v !== 'all' && p.set(k, v))
   return p.toString()
 }
@@ -63,7 +65,7 @@ function RejectDialog({ target, onClose, onDone }: { target: Submission; onClose
   )
 }
 
-export function SubmissionsAdmin() {
+export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) {
   const [filters, setFilters] = useState<Filters>({ status: 'pending', platform: 'all', period: '', name: '' })
   const [items, setItems] = useState<Submission[] | null>(null)
   const [periods, setPeriods] = useState<string[]>([])
@@ -82,7 +84,7 @@ export function SubmissionsAdmin() {
   const load = useCallback(async (f: Filters) => {
     setError('')
     try {
-      const res = await fetch(`/api/admin/submissions?${query(f)}`)
+      const res = await fetch(`/api/admin/submissions?${query(f, program)}`)
       if (res.status === 401) return location.assign('/admin/login')
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -92,7 +94,7 @@ export function SubmissionsAdmin() {
     } catch (e) {
       setError((e as Error).message || 'Data belum termuat.')
     }
-  }, [])
+  }, [program])
 
   useEffect(() => {
     if (!ready) return
@@ -140,23 +142,19 @@ export function SubmissionsAdmin() {
   const allPicked = pendingIds.length > 0 && pendingIds.every((id) => selected.has(id))
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
-  const decide = (s: Submission) => (
-    <>
-      {s.status !== 'approved' && <button type="button" className="btn bg-ok text-white" onClick={() => act(s, 'approve')}>Setujui</button>}
-      {s.status !== 'rejected' && <button type="button" className="btn bg-bad text-white" onClick={() => setRejecting(s)}>Tolak</button>}
-      {s.status !== 'pending' && <button type="button" className="btn-ghost" onClick={() => act(s, 'reset')}>Batalkan</button>}
-    </>
-  )
+  const undo = (s: Submission) =>
+    s.status !== 'pending' && <button type="button" className="btn-ghost btn-sm" title="Kembalikan ke menunggu" onClick={() => act(s, 'reset')}>Batalkan</button>
 
+  // Viewing tools on top, the decision row always last.
   const actions = (s: Submission) => (
-    <div className="flex flex-wrap gap-2">
-      <button type="button" className="btn-primary btn-sm" onClick={() => setPreviewing(s)}>Pratinjau & review</button>
-      <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Buka link <ExternalIcon /></a>
-      {s.sharein_url && <a href={s.sharein_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Sharein <ExternalIcon /></a>}
-      {s.screenshot_url && <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Bukti</a>}
-      {s.status !== 'approved' && <button type="button" className="btn btn-sm bg-ok text-white" onClick={() => act(s, 'approve')}>Setujui</button>}
-      {s.status !== 'rejected' && <button type="button" className="btn btn-sm bg-bad text-white" onClick={() => setRejecting(s)}>Tolak</button>}
-      {s.status !== 'pending' && <button type="button" className="btn-ghost btn-sm" onClick={() => act(s, 'reset')}>Batalkan</button>}
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-primary btn-sm" onClick={() => setPreviewing(s)}>Pratinjau & review</button>
+        <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Buka link <ExternalIcon /></a>
+        {s.screenshot_url && <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">Bukti</a>}
+        {undo(s)}
+      </div>
+      <DecisionButtons size="sm" status={s.status} onApprove={() => act(s, 'approve')} onReject={() => setRejecting(s)} />
     </div>
   )
 
@@ -193,7 +191,7 @@ export function SubmissionsAdmin() {
             <input id="f-name" className="field" value={filters.name} onChange={set('name')} placeholder="Cari nama" />
           </div>
           <div className="col-span-2 flex items-end gap-2 md:col-span-1">
-            <a href={`/api/admin/export.csv?${query(filters)}`} className="btn-ghost w-full">Ekspor CSV</a>
+            <a href={`/api/admin/export.csv?${query(filters, program)}`} className="btn-ghost w-full">Ekspor CSV</a>
           </div>
         </div>
       </div>
@@ -247,7 +245,7 @@ export function SubmissionsAdmin() {
                   <th className="px-3 py-3 text-right">Like</th>
                   <th className="px-3 py-3 text-right">Komentar</th>
                   <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Aksi</th>
+                  <th className="min-w-[17rem] px-3 py-3">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -278,10 +276,9 @@ export function SubmissionsAdmin() {
       )}
       {previewing && (
         <PreviewPanel
-          title={`${previewing.submitter_name} · ${previewing.platform === 'tiktok' ? 'TikTok' : 'Reels'}`}
+          title={`${previewing.submitter_name} · ${previewing.platform === 'tiktok' ? 'TikTok' : 'Reels'}${program === 'golden' ? '' : ` · ${CHANNEL_INFO[program].label}`}`}
           tabs={[
             { label: previewing.platform === 'tiktok' ? 'Konten TikTok' : 'Konten Reels', url: previewing.source_url },
-            ...(previewing.sharein_url ? [{ label: 'Link Sharein', url: previewing.sharein_url }] : []),
           ]}
           onClose={() => setPreviewing(null)}
           details={
@@ -297,7 +294,12 @@ export function SubmissionsAdmin() {
               {previewing.reject_reason && (<><dt className="muted">Alasan</dt><dd className="text-bad">{previewing.reject_reason}</dd></>)}
             </dl>
           }
-          actions={decide(previewing)}
+          actions={
+            <div className="space-y-2">
+              {previewing.status !== 'pending' && <div className="flex justify-end">{undo(previewing)}</div>}
+              <DecisionButtons status={previewing.status} onApprove={() => act(previewing, 'approve')} onReject={() => setRejecting(previewing)} />
+            </div>
+          }
         />
       )}
       {rejecting && (

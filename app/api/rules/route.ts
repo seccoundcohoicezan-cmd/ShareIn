@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { ssoConfig } from '@/lib/mytopstar'
 import { getProgress } from '@/lib/service'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,11 @@ export async function GET() {
         reels: { min_like: settings.min_like_reels, min_comment: settings.min_comment_reels },
       },
       collected: progress,
+      programs: {
+        pelatihan: { open: settings.pelatihan_open, weekly_min: settings.weekly_min_pelatihan },
+        duta: { open: settings.duta_open, weekly_min: settings.weekly_min_duta },
+      },
+      sso: Boolean(ssoConfig()),
       golden: {
         start: settings.golden_pool_start,
         end: settings.golden_pool_end,

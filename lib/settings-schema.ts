@@ -1,4 +1,4 @@
-import type { MetricsAdapterMode, Platform, Settings } from './types'
+import type { Channel, MetricsAdapterMode, Platform, Program, Settings } from './types'
 
 export const SETTING_KEYS = [
   'period_id',
@@ -19,6 +19,8 @@ export const SETTING_KEYS = [
   'auto_approve_golden',
   'auto_approve_pelatihan',
   'auto_approve_duta',
+  'weekly_min_pelatihan',
+  'weekly_min_duta',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -43,6 +45,8 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   auto_approve_golden: 'FALSE',
   auto_approve_pelatihan: 'FALSE',
   auto_approve_duta: 'FALSE',
+  weekly_min_pelatihan: '3',
+  weekly_min_duta: '3',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -81,6 +85,8 @@ export function parseSettings(raw: Map<string, string>): Settings {
     auto_approve_golden: toBool(get('auto_approve_golden')),
     auto_approve_pelatihan: toBool(get('auto_approve_pelatihan')),
     auto_approve_duta: toBool(get('auto_approve_duta')),
+    weekly_min_pelatihan: Math.min(toInt(get('weekly_min_pelatihan'), 3), 100),
+    weekly_min_duta: Math.min(toInt(get('weekly_min_duta'), 3), 100),
   }
 }
 
@@ -109,6 +115,8 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     auto_approve_golden: s.auto_approve_golden ? 'TRUE' : 'FALSE',
     auto_approve_pelatihan: s.auto_approve_pelatihan ? 'TRUE' : 'FALSE',
     auto_approve_duta: s.auto_approve_duta ? 'TRUE' : 'FALSE',
+    weekly_min_pelatihan: String(s.weekly_min_pelatihan),
+    weekly_min_duta: String(s.weekly_min_duta),
   }
 }
 
@@ -128,4 +136,16 @@ export function currentWeekId(d: Date): string {
   const offset = (first.getUTCDay() + 6) % 7
   const week = Math.floor((wib.getUTCDate() + offset - 1) / 7) + 1
   return `${y}-${String(m + 1).padStart(2, '0')}-W${week}`
+}
+
+export function channelOpen(s: Settings, c: Channel): boolean {
+  return c === 'golden' ? s.period_open : c === 'pelatihan' ? s.pelatihan_open : s.duta_open
+}
+
+export function autoApprove(s: Settings, c: Channel): boolean {
+  return c === 'golden' ? s.auto_approve_golden : c === 'pelatihan' ? s.auto_approve_pelatihan : s.auto_approve_duta
+}
+
+export function weeklyMin(s: Settings, p: Program): number {
+  return p === 'pelatihan' ? s.weekly_min_pelatihan : s.weekly_min_duta
 }

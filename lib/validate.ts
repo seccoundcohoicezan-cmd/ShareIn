@@ -20,6 +20,8 @@ export interface CheckContext {
   link: ParsedLink | ParseError | 'unresolved'
   /** Existing non-void submission with the same source_key in any period. */
   duplicate: Pick<Submission, 'created_at'> | null
+  /** Whether the target program accepts links; defaults to the Golden Ticket switch. */
+  open?: boolean
 }
 
 const SHORT_PLATFORM: Record<Platform, string> = { tiktok: 'TikTok', reels: 'Reels' }
@@ -56,8 +58,8 @@ export function runChecks(input: CheckInput, ctx: CheckContext): CheckResult {
   const { settings, link } = ctx
   const checks: Check[] = []
 
-  if (!settings.period_open) {
-    checks.push({ id: 'period_open', pass: false, message: 'Setoran sedang ditutup. Pantau beranda untuk periode berikutnya.' })
+  if (!(ctx.open ?? settings.period_open)) {
+    checks.push({ id: 'period_open', pass: false, message: 'Setoran program ini sedang ditutup. Pantau halamannya untuk info berikutnya.' })
   }
 
   const url = linkCheck(input, link)

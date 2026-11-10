@@ -43,7 +43,7 @@ export function toApiSubmission(s: Submission) {
 export function selectGolden(all: Submission[], q: z.infer<typeof goldenListSchema>) {
   const since = q.updated_since ? Date.parse(q.updated_since) : null
   const rows = all
-    .filter((s) => s.status !== 'void')
+    .filter((s) => s.status !== 'void' && s.program === 'golden')
     .filter((s) => q.status === 'all' || s.status === q.status)
     .filter((s) => q.platform === 'all' || s.platform === q.platform)
     .filter((s) => !q.period || s.period_id === q.period)
@@ -59,13 +59,13 @@ export async function listGolden(q: z.infer<typeof goldenListSchema>) {
 }
 
 export async function findGolden(id: string) {
-  const s = (await listSubmissionsFresh()).find((x) => x.id === id && x.status !== 'void')
+  const s = (await listSubmissionsFresh()).find((x) => x.id === id && x.status !== 'void' && x.program === 'golden')
   return s ? toApiSubmission(s) : null
 }
 
 export async function goldenSummary(now = Date.now()) {
   const [{ progress }, settings, all] = await Promise.all([getProgress(), getSettings(), listSubmissionsCached()])
-  const inPeriod = all.filter((s) => s.period_id === settings.period_id && s.status !== 'void')
+  const inPeriod = all.filter((s) => s.period_id === settings.period_id && s.status !== 'void' && s.program === 'golden')
   const count = (st: string) => inPeriod.filter((s) => s.status === st).length
   return {
     period_id: settings.period_id,

@@ -1,10 +1,12 @@
 import { randomInt } from 'node:crypto'
 import { maskWhatsapp, normalizeWhatsapp } from './identity'
 import { withLock } from './lock'
-import { participantsTable, taskSubmissionsTable, tasksTable } from './repo/programs'
+import { participantsTable } from './repo/programs'
 import { strip } from './repo/records'
+import { getSettingsFresh } from './repo/settings'
 import { listSubmissionsFresh } from './repo/submissions'
-import { AUTO_REVIEWER, PROGRAM_INFO, type Participant } from './types'
+import { AUTO_REVIEWER, CHANNEL_INFO, type Channel, type Participant, type Program } from './types'
+import { weeklyProgress } from './weekly'
 
 // 12 chars from an unambiguous alphabet (~2^59): long enough to be unguessable with rate limiting,
 // short enough to read aloud or type like a complaint ticket number (shown as XXXX-XXXX-XXXX).
@@ -37,7 +39,7 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
     let token = newToken()
     while (taken.has(token)) token = newToken()
     const now = new Date().toISOString()
-    const p: Participant = { id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: name.trim().replace(/\s+/g, ' '), whatsapp: wa, created_at: now, last_seen_at: '' }
+    const p: Participant = { id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: name.trim().replace(/\s+/g, ' '), whatsapp: wa, created_at: now, last_seen_at: '', sso_sub: '' }
     // Another server may have registered the same number at the same moment: earliest row wins.
     const after = await participantsTable.appendAndList([p])
     return strip(after.find((x) => x.whatsapp === wa) ?? { ...p, _index: -1 })
@@ -54,12 +56,11 @@ export async function participantByToken(token: string): Promise<Participant | n
 
 export interface TrackItem {
   id: string
-  program: 'goldenticket' | 'pelatihan' | 'duta'
+  program: Channel
   programLabel: string
   title: string
   link: string
   sharein?: string
-  code?: string
   likes?: number
   comments?: number
   status: 'pending' | 'approved' | 'rejected'
@@ -73,48 +74,34 @@ export interface TrackItem {
 export async function tracking(token: string) {
   const me = await participantByToken(token)
   if (!me) return null
-  const [golden, subs, tasks] = await Promise.all([listSubmissionsFresh(), taskSubmissionsTable.list(), tasksTable.list()])
-  const titles = new Map(tasks.map((t) => [t.id, t.title]))
-  const items: TrackItem[] = [
-    ...golden
-      .filter((s) => s.whatsapp === me.whatsapp && s.status !== 'void')
-      .map((s): TrackItem => ({
-        id: s.id,
-        program: 'goldenticket',
-        programLabel: 'Golden Ticket',
-        title: s.platform === 'tiktok' ? 'Konten TikTok' : 'Konten Instagram Reels',
-        link: s.source_url,
-        sharein: s.sharein_url,
-        likes: s.likes,
-        comments: s.comments,
-        status: s.status as TrackItem['status'],
-        reason: s.reject_reason,
-        created_at: s.created_at,
-        reviewed_at: s.reviewed_at,
-        auto: s.reviewed_by === AUTO_REVIEWER,
-      })),
-    ...subs
-      .filter((s) => s.identity_key === me.whatsapp && s.status !== 'void')
-      .map((s): TrackItem => ({
-        id: s.id,
-        program: s.program,
-        programLabel: PROGRAM_INFO[s.program].label,
-        title: titles.get(s.task_id) ?? 'Tugas',
-        link: s.proof_url,
-        code: s.code,
-        status: s.status as TrackItem['status'],
-        reason: s.reject_reason,
-        created_at: s.created_at,
-        reviewed_at: s.reviewed_at,
-        auto: s.reviewed_by === AUTO_REVIEWER,
-      })),
-  ].sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const [all, settings] = await Promise.all([listSubmissionsFresh(), getSettingsFresh()])
+  const mine = all.filter((s) => s.whatsapp === me.whatsapp && s.status !== 'void')
+  const items: TrackItem[] = mine
+    .map((s): TrackItem => ({
+      id: s.id,
+      program: s.program,
+      programLabel: CHANNEL_INFO[s.program].label,
+      title: s.platform === 'tiktok' ? 'Konten TikTok' : 'Konten Instagram Reels',
+      link: s.source_url,
+      sharein: s.sharein_url,
+      likes: s.likes,
+      comments: s.comments,
+      status: s.status as TrackItem['status'],
+      reason: s.reject_reason,
+      created_at: s.created_at,
+      reviewed_at: s.reviewed_at,
+      auto: s.reviewed_by === AUTO_REVIEWER,
+    }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  // Weekly targets are shown for the obligation programs this person takes part in.
+  const joined = (['pelatihan', 'duta'] as Program[]).filter((p) => mine.some((s) => s.program === p) || (p === 'duta' && me.sso_sub))
   return {
     name: me.name,
     whatsapp: maskWhatsapp(me.whatsapp),
     token: me.token,
     since: me.created_at,
     items,
+    weekly: joined.map((p) => weeklyProgress(all, settings, p, me.whatsapp)),
     counts: {
       total: items.length,
       pending: items.filter((i) => i.status === 'pending').length,
@@ -127,14 +114,11 @@ export async function tracking(token: string) {
 
 /** Admin list: every participant with counts and their link. */
 export async function adminParticipants() {
-  const [people, golden, subs] = await Promise.all([participantsTable.list(), listSubmissionsFresh(), taskSubmissionsTable.list()])
+  const [people, all] = await Promise.all([participantsTable.list(), listSubmissionsFresh()])
   return people
     .map(strip)
     .map((p) => {
-      const mine = [
-        ...golden.filter((s) => s.whatsapp === p.whatsapp && s.status !== 'void'),
-        ...subs.filter((s) => s.identity_key === p.whatsapp && s.status !== 'void'),
-      ]
+      const mine = all.filter((s) => s.whatsapp === p.whatsapp && s.status !== 'void')
       return {
         ...p,
         total: mine.length,
@@ -144,4 +128,38 @@ export async function adminParticipants() {
       }
     })
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export interface SsoProfile {
+  sub: string
+  name: string
+  /** E.164 (+62…) from the MyTopstar `phone_number` claim. */
+  phone: string
+}
+
+/**
+ * Just-in-time account for a MyTopstar sign-in: matched on the MyTopstar id first, then on the
+ * WhatsApp number so a Duta who already sent links keeps their history and personal link.
+ */
+export async function participantFromSso(profile: SsoProfile): Promise<Participant | null> {
+  const wa = normalizeWhatsapp(profile.phone)
+  return withLock('participants', async () => {
+    const all = await participantsTable.list()
+    const bySub = all.find((p) => p.sso_sub === profile.sub)
+    if (bySub) return strip(bySub)
+    if (!wa) return null
+    const byWa = all.find((p) => p.whatsapp === wa)
+    if (byWa) {
+      const linked = { ...byWa, sso_sub: profile.sub }
+      await participantsTable.update([linked])
+      return strip(linked)
+    }
+    const taken = new Set(all.map((p) => p.token))
+    let token = newToken()
+    while (taken.has(token)) token = newToken()
+    const name = profile.name.trim().replace(/\s+/g, ' ') || 'Duta'
+    const p: Participant = { id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name, whatsapp: wa, created_at: new Date().toISOString(), last_seen_at: '', sso_sub: profile.sub }
+    const after = await participantsTable.appendAndList([p])
+    return strip(after.find((x) => x.whatsapp === wa) ?? { ...p, _index: -1 })
+  })
 }

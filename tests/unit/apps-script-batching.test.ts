@@ -21,7 +21,7 @@ describe('AppsScriptStore round trips', () => {
     expect(calls.map((c) => c.join('+'))).toEqual(['read', 'ensure', 'read'])
     calls.length = 0
     AppsScriptStore.READ_TTL_MS = 0
-    await Promise.all([store.read('admins'), store.read('submissions'), store.read('tasks'), store.read('admins')])
+    await Promise.all([store.read('admins'), store.read('submissions'), store.read('participants'), store.read('admins')])
     expect(calls).toEqual([['read', 'read', 'read']])
     AppsScriptStore.READ_TTL_MS = 3000
   })
@@ -60,7 +60,7 @@ describe('submission speed', () => {
       return sim.poster(u, b)
     }))
     invalidate()
-    const input = { submitter_name: 'A', whatsapp: '081234567890', platform: 'tiktok' as const, source_url: 'https://www.tiktok.com/@a/video/7400000000000012345', sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const }
+    const input = { submitter_name: 'A', whatsapp: '081234567890', platform: 'tiktok' as const, source_url: 'https://www.tiktok.com/@a/video/7400000000000012345', sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const, program: 'golden' as const }
     await Promise.all([participantsTable.list(), getSettingsFresh(), listSubmissionsFresh()])
     const [r] = await Promise.all([createBatch([input]), ensureParticipant('A', '081234567890')])
     expect(r.ok).toBe(true)

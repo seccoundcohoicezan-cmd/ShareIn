@@ -114,6 +114,11 @@ export class AppsScriptStore implements TableStore {
     return this.ensured
   }
 
+  /** Drops the shared recent read of a table, so the next read reaches the sheet. */
+  forget(table: TableName) {
+    this.recent.delete(table)
+  }
+
   private markVerified(table: TableName, header: string[]) {
     if ((TABLES[table] as readonly string[]).every((c) => header.includes(c))) this.verified.add(table)
   }

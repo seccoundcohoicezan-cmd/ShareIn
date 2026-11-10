@@ -1,6 +1,6 @@
 import { invalidate } from '../cache'
 import { getStore } from './index'
-import { appendThenRead, recordToRow, rowToRecord, type Cell, type TableName } from './store'
+import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell, type TableName } from './store'
 
 export type Stored<T> = T & { _index: number }
 
@@ -20,7 +20,8 @@ export function recordTable<T extends { id: string }>(
   }
   async function head() {
     if (!header) await list()
-    return header!
+    header = await writeHeader(getStore(), table, header)
+    return header
   }
   return {
     list,

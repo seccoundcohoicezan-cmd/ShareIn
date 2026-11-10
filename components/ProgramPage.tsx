@@ -1,40 +1,50 @@
-import { programSummary } from '@/lib/program-service'
-import type { Program } from '@/lib/types'
-import { TaskForm } from './TaskForm'
-import { Toaster } from './Toast'
-import { EmptyState, Panel, PillLabel } from './ui'
+import Link from 'next/link'
+import { loadProgram } from '@/lib/public-data'
+import { CHANNEL_INFO, type Program } from '@/lib/types'
+import { CollectedFeed } from './CollectedFeed'
+import { ArrowUpIcon } from './icons'
+import { RulesList } from './RulesList'
+import { Panel, PillLabel } from './ui'
+import { WeeklyMe } from './WeeklyMe'
 
-async function load(program: Program) {
-  try {
-    return await programSummary(program)
-  } catch (e) {
-    console.error('program summary unavailable', (e as Error).message)
-    return null
-  }
+function weekLabel(startIso: string) {
+  const fmt = (d: Date) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', timeZone: 'Asia/Jakarta' })
+  const start = new Date(startIso)
+  return `${fmt(start)} – ${fmt(new Date(start.getTime() + 6 * 86_400_000))}`
 }
 
-const STEPS = ['Kerjakan tugas', 'Kumpulkan link bukti', 'Dapat kode tugas', 'Pantau statusnya']
-
-export async function ProgramPage({ program, pill, title, intro }: { program: Program; pill: string; title: string; intro: string }) {
-  const data = await load(program)
+/** Pelatihan / Duta: the Golden Ticket link system as a weekly obligation, without prizes. */
+export async function ProgramPage({ program, pill, intro }: { program: Program; pill: string; intro: string }) {
+  const { settings, feed, summary } = await loadProgram(program)
+  const { label, path } = CHANNEL_INFO[program]
+  const setorHref = `${path}/setor`
   return (
     <div className="space-y-5">
       <section className="px-1 pt-2">
         <PillLabel as="span">{pill}</PillLabel>
-        <h1 className="mt-3 text-[2.25rem] font-extrabold leading-tight tracking-tight">{title}</h1>
+        <h1 className="mt-3 text-[2.25rem] font-extrabold leading-tight tracking-tight">{label}</h1>
         <p className="muted mt-2 max-w-md">{intro}</p>
-        {data && (
-          <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${data.open ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'}`}>
-            {data.open ? 'Pengumpulan dibuka' : 'Pengumpulan ditutup sementara'}
-          </p>
-        )}
+        <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${summary.open ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'}`}>
+          {summary.open ? 'Pengumpulan dibuka' : 'Pengumpulan ditutup sementara'}
+        </p>
+      </section>
+
+      <section className="rounded-panel bg-brand-lavender p-5" aria-labelledby="target">
+        <p id="target" className="text-xs font-extrabold tracking-[0.2em] text-brand-purple">TARGET MINGGUAN</p>
+        <p className="mt-2 text-2xl font-extrabold">
+          {summary.min > 0 ? `Minimal ${summary.min} link per orang` : 'Belum ada target minimal'}
+        </p>
+        <p className="muted text-sm">Minggu ini: {weekLabel(summary.week.start)} (Senin–Minggu WIB)</p>
+        <div className="mt-4">
+          <WeeklyMe program={program} setorHref={setorHref} />
+        </div>
       </section>
 
       <div className="grid grid-cols-3 gap-3 text-center">
         {[
-          ['Peserta', data?.participants ?? 0],
-          ['Kode terkumpul', data?.codes ?? 0],
-          ['Disetujui', data?.approved ?? 0],
+          ['Aktif minggu ini', summary.active],
+          ['Capai target', summary.met],
+          ['Link minggu ini', summary.linksThisWeek],
         ].map(([k, v]) => (
           <div key={k} className="panel-solid !p-3">
             <p className="text-2xl font-extrabold tabular-nums text-brand-purple">{v}</p>
@@ -43,48 +53,25 @@ export async function ProgramPage({ program, pill, title, intro }: { program: Pr
         ))}
       </div>
 
-      <Panel aria-labelledby="cara">
-        <PillLabel id="cara">Cara ikut</PillLabel>
-        <ol className="mt-4 grid gap-3 sm:grid-cols-4">
-          {STEPS.map((s, i) => (
-            <li key={s} className="flex items-center gap-3 rounded-field bg-white/70 p-3 sm:flex-col sm:items-start">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-purple text-sm font-extrabold text-white">{i + 1}</span>
-              <span className="text-sm font-bold">{s}</span>
-            </li>
-          ))}
-        </ol>
-      </Panel>
-
-      <section aria-labelledby="tugas" className="panel-solid">
-        <PillLabel id="tugas">Daftar tugas</PillLabel>
-        {!data ? (
-          <p className="muted mt-4 text-sm">Daftar tugas belum bisa dimuat. Coba muat ulang halaman.</p>
-        ) : data.tasks.length === 0 ? (
-          <div className="mt-4"><EmptyState title="Belum ada tugas.">Tugas akan muncul di sini setelah diumumkan admin.</EmptyState></div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {summary.open ? (
+          <Link href={setorHref} className="btn-primary w-full sm:w-auto">
+            Kirim link konten <ArrowUpIcon />
+          </Link>
         ) : (
-          <ol className="mt-4 space-y-3">
-            {data.tasks.map((t, i) => (
-              <li key={t.id} className="rounded-field border border-brand-purple/10 p-4">
-                <p className="font-extrabold"><span className="text-brand-purple">{i + 1}.</span> {t.title}</p>
-                {t.description && <p className="muted mt-1 whitespace-pre-line text-sm">{t.description}</p>}
-                {t.proof_hint && <p className="mt-2 text-xs font-bold text-brand-purple">Bukti: {t.proof_hint}</p>}
-              </li>
-            ))}
-          </ol>
+          <span className="btn-primary w-full opacity-60 sm:w-auto" aria-disabled="true">
+            Pengumpulan sedang ditutup
+          </span>
         )}
-      </section>
+        <Link href="/pantau" className="btn-ghost w-full sm:w-auto">Pantau setoranku</Link>
+      </div>
 
-      {data && data.tasks.length > 0 && <TaskForm program={program} tasks={data.tasks} open={data.open} />}
+      <CollectedFeed initial={feed} program={program} />
 
-      <section className="panel-solid flex flex-wrap items-center gap-3" aria-labelledby="pantau-judul">
-        <div className="min-w-0 flex-1">
-          <h2 id="pantau-judul" className="font-extrabold">Pantau kode & status tugasmu</h2>
-          <p className="muted text-sm">Semua kode dan status disetujui/ditolak ada di link pantau unikmu.</p>
-        </div>
-        <a href="/pantau" className="btn-primary btn-sm">Buka halaman pantau</a>
-      </section>
-
-      <Toaster />
+      <Panel aria-labelledby="ketentuan">
+        <PillLabel id="ketentuan">Ketentuan</PillLabel>
+        <RulesList settings={settings} />
+      </Panel>
     </div>
   )
 }

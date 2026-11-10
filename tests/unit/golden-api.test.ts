@@ -10,7 +10,7 @@ import type { Submission } from '@/lib/types'
 const input = (n: number, over: Partial<SubmissionInput> = {}): SubmissionInput => ({
   submitter_name: 'Rina', whatsapp: '081234567890', platform: 'tiktok',
   source_url: `https://www.tiktok.com/@a/video/74000000000000${String(n).padStart(5, '0')}`, sharein_url: 'https://sharein.id/c/x',
-  likes: 120000, comments: 6000, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual', ...over,
+  likes: 120000, comments: 6000, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual', program: 'golden', ...over,
 })
 
 beforeEach(() => {
@@ -52,7 +52,7 @@ describe('Golden Ticket API data', () => {
   })
 
   it('updated_since catches later reviews, void rows stay hidden', () => {
-    const base = { period_id: 'p', submitter_name: 'A', whatsapp: '', platform: 'tiktok', source_url: '', source_key: '', sharein_url: '', likes: 1, comments: 1, metrics_source: 'manual', organic_declared: true, screenshot_url: '', reject_reason: '', reviewed_by: '', needs_review: false } as const
+    const base = { period_id: 'p', submitter_name: 'A', whatsapp: '', platform: 'tiktok', source_url: '', source_key: '', sharein_url: '', likes: 1, comments: 1, metrics_source: 'manual', organic_declared: true, screenshot_url: '', reject_reason: '', reviewed_by: '', needs_review: false, program: 'golden' } as const
     const rows: Submission[] = [
       { ...base, id: 'a', created_at: '2026-11-01T00:00:00Z', status: 'approved', reviewed_at: '2026-11-08T00:00:00Z' },
       { ...base, id: 'b', created_at: '2026-11-02T00:00:00Z', status: 'pending', reviewed_at: '' },

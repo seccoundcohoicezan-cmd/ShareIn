@@ -2,8 +2,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatNumber, parseCount } from '@/lib/format'
-import type { Check, CheckId, Platform } from '@/lib/types'
-import { PLATFORM_LABEL } from '@/lib/types'
+import type { Channel, Check, CheckId, Platform, Program } from '@/lib/types'
+import { CHANNEL_INFO, PLATFORM_LABEL } from '@/lib/types'
 import { detectPlatform, LINK_RULE_MESSAGE, parseSourceUrl } from '@/lib/url'
 import { CheckIcon, CrossIcon, GiftSolid } from './icons'
 import { PantauCard } from './PantauCard'
@@ -18,7 +18,11 @@ interface Rules {
   metrics_adapter: 'off' | 'rapidapi' | 'apify'
   sharein_domains: string[]
   rules: Record<Platform, { min_like: number; min_comment: number }>
+  programs: Record<Program, { open: boolean; weekly_min: number }>
+  sso: boolean
 }
+
+type Weekly = { sent: number; approved: number; min: number; met: boolean }
 
 const NAME_KEY = 'sharein_name'
 const MAX_BYTES = 2 * 1024 * 1024
@@ -190,7 +194,8 @@ function ContentCard({
   )
 }
 
-export function SetorForm() {
+export function SetorForm({ program = 'golden' }: { program?: Channel }) {
+  const golden = program === 'golden'
   const [rules, setRules] = useState<Rules | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [name, setName] = useState('')
@@ -234,6 +239,7 @@ export function SetorForm() {
   const [busy, setBusy] = useState<'send' | null>(null)
   const [formError, setFormError] = useState('')
   const [done, setDone] = useState<{ saved: number; total: number; token: string; auto: boolean; failed: string[] } | null>(null)
+  const [weekly, setWeekly] = useState<Weekly | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -245,7 +251,7 @@ export function SetorForm() {
 
   useEffect(() => {
     setName(localStorage.getItem(NAME_KEY) ?? '')
-    fetch('/api/rules')
+    fetch('/api/rules', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setRules)
       .catch(() => setLoadError(true))
@@ -274,6 +280,7 @@ export function SetorForm() {
       organic_declared: organic,
       checked_declared: checked,
       has_screenshot: Boolean(file),
+      program,
       items: items.map((i) => ({
         platform: detectPlatform(i.url) ?? 'tiktok',
         source_url: i.url,
@@ -324,6 +331,12 @@ export function SetorForm() {
         toast('Terkirim')
         const failed = (data.results as { ok: boolean; checks?: Check[] }[]).flatMap((r, i) => (r.ok ? [] : [`Konten ${i + 1}: ${r.checks?.[0]?.message ?? 'gagal disimpan'}`]))
         setDone({ saved: data.saved, total: items.length, token: data.token ?? '', auto: data.status === 'approved', failed })
+        if (!golden) {
+          fetch(`/api/me?program=${program}`, { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((d) => setWeekly(d.weekly ?? null))
+            .catch(() => {})
+        }
         window.scrollTo({ top: 0 })
         return
       }
@@ -363,7 +376,8 @@ export function SetorForm() {
     setResults(null)
     setCheckedKey('')
     setDone(null)
-    fetch('/api/rules').then((r) => r.json()).then(setRules).catch(() => {})
+    setWeekly(null)
+    fetch('/api/rules', { cache: 'no-store' }).then((r) => r.json()).then(setRules).catch(() => {})
   }
 
   if (done) {
@@ -373,7 +387,12 @@ export function SetorForm() {
           <GiftSolid className="h-24 w-24" />
         </div>
         <h2 className="mt-4 text-2xl font-extrabold">{done.saved === 1 ? 'Setoran terkirim' : `${done.saved} setoran terkirim`}</h2>
-        <p className="muted mx-auto mt-2 max-w-sm">{done.auto ? 'Setoranmu sudah disetujui otomatis.' : 'Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.'} Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
+        <p className="muted mx-auto mt-2 max-w-sm">{done.auto ? 'Setoranmu sudah disetujui otomatis.' : 'Admin akan memeriksa dalam 1×24 jam. Status disetujui/ditolak langsung terlihat di halaman pantaumu.'}{golden && ' Makin banyak konten yang kamu submit, makin besar peluang rewardmu.'}</p>
+        {weekly && weekly.min > 0 && (
+          <p className={`mx-auto mt-3 max-w-sm rounded-field p-3 text-sm font-bold ${weekly.met ? 'bg-green-50 text-green-900' : 'bg-amber-50 text-amber-900'}`}>
+            Minggu ini {weekly.sent}/{weekly.min} link. {weekly.met ? 'Target mingguan tercapai.' : `Kurang ${weekly.min - weekly.sent} link lagi.`}
+          </p>
+        )}
         {done.failed.length > 0 && (
           <ul className="mx-auto mt-3 max-w-sm rounded-field bg-red-50 p-3 text-left text-sm text-bad">
             {done.failed.map((f) => <li key={f}>{f}</li>)}
@@ -398,7 +417,8 @@ export function SetorForm() {
     )
   }
 
-  const closed = rules && !rules.period_open
+  const closed = rules && !(golden ? rules.period_open : rules.programs?.[program]?.open)
+  const target = !golden && rules ? rules.programs?.[program]?.weekly_min ?? 0 : 0
 
   return (
     <form
@@ -411,7 +431,7 @@ export function SetorForm() {
     >
       {closed && (
         <div role="alert" className="rounded-panel border border-warn/40 bg-amber-50 p-4 font-bold">
-          Setoran sedang ditutup. Pantau beranda untuk periode berikutnya.
+          Setoran {CHANNEL_INFO[program].label} sedang ditutup. Pantau halamannya untuk info berikutnya.
         </div>
       )}
 
@@ -428,6 +448,12 @@ export function SetorForm() {
           </div>
         ) : (
           <>
+            {program === 'duta' && rules?.sso && (
+              <>
+                <a href="/auth/sso/login?next=/dutateladan/setor" className="btn-primary w-full">Masuk dengan MyTopstar</a>
+                <p className="muted -mt-3 text-center text-xs">Duta yang punya akun MyTopstar langsung masuk tanpa isi data.</p>
+              </>
+            )}
             <div className="rounded-field border border-brand-purple/20 bg-brand-lavender/60 p-3">
               <label htmlFor="link-pantau" className="label">Sudah pernah setor? Tempel link pantaumu</label>
               <div className="flex gap-2">
@@ -450,7 +476,11 @@ export function SetorForm() {
             </div>
           </>
         )}
-        <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
+        {golden ? (
+          <p className="rounded-field bg-brand-amber/20 px-3 py-2 text-sm font-bold">Makin banyak konten yang kamu submit, makin besar peluang rewardmu.</p>
+        ) : target > 0 ? (
+          <p className="rounded-field bg-brand-lavender px-3 py-2 text-sm font-bold">Kewajiban: minimal {target} link setiap minggu (Senin–Minggu).</p>
+        ) : null}
       </section>
 
       <section className="panel-solid space-y-3" aria-labelledby="syarat">

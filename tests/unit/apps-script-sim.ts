@@ -86,6 +86,10 @@ export function createAppsScriptSim(secret: string) {
   const doPost = vm.runInContext('doPost', ctx) as (e: unknown) => { getContent(): string }
   return {
     sheets,
+    /** Replaces a tab's header row, e.g. to mimic a sheet created before a column existed. */
+    setHeader: (name: string, header: string[]) => {
+      sheets.get(name)!.grid[0] = [...header]
+    },
     poster: async (_url: string, body: string) => ({ status: 200, text: doPost({ postData: { contents: body } }).getContent() }),
   }
 }

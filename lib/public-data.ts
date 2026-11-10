@@ -1,15 +1,29 @@
 import 'server-only'
 import { parseSettings } from './settings-schema'
 import { collectedFeed, getProgress, type CollectedFeed } from './service'
-import type { Settings } from './types'
+import type { Channel, Program, Settings } from './types'
+import { programSummary, summarize, type ProgramSummary } from './weekly'
+
+const EMPTY_FEED: CollectedFeed = { total: 0, tiktok: 0, reels: 0, items: [] }
 
 /** Public pages must render even when the database is unreachable (e.g. at build time). */
-export async function loadPublic(): Promise<{ settings: Settings; feed: CollectedFeed }> {
+export async function loadPublic(program: Channel = 'golden'): Promise<{ settings: Settings; feed: CollectedFeed }> {
   try {
-    const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed()])
+    const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed(0, 12, program)])
     return { settings, feed }
   } catch (e) {
     console.error('public data unavailable', (e as Error).message)
-    return { settings: parseSettings(new Map()), feed: { total: 0, tiktok: 0, reels: 0, items: [] } }
+    return { settings: parseSettings(new Map()), feed: EMPTY_FEED }
+  }
+}
+
+export async function loadProgram(program: Program): Promise<{ settings: Settings; feed: CollectedFeed; summary: ProgramSummary }> {
+  try {
+    const [{ settings, feed }, summary] = await Promise.all([loadPublic(program), programSummary(program)])
+    return { settings, feed, summary }
+  } catch (e) {
+    console.error('program data unavailable', (e as Error).message)
+    const settings = parseSettings(new Map())
+    return { settings, feed: EMPTY_FEED, summary: summarize([], settings, program) }
   }
 }

@@ -1,109 +1,136 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { invalidate } from '@/lib/cache'
-import { goldenAmount, formatRupiah } from '@/lib/golden'
-import {
-  normalizeWhatsapp, programSummary, reviewTaskSubmissions, saveTask, submitTask,
-} from '@/lib/program-service'
-import { setStore } from '@/lib/repo'
+import { participantFromSso } from '@/lib/participant-service'
+import { setStore, getStore } from '@/lib/repo'
 import { AppsScriptStore } from '@/lib/repo/apps-script-store'
 import { LocalStore } from '@/lib/repo/memory-store'
-import { taskSubmissionsTable } from '@/lib/repo/programs'
-import { getSettingsFresh, saveSettings } from '@/lib/repo/settings'
+import { participantsTable } from '@/lib/repo/programs'
+import { saveSettings, getSettingsFresh } from '@/lib/repo/settings'
+import { listSubmissionsFresh } from '@/lib/repo/submissions'
 import type { TableStore } from '@/lib/repo/store'
+import { collectedFeed, createBatch, getProgress, type SubmissionInput } from '@/lib/service'
+import type { Channel } from '@/lib/types'
+import { inWeek, weekOf } from '@/lib/week'
+import { programSummary, summarize, weeklyProgress, weeklyRecap } from '@/lib/weekly'
 import { createAppsScriptSim } from './apps-script-sim'
 
-const SECRET = 'x'.repeat(40)
+const SECRET = 'p'.repeat(40)
+let n = 0
+function link(program: Channel, wa = '081234567890', name = 'Rina Utami'): SubmissionInput {
+  n++
+  return {
+    submitter_name: name, whatsapp: wa, platform: 'tiktok', source_url: `https://www.tiktok.com/@a/video/75000000000000${String(n).padStart(5, '0')}`,
+    sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual', program,
+  }
+}
 
-describe('golden pool', () => {
-  const pool = { golden_pool_start: 2_000_000, golden_pool_end: 5_000_000, golden_start_at: '2026-11-07T00:00:00+07:00', golden_end_at: '2026-12-05T23:59:59+07:00' }
-  it('starts at 2jt, ends at 5jt on 5 Dec, grows monotonically in between', () => {
-    expect(goldenAmount(pool, Date.parse('2026-11-01T00:00:00Z'))).toBe(2_000_000)
-    expect(goldenAmount(pool, Date.parse('2026-12-06T00:00:00+07:00'))).toBe(5_000_000)
-    const a = goldenAmount(pool, Date.parse('2026-11-20T12:00:00Z'))
-    const b = goldenAmount(pool, Date.parse('2026-11-20T12:00:05Z'))
-    expect(a).toBeGreaterThan(2_000_000)
-    expect(a).toBeLessThan(5_000_000)
-    expect(b).toBeGreaterThan(a)
-    expect(b - a).toBeLessThan(20) // "sedikit demi sedikit": a few rupiah every second
-  })
-  it('formats rupiah', () => expect(formatRupiah(2345678)).toBe('Rp2.345.678'))
-})
-
-describe('identity helpers', () => {
-  it('normalizes Indonesian WhatsApp numbers', () => {
-    for (const v of ['081234567890', '+62 812-3456-7890', '6281234567890', '81234567890']) expect(normalizeWhatsapp(v)).toBe('6281234567890')
-    for (const v of ['12345', '021555123', 'abc', '']) expect(normalizeWhatsapp(v)).toBeNull()
+describe('week boundaries (WIB, Monday–Sunday)', () => {
+  it('Sunday 23:59 WIB is still the same week; Monday 00:00 WIB starts a new one', () => {
+    const sunday = new Date('2026-11-15T16:59:00Z') // Sun 23:59 WIB
+    const monday = new Date('2026-11-15T17:00:00Z') // Mon 00:00 WIB
+    expect(weekOf(sunday).start).toBe('2026-11-08T17:00:00.000Z')
+    expect(weekOf(monday).start).toBe('2026-11-15T17:00:00.000Z')
+    expect(inWeek('2026-11-15T16:59:59Z', weekOf(sunday))).toBe(true)
+    expect(inWeek('2026-11-15T17:00:00Z', weekOf(sunday))).toBe(false)
   })
 })
 
 describe.each([
   ['memory', () => new LocalStore(null) as TableStore],
-  ['Apps Script (real Code.js, simulated sheet)', () => new AppsScriptStore('https://sim', SECRET, createAppsScriptSim(SECRET).poster) as TableStore],
-])('program flow on %s', (_n, make) => {
+  ['Apps Script (real Code.js)', () => new AppsScriptStore('https://sim', SECRET, createAppsScriptSim(SECRET).poster) as TableStore],
+])('Pelatihan & Duta link system on %s', (_n, make) => {
   beforeEach(() => {
     setStore(make())
     invalidate()
   })
 
-  async function setup() {
-    const t1 = await saveTask('pelatihan', { title: 'Buat video 30 detik', description: '', proof_hint: 'link TikTok', active: true, order: 1 }, 'owner@x.id')
-    const t2 = await saveTask('pelatihan', { title: 'Upload ke Sharein', description: '', proof_hint: '', active: true, order: 2 }, 'owner@x.id')
-    return { t1, t2 }
-  }
-  const sub = (task_id: string, wa = '081234567890', name = 'Rina Utami') => ({ task_id, name, whatsapp: wa, proof_url: 'https://www.tiktok.com/@rina/video/1', note: '' })
-
-  it('one finished task = one unique code; same task twice by same identity is refused', async () => {
-    const { t1, t2 } = await setup()
-    const a = await submitTask('pelatihan', sub(t1.id))
-    const b = await submitTask('pelatihan', sub(t2.id, '+62 812 3456 7890'))
-    expect(a.ok && a.code).toMatch(/^PC-[A-Z2-9]{6}$/)
-    expect(b.ok && b.code).toMatch(/^PC-/)
-    expect(a.ok && b.ok && a.code !== b.code).toBe(true)
-    const again = await submitTask('pelatihan', sub(t1.id, '6281234567890'))
+  it('links are kept per program: same video may go to Duta and Golden, but not twice to Duta', async () => {
+    const duta = link('duta')
+    const r1 = await createBatch([duta])
+    expect(r1.ok).toBe(true)
+    const again = await createBatch([{ ...duta }])
     expect(again.ok).toBe(false)
-    expect(!again.ok && again.message).toContain(a.ok ? a.code : '')
+    const golden = await createBatch([{ ...duta, program: 'golden' }])
+    expect(golden.ok).toBe(true)
+    const all = await listSubmissionsFresh()
+    expect(all.map((s) => s.program).sort()).toEqual(['duta', 'golden'])
+    // Golden numbers and feeds only show Golden links.
+    expect((await getProgress()).progress.find((p) => p.platform === 'tiktok')!.used).toBe(1)
+    expect((await collectedFeed(0, 12, 'duta')).total).toBe(1)
+    expect((await collectedFeed(0, 12, 'pelatihan')).total).toBe(0)
   })
 
-  it('validates identity, proof link, task, and closed program', async () => {
-    const { t1 } = await setup()
-    expect(await submitTask('pelatihan', { ...sub(t1.id), whatsapp: '123' })).toMatchObject({ ok: false, field: 'whatsapp' })
-    expect(await submitTask('pelatihan', { ...sub(t1.id), proof_url: 'http://x.com' })).toMatchObject({ ok: false, field: 'proof_url' })
-    expect(await submitTask('duta', sub(t1.id))).toMatchObject({ ok: false, field: 'task_id' })
+  it('closing a program and auto-approve follow that program’s own settings', async () => {
     const s = await getSettingsFresh()
-    await saveSettings({ ...s, pelatihan_open: false })
-    expect((await submitTask('pelatihan', sub(t1.id))).ok).toBe(false)
+    await saveSettings({ ...s, duta_open: false, auto_approve_pelatihan: true })
+    const closed = await createBatch([link('duta')])
+    expect(closed.ok).toBe(false)
+    if (!closed.ok) expect(closed.items[0].checks.find((c) => c.id === 'period_open')?.pass).toBe(false)
+    const auto = await createBatch([link('pelatihan')])
+    expect(auto.ok && auto.results[0].ok && auto.results[0].submission.status).toBe('approved')
+    const golden = await createBatch([link('golden')])
+    expect(golden.ok && golden.results[0].ok && golden.results[0].submission.status).toBe('pending')
   })
 
-  it('auto-approve per program: new submissions are approved by the system, others still wait', async () => {
-    const { t1, t2 } = await setup()
-    const first = await submitTask('pelatihan', sub(t1.id, '081111111111', 'Andi'))
-    expect(first).toMatchObject({ ok: true, status: 'pending' })
+  it('weekly minimum: progress per person, summary and recap with unmet first', async () => {
     const s = await getSettingsFresh()
-    await saveSettings({ ...s, auto_approve_pelatihan: true })
+    await saveSettings({ ...s, weekly_min_duta: 2 })
+    await createBatch([link('duta'), link('duta')])
+    await createBatch([link('duta', '081298765432', 'Budi')])
+    await createBatch([link('pelatihan', '081298765432', 'Budi')])
+    const [all, settings] = await Promise.all([listSubmissionsFresh(), getSettingsFresh()])
+    expect(weeklyProgress(all, settings, 'duta', '6281234567890')).toMatchObject({ sent: 2, min: 2, met: true })
+    expect(weeklyProgress(all, settings, 'duta', '6281298765432')).toMatchObject({ sent: 1, met: false })
+    // Last week's links do not count this week.
+    const nextWeek = new Date(Date.now() + 7 * 86_400_000)
+    expect(weeklyProgress(all, settings, 'duta', '6281234567890', nextWeek)).toMatchObject({ sent: 0, met: false })
     invalidate()
-    const second = await submitTask('pelatihan', sub(t2.id, '081111111111', 'Andi'))
-    expect(second).toMatchObject({ ok: true, status: 'approved' })
-    const rows = await taskSubmissionsTable.list()
-    expect(rows.map((r) => [r.status, r.reviewed_by])).toEqual([['pending', ''], ['approved', 'otomatis']])
-    expect(rows[1].reviewed_at).not.toBe('')
-    // Duta has its own switch, still off.
-    const duta = await saveTask('duta', { title: 'Tugas wajib', description: '', proof_hint: '', active: true, order: 1 }, 'o')
-    expect(await submitTask('duta', sub(duta.id, '081111111111', 'Andi'))).toMatchObject({ ok: true, status: 'pending' })
-    await reviewTaskSubmissions('pelatihan', [rows[0].id], 'approve', '', 'o')
-    invalidate()
-    expect(await programSummary('pelatihan')).toMatchObject({ codes: 2, approved: 2, participants: 1 })
+    expect(await programSummary('duta')).toMatchObject({ min: 2, active: 2, met: 1, linksThisWeek: 3 })
+    expect(summarize(all, settings, 'pelatihan')).toMatchObject({ active: 1, linksThisWeek: 1 })
+    // Recap lists only people registered as participants.
+    const { ensureParticipant } = await import('@/lib/participant-service')
+    await ensureParticipant('Rina Utami', '081234567890')
+    await ensureParticipant('Budi', '081298765432')
+    await ensureParticipant('Sari', '081311112222')
+    const recap = await weeklyRecap('duta')
+    expect(recap.rows.map((r) => [r.name, r.sent, r.met])).toEqual([['Budi', 1, false], ['Rina Utami', 2, true]])
+    expect((await weeklyRecap('duta', true)).rows[0].name).toBe('Sari')
+  })
+
+  it('MyTopstar sign-in creates a participant once and links an existing WhatsApp account', async () => {
+    const { ensureParticipant } = await import('@/lib/participant-service')
+    const old = await ensureParticipant('Rina Utami', '081234567890')
+    const linked = await participantFromSso({ sub: 'mt-1', name: 'Rina U.', phone: '+6281234567890' })
+    expect(linked!.token).toBe(old!.token)
+    expect((await participantsTable.list()).find((p) => p.token === old!.token)!.sso_sub).toBe('mt-1')
+    const fresh = await participantFromSso({ sub: 'mt-2', name: 'Budi', phone: '+6281298765432' })
+    expect(fresh!.whatsapp).toBe('6281298765432')
+    // Same MyTopstar account again → same participant, even if the phone changed.
+    expect((await participantFromSso({ sub: 'mt-2', name: 'Budi', phone: '+6281300000000' }))!.token).toBe(fresh!.token)
+    expect(await participantFromSso({ sub: 'mt-3', name: 'Tanpa HP', phone: '' })).toBeNull()
+    expect(await participantsTable.list()).toHaveLength(2)
   })
 })
 
-describe('Apps Script Code.js guards', () => {
-  it('rejects wrong secret and stores formula-looking input as text', async () => {
+describe('older sheets', () => {
+  it('a submissions tab without the program column gets it before the first write (no Duta link saved as Golden)', async () => {
     const sim = createAppsScriptSim(SECRET)
-    const bad = new AppsScriptStore('https://sim', 'y'.repeat(40), sim.poster)
-    await expect(bad.read('settings')).rejects.toThrow(/unauthorized/)
-    const good = new AppsScriptStore('https://sim', SECRET, sim.poster)
-    await good.append('audit_log', [['2026', '=IMPORTXML("http://evil")', 'x', 'y', '', '']])
-    const { rows } = await good.read('audit_log')
-    expect(rows[0][1]).toBe('=IMPORTXML("http://evil")')
-    expect(sim.sheets.get('audit_log')!.grid[0]).toEqual(['time', 'actor', 'action', 'target', 'before', 'after'])
+    const store = new AppsScriptStore('https://sim', SECRET, sim.poster)
+    setStore(store)
+    invalidate()
+    await store.ensureSchema()
+    // Simulate the live sheet from before this change: header without "program".
+    const old = (await store.read('submissions')).header.filter((h) => h !== 'program')
+    sim.setHeader('submissions', old)
+    const fresh = new AppsScriptStore('https://sim', SECRET, sim.poster)
+    setStore(fresh)
+    invalidate()
+    await listSubmissionsFresh()
+    const r = await createBatch([link('duta')])
+    expect(r.ok).toBe(true)
+    invalidate()
+    const all = await listSubmissionsFresh()
+    expect(all[0].program).toBe('duta')
+    expect(getStore()).toBe(fresh)
   })
 })

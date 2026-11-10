@@ -63,11 +63,9 @@ export function PreviewPanel({ title, tabs, details, actions, onClose }: { title
               </>
             )}
           </div>
-          <div className="space-y-4">
-            <div className="text-sm">{details}</div>
-            <div className="flex flex-wrap gap-2">{actions}</div>
-          </div>
+          <div className="text-sm">{details}</div>
         </div>
+        {actions && <div className="border-t border-brand-purple/10 bg-white p-3">{actions}</div>}
       </div>
     </div>
   )

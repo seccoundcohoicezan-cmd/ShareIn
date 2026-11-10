@@ -6,7 +6,7 @@ import { toast, Toaster } from './Toast'
 
 type NumKey =
   | 'min_like_tiktok' | 'min_comment_tiktok' | 'min_like_reels' | 'min_comment_reels'
-  | 'golden_pool_start' | 'golden_pool_end'
+  | 'golden_pool_start' | 'golden_pool_end' | 'weekly_min_pelatihan' | 'weekly_min_duta'
 
 // datetime-local works in the browser's zone; the program runs on WIB, so convert explicitly.
 function toWibInput(iso: string) {
@@ -41,7 +41,7 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState(initial)
   const [nums, setNums] = useState<Record<NumKey, string>>(() => {
-    const keys: NumKey[] = ['min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end']
+    const keys: NumKey[] = ['min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end', 'weekly_min_pelatihan', 'weekly_min_duta']
     return Object.fromEntries(keys.map((k) => [k, formatNumber(initial[k])])) as Record<NumKey, string>
   })
   const [domains, setDomains] = useState(initial.sharein_domains.join(', '))
@@ -150,6 +150,14 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <h2 className="font-extrabold">Pelatihan Content & Duta Teladan</h2>
         <Toggle id="pelatihan_open" label="Pengumpulan Pelatihan dibuka" checked={s.pelatihan_open} onChange={(v) => setS({ ...s, pelatihan_open: v })} />
         <Toggle id="duta_open" label="Pengumpulan Duta Teladan dibuka" checked={s.duta_open} onChange={(v) => setS({ ...s, duta_open: v })} />
+        <div>
+          <p className="font-bold">Minimal link per orang setiap minggu</p>
+          <p className="muted mb-3 text-sm">Kewajiban mingguan (Senin–Minggu WIB). Isi 0 bila tidak ada target. Peserta melihat progresnya, admin melihat siapa yang belum di Rekap mingguan.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {num('weekly_min_pelatihan', 'Pelatihan Content')}
+            {num('weekly_min_duta', 'Duta Teladan')}
+          </div>
+        </div>
       </section>
 
       <section className="panel-solid">
