@@ -5,6 +5,9 @@ import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
 import { approveWaiting } from '@/lib/admin-service'
 import { getSettings, getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export const dynamic = 'force-dynamic'
 
 const count = z.number().int().min(0).max(1_000_000_000)

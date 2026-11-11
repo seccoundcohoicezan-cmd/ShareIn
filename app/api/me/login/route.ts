@@ -4,6 +4,9 @@ import { jsonError, limitOr429, readJson } from '@/lib/http'
 import { participantByToken } from '@/lib/participant-service'
 import { setUserCookie } from '@/lib/user-session'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 const schema = z.object({ link: z.string().trim().min(1).max(300) })
 
 /** Log in by pasting the unique monitoring link (or just its code). */

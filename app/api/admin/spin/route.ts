@@ -4,6 +4,9 @@ import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
 import { revalidatePublic } from '@/lib/revalidate'
 import { deleteSpins, draw, setWheelChoices, wheel } from '@/lib/spin'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export const dynamic = 'force-dynamic'
 
 // The spin wheel belongs to Pelatihan Content.

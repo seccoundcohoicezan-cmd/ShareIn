@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { review } from '@/lib/admin-service'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 const schema = z.object({ ids: z.array(z.string().max(40)).min(1).max(200), action: z.literal('approve') })
 
 export async function POST(req: NextRequest) {

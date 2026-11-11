@@ -3,6 +3,9 @@ import { jsonError } from '@/lib/http'
 import { asProgram } from '@/lib/program-param'
 import { programSummary } from '@/lib/progress'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export const dynamic = 'force-dynamic'
 
 export async function GET(_req: Request, { params }: { params: { program: string } }) {

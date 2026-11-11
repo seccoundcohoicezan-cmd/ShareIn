@@ -3,6 +3,9 @@ import { jsonError, limitKey, limitOr429 } from '@/lib/http'
 import { tracking } from '@/lib/participant-service'
 import { USER_COOKIE } from '@/lib/user-session'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export const dynamic = 'force-dynamic'
 
 // Live tracking: read straight from the spreadsheet on every call (the page polls every 15 s).

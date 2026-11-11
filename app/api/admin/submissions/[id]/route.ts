@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { review, reviewSchema } from '@/lib/admin-service'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!sameOrigin(req)) return jsonError(403, 'Permintaan ditolak.')
   const s = await requireAdmin(req)

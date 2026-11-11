@@ -7,6 +7,9 @@ import { listSubmissionsCached } from '@/lib/repo/submissions'
 import { USER_COOKIE } from '@/lib/user-session'
 import { progressFor } from '@/lib/progress'
 
+// Room for Apps Script busy-retries during a burst (Vercel's default limit is shorter).
+export const maxDuration = 60
+
 export const dynamic = 'force-dynamic'
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
