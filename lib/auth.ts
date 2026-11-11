@@ -5,8 +5,10 @@ import { addAdmin, listAdmins } from './repo/admins'
 import { SESSION_COOKIE, verifySession, type Session } from './session'
 import type { AdminRole } from './types'
 
+// Cost 10: bcryptjs is pure JS, and cost 12 took ~1 s per hash/login on the server. Older cost-12
+// hashes keep working (the cost is stored in the hash).
 export async function hashPassword(pw: string) {
-  return bcrypt.hash(pw, 12)
+  return bcrypt.hash(pw, 10)
 }
 
 /** Verifies credentials; bootstraps the first owner from ADMIN_EMAIL/ADMIN_PASSWORD when the sheet is empty. */

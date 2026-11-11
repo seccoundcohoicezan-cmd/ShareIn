@@ -12,6 +12,7 @@ export const TABLES = {
   audit_log: ['time', 'actor', 'action', 'target', 'before', 'after'],
   api_keys: ['id', 'name', 'prefix', 'key_hash', 'active', 'created_at', 'created_by'],
   participants: ['id', 'token', 'name', 'whatsapp', 'created_at', 'last_seen_at', 'sso_sub'],
+  spins: ['id', 'created_at', 'program', 'round_start', 'participant_id', 'name', 'whatsapp', 'prize', 'entries', 'drawn_by', 'deleted'],
 } as const
 
 export type TableName = keyof typeof TABLES
@@ -32,10 +33,32 @@ export interface TableStore {
   update(table: TableName, updates: { index: number; row: Row }[]): Promise<void>
   /** Appends and returns the table afterwards, in one round trip where the backend supports it. */
   appendAndRead?(table: TableName, rows: Row[]): Promise<TableData>
+  /** Several appends/updates (possibly to different tables) in one round trip. */
+  writeBatch?(ops: WriteOp[]): Promise<void>
   /** Changes some columns of rows found by key in one round trip, without reading the table first. */
   patch?(table: TableName, req: PatchRequest): Promise<PatchResult>
   /** Drops any cached read of the table (stores that share reads). */
   forget?(table: TableName): void
+}
+
+export type WriteOp =
+  | { action: 'append'; table: TableName; rows: Row[] }
+  | { action: 'update'; table: TableName; updates: { index: number; row: Row }[] }
+
+/** Runs writes in one request where the store supports it, otherwise one after another. */
+export async function writeAll(store: TableStore, ops: WriteOp[]): Promise<void> {
+  const real = ops.filter((o) => (o.action === 'append' ? o.rows.length : o.updates.length) > 0)
+  if (!real.length) return
+  if (store.writeBatch) return store.writeBatch(real)
+  for (const o of real) {
+    if (o.action === 'append') await store.append(o.table, o.rows)
+    else await store.update(o.table, o.updates)
+  }
+}
+
+/** One audit_log row, for writing together with the change it describes. */
+export function auditOp(actor: string, action: string, target: string, before: unknown, after: unknown): WriteOp {
+  return { action: 'append', table: 'audit_log', rows: [[new Date().toISOString(), actor, action, target, JSON.stringify(before ?? ''), JSON.stringify(after ?? '')]] }
 }
 
 export interface PatchRequest {

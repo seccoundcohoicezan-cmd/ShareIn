@@ -4,7 +4,7 @@ import { normalizeName } from './format'
 import { withLock } from './lock'
 import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
-import { listSubmissionsCached, listSubmissionsFresh, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
+import { listSubmissionsCached, listSubmissionsFresh, listSubmissionsRecent, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
 import type { Submission } from './types'
 
 export const REJECT_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid'] as const
@@ -36,7 +36,7 @@ function strip(s: StoredSubmission): Submission {
 }
 
 export async function adminList(f: Filters) {
-  const all = (await listSubmissionsFresh()).map(strip)
+  const all = (await listSubmissionsRecent()).map(strip)
   const periods = Array.from(new Set(all.filter((s) => s.program === f.program).map((s) => s.period_id))).filter(Boolean).sort().reverse()
   return { items: applyFilters(all, f), periods }
 }

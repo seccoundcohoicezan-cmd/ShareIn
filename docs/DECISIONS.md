@@ -113,3 +113,13 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 55 | Form membaca `/api/rules` tanpa cache browser. | Program yang baru ditutup admin masih tampil terbuka di tab yang pernah dibuka. |
 | 56 | Setujui/Tolak/Batalkan = 1 request ke spreadsheet (operasi Apps Script `patch`: cari baris lewat id, tulis kolom review, catat audit_log sekaligus; Apps Script @5). Sebelumnya baca tabel + tulis + 1 append audit per setoran (≈3 × 2,5 dtk). Bila Apps Script lama, otomatis kembali ke cara lama. | Admin menunggu terlalu lama saat menyetujui. |
 | 57 | Saat menyimpan review: tombol yang ditekan menampilkan spinner ("Menyetujui…", "Menolak…", "Membatalkan…"), kedua tombol terkunci agar tidak terkirim dua kali, dan bar tipis bergerak di atas layar; juga untuk setujui massal dan saat daftar dimuat ulang. | Admin bingung karena tidak ada tanda proses. |
+
+## Putaran 17 (11 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 58 | Pelatihan = undian: kumpulkan `pelatihan_need_tiktok` (5) link TikTok + `pelatihan_need_reels` (5) link Reels yang **disetujui** sejak putaran dimulai → otomatis masuk roda spin wheel. Tidak ada target mingguan. | Permintaan pengguna. Hanya link disetujui yang dihitung agar link asal tidak bisa membawa orang ke undian. |
+| 59 | Spin wheel (tab admin Pelatihan): pemenang dipilih server dengan `crypto.randomInt`, roda hanya menganimasikan hasilnya. Disimpan di tab `spins` (hadiah opsional, jumlah peserta, pengundi). Pemenang di putaran yang sama tidak ikut lagi. "Hapus" = sembunyikan riwayat (baris tetap di sheet, ditandai deleted), orangnya kembali ke roda. "Reset undian" = putaran baru (`pelatihan_round_start` = sekarang), hitungan semua orang mulai 0, riwayat tetap. Hapus/Reset hanya owner. Riwayat pemenang tampil publik dengan nama disingkat. | Permintaan "bisa direset atau dihapus, tampilkan riwayat yang dapat siapa". |
+| 60 | Duta = `duta_week_tiktok` (10) + `duta_week_reels` (10) konten per minggu Senin–Minggu WIB, berulang otomatis; dihitung link menunggu + disetujui. | Permintaan pengguna (20 konten/minggu). |
+| 61 | Tambah admin, ubah admin, ganti sandi, dan simpan pengaturan menulis baris + audit_log dalam 1 request; bcrypt cost 12 → 10 (bcryptjs murni JS, ±1 dtk per hash); daftar admin dikembalikan langsung tanpa muat ulang; tombol menampilkan spinner. Daftar setoran admin memakai cache 15 dtk. | "Menambahkan akun admin/owner masih lag". |
+| 62 | Baris "Like & komentar: cek di link" disembunyikan bila tidak ada angka. | Tampilan lebih ringkas. |

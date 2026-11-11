@@ -1,4 +1,4 @@
-import { cellToString, TABLES, type PatchRequest, type PatchResult, type Row, type TableData, type TableName, type TableStore } from './store'
+import { cellToString, TABLES, type PatchRequest, type PatchResult, type Row, type WriteOp, type TableData, type TableName, type TableStore } from './store'
 
 type Op =
   | { action: 'ensure'; tables: Record<string, readonly string[]> }
@@ -107,7 +107,10 @@ export class AppsScriptStore implements TableStore {
 
   ensureSchema(): Promise<void> {
     this.ensured ??= this.call({ action: 'ensure', tables: TABLES })
-      .then(() => undefined)
+      .then(() => {
+        // ensure brings every tab's header up to date, so later writes skip the check.
+        for (const t of Object.keys(TABLES) as TableName[]) this.verified.add(t)
+      })
       .catch((e) => {
         this.ensured = null
         throw e
@@ -135,6 +138,21 @@ export class AppsScriptStore implements TableStore {
     this.markVerified(table, r.table.header)
     this.recent.set(table, { at: Date.now(), data: Promise.resolve(r.table) })
     return { header: r.table.header.length ? r.table.header : [...TABLES[table]], rows: r.table.rows.map((row) => [...row]) }
+  }
+
+  async writeBatch(ops: WriteOp[]): Promise<void> {
+    const tables = Array.from(new Set(ops.map((o) => o.table)))
+    for (const t of tables) await this.ensureFor(t)
+    tables.forEach((t) => this.recent.delete(t))
+    await this.send(
+      ops.map((o): Op =>
+        o.action === 'append'
+          ? { action: 'append', table: o.table, rows: o.rows.map((r) => r.map(cellToString)) }
+          : { action: 'update', table: o.table, updates: o.updates.map((u) => ({ index: u.index, row: u.row.map(cellToString) })) },
+      ),
+      0,
+    )
+    tables.forEach((t) => this.recent.delete(t))
   }
 
   async patch(table: TableName, req: PatchRequest): Promise<PatchResult> {

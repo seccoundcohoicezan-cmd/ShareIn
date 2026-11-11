@@ -3,7 +3,7 @@ import { appsScriptConfigured, getStore, sheetsConfigured } from './repo'
 import { listAdmins } from './repo/admins'
 import { getSettings } from './repo/settings'
 import { getProgress } from './service'
-import { programSummary } from './weekly'
+import { programSummary } from './progress'
 
 export async function warmCaches(first: boolean) {
   if (!appsScriptConfigured() && !sheetsConfigured()) return

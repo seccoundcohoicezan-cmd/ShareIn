@@ -62,7 +62,8 @@ describe.each([
     expect(view!.items.map((i) => i.program).sort()).toEqual(['golden', 'pelatihan'])
     expect(view!.counts).toMatchObject({ total: 2, pending: 2 })
     expect(view!.whatsapp).toBe('6281••••890')
-    expect(view!.weekly).toEqual([expect.objectContaining({ program: 'pelatihan', sent: 1, min: 3, met: false })])
+    // Pelatihan counts approved links toward the draw: nothing yet while waiting for review.
+    expect(view!.progress).toEqual([expect.objectContaining({ program: 'pelatihan', mode: 'draw', tiktok: 0, pending: 1, met: false, target: { tiktok: 5, reels: 5 } })])
 
     // Admin edits the sheet by hand: Indonesian words in the status column.
     const all = await listSubmissionsFresh()
@@ -72,12 +73,11 @@ describe.each([
     view = await tracking(me!.token)
     expect(view!.counts).toMatchObject({ approved: 1, rejected: 1, pending: 0 })
     expect(view!.items.find((i) => i.program === 'pelatihan')!.reason).toBe('Bukan konten pro-kontra')
-    // A rejected link does not count toward the weekly minimum.
-    expect(view!.weekly[0].sent).toBe(0)
+    expect(view!.progress[0]).toMatchObject({ tiktok: 0, pending: 0 })
     await review([p.id], 'approve', '', 'o')
     view = await tracking(me!.token)
     expect(view!.counts.approved).toBe(2)
-    expect(view!.weekly[0]).toMatchObject({ sent: 1, approved: 1 })
+    expect(view!.progress[0]).toMatchObject({ tiktok: 1, reels: 0, met: false })
   })
 
   it('unknown code → null', async () => {

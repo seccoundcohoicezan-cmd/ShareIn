@@ -8,6 +8,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { email: str
   if (s instanceof NextResponse) return s
   const body = patchAdminSchema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
-  const err = await patchAdmin(decodeURIComponent(params.email), body.data, s.email)
-  return err ? jsonError(400, err) : NextResponse.json({ ok: true })
+  const r = await patchAdmin(decodeURIComponent(params.email), body.data, s.email)
+  return 'error' in r ? jsonError(400, r.error) : NextResponse.json({ ok: true, admins: r.admins })
 }

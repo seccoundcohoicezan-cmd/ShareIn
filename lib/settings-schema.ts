@@ -19,8 +19,11 @@ export const SETTING_KEYS = [
   'auto_approve_golden',
   'auto_approve_pelatihan',
   'auto_approve_duta',
-  'weekly_min_pelatihan',
-  'weekly_min_duta',
+  'pelatihan_need_tiktok',
+  'pelatihan_need_reels',
+  'pelatihan_round_start',
+  'duta_week_tiktok',
+  'duta_week_reels',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -45,8 +48,11 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   auto_approve_golden: 'FALSE',
   auto_approve_pelatihan: 'FALSE',
   auto_approve_duta: 'FALSE',
-  weekly_min_pelatihan: '3',
-  weekly_min_duta: '3',
+  pelatihan_need_tiktok: '5',
+  pelatihan_need_reels: '5',
+  pelatihan_round_start: '',
+  duta_week_tiktok: '10',
+  duta_week_reels: '10',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -85,8 +91,11 @@ export function parseSettings(raw: Map<string, string>): Settings {
     auto_approve_golden: toBool(get('auto_approve_golden')),
     auto_approve_pelatihan: toBool(get('auto_approve_pelatihan')),
     auto_approve_duta: toBool(get('auto_approve_duta')),
-    weekly_min_pelatihan: Math.min(toInt(get('weekly_min_pelatihan'), 3), 100),
-    weekly_min_duta: Math.min(toInt(get('weekly_min_duta'), 3), 100),
+    pelatihan_need_tiktok: Math.min(toInt(get('pelatihan_need_tiktok'), 5), 100),
+    pelatihan_need_reels: Math.min(toInt(get('pelatihan_need_reels'), 5), 100),
+    pelatihan_round_start: get('pelatihan_round_start').trim() ? toIso(get('pelatihan_round_start'), '1970-01-01T00:00:00Z') : '',
+    duta_week_tiktok: Math.min(toInt(get('duta_week_tiktok'), 10), 100),
+    duta_week_reels: Math.min(toInt(get('duta_week_reels'), 10), 100),
   }
 }
 
@@ -115,8 +124,11 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     auto_approve_golden: s.auto_approve_golden ? 'TRUE' : 'FALSE',
     auto_approve_pelatihan: s.auto_approve_pelatihan ? 'TRUE' : 'FALSE',
     auto_approve_duta: s.auto_approve_duta ? 'TRUE' : 'FALSE',
-    weekly_min_pelatihan: String(s.weekly_min_pelatihan),
-    weekly_min_duta: String(s.weekly_min_duta),
+    pelatihan_need_tiktok: String(s.pelatihan_need_tiktok),
+    pelatihan_need_reels: String(s.pelatihan_need_reels),
+    pelatihan_round_start: s.pelatihan_round_start,
+    duta_week_tiktok: String(s.duta_week_tiktok),
+    duta_week_reels: String(s.duta_week_reels),
   }
 }
 
@@ -146,6 +158,7 @@ export function autoApprove(s: Settings, c: Channel): boolean {
   return c === 'golden' ? s.auto_approve_golden : c === 'pelatihan' ? s.auto_approve_pelatihan : s.auto_approve_duta
 }
 
-export function weeklyMin(s: Settings, p: Program): number {
-  return p === 'pelatihan' ? s.weekly_min_pelatihan : s.weekly_min_duta
+/** Links needed per platform: Pelatihan for the draw (cumulative), Duta every week. */
+export function targetFor(s: Settings, p: Program): { tiktok: number; reels: number } {
+  return p === 'pelatihan' ? { tiktok: s.pelatihan_need_tiktok, reels: s.pelatihan_need_reels } : { tiktok: s.duta_week_tiktok, reels: s.duta_week_reels }
 }

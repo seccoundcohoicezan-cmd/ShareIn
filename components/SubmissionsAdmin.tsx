@@ -272,7 +272,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
                       {s.needs_review && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Selisih angka API</span>}
                     </div>
                     <p className="mt-2 font-extrabold">{s.submitter_name}</p>
-                    <p className="text-sm tabular-nums">{metricsText(s.likes, s.comments)}</p>
+                    {(s.likes > 0 || s.comments > 0) && <p className="text-sm tabular-nums">{metricsText(s.likes, s.comments)}</p>}
                     <p className="muted text-xs">{formatDateTime(s.created_at)} · {s.period_id} · {s.metrics_source === 'api' ? 'angka API' : 'cek manual'}</p>
                     {s.reject_reason && <p className="mt-1 text-sm text-bad">Alasan: {s.reject_reason}</p>}
                   </div>

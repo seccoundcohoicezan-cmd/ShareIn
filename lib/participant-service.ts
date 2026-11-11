@@ -4,9 +4,9 @@ import { withLock } from './lock'
 import { participantsTable } from './repo/programs'
 import { strip } from './repo/records'
 import { getSettingsFresh } from './repo/settings'
-import { listSubmissionsFresh } from './repo/submissions'
+import { listSubmissionsFresh, listSubmissionsRecent } from './repo/submissions'
 import { AUTO_REVIEWER, CHANNEL_INFO, type Channel, type Participant, type Program } from './types'
-import { weeklyProgress } from './weekly'
+import { progressFor } from './progress'
 
 // 12 chars from an unambiguous alphabet (~2^59): long enough to be unguessable with rate limiting,
 // short enough to read aloud or type like a complaint ticket number (shown as XXXX-XXXX-XXXX).
@@ -93,7 +93,7 @@ export async function tracking(token: string) {
       auto: s.reviewed_by === AUTO_REVIEWER,
     }))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-  // Weekly targets are shown for the obligation programs this person takes part in.
+  // Targets are shown for the programs this person takes part in (Duta via MyTopstar counts too).
   const joined = (['pelatihan', 'duta'] as Program[]).filter((p) => mine.some((s) => s.program === p) || (p === 'duta' && me.sso_sub))
   return {
     name: me.name,
@@ -101,7 +101,7 @@ export async function tracking(token: string) {
     token: me.token,
     since: me.created_at,
     items,
-    weekly: joined.map((p) => weeklyProgress(all, settings, p, me.whatsapp)),
+    progress: joined.map((p) => progressFor(all, settings, p, me.whatsapp)),
     counts: {
       total: items.length,
       pending: items.filter((i) => i.status === 'pending').length,
@@ -114,7 +114,7 @@ export async function tracking(token: string) {
 
 /** Admin list: every participant with counts and their link. */
 export async function adminParticipants() {
-  const [people, all] = await Promise.all([participantsTable.list(), listSubmissionsFresh()])
+  const [people, all] = await Promise.all([participantsTable.list(), listSubmissionsRecent()])
   return people
     .map(strip)
     .map((p) => {

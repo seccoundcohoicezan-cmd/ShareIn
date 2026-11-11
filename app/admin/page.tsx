@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { PlatformTag, StatusBadge, EmptyState } from '@/components/ui'
 import { dashboard } from '@/lib/admin-service'
 import { formatDateTime, formatNumber, metricsText } from '@/lib/format'
-import { programSummary } from '@/lib/weekly'
+import { programSummary } from '@/lib/progress'
 import { getProgress } from '@/lib/service'
 import { isDemoStore } from '@/lib/repo'
 import { AdminShell, requirePageSession } from './shell'
@@ -53,7 +53,8 @@ export default async function AdminHome() {
           <Link key={p.key} href={`/admin/program/${p.key}`} className="panel-solid !p-4 hover:border-brand-violet">
             <p className="font-extrabold">{p.label}</p>
             <p className="muted mt-1 text-sm">
-              <b className="text-warn">{pendingByProgram[p.key]}</b> menunggu review · minggu ini {p.s.met}/{p.s.active} capai target {p.s.min} link
+              <b className="text-warn">{pendingByProgram[p.key]}</b> menunggu review ·{' '}
+              {p.s.mode === 'draw' ? `${p.s.met} orang masuk undian` : `minggu ini ${p.s.met}/${p.s.active} capai target ${p.s.target.tiktok} TikTok + ${p.s.target.reels} Reels`}
             </p>
           </Link>
         ))}

@@ -2,8 +2,7 @@ import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
-import { audit } from '@/lib/repo/audit'
-import { getSettingsFresh, saveSettings } from '@/lib/repo/settings'
+import { getSettings, getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +29,11 @@ const schema = z.object({
   auto_approve_golden: z.boolean(),
   auto_approve_pelatihan: z.boolean(),
   auto_approve_duta: z.boolean(),
-  weekly_min_pelatihan: z.number().int().min(0).max(100, 'Minimal mingguan maksimal 100 link.'),
-  weekly_min_duta: z.number().int().min(0).max(100, 'Minimal mingguan maksimal 100 link.'),
+  pelatihan_need_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
+  pelatihan_need_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
+  pelatihan_round_start: z.union([z.literal(''), z.string().datetime({ offset: true })]),
+  duta_week_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
+  duta_week_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
 }).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
   message: 'Tanggal akhir hadiah harus setelah tanggal mulai.',
 })
@@ -48,8 +50,7 @@ export async function PUT(req: NextRequest) {
   if (s instanceof NextResponse) return s
   const body = schema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
-  const diff = await saveSettings(body.data)
-  if (Object.keys(diff.after).length) await audit(s.email, 'settings.update', 'settings', diff.before, diff.after)
+  await saveSettings(body.data, { actor: s.email })
   revalidatePublic()
-  return NextResponse.json({ ok: true, settings: await getSettingsFresh() })
+  return NextResponse.json({ ok: true, settings: await getSettings() })
 }

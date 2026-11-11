@@ -6,7 +6,7 @@ import { toast, Toaster } from './Toast'
 
 type NumKey =
   | 'min_like_tiktok' | 'min_comment_tiktok' | 'min_like_reels' | 'min_comment_reels'
-  | 'golden_pool_start' | 'golden_pool_end' | 'weekly_min_pelatihan' | 'weekly_min_duta'
+  | 'golden_pool_start' | 'golden_pool_end' | 'pelatihan_need_tiktok' | 'pelatihan_need_reels' | 'duta_week_tiktok' | 'duta_week_reels'
 
 // datetime-local works in the browser's zone; the program runs on WIB, so convert explicitly.
 function toWibInput(iso: string) {
@@ -41,7 +41,7 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState(initial)
   const [nums, setNums] = useState<Record<NumKey, string>>(() => {
-    const keys: NumKey[] = ['min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end', 'weekly_min_pelatihan', 'weekly_min_duta']
+    const keys: NumKey[] = ['min_like_tiktok', 'min_comment_tiktok', 'min_like_reels', 'min_comment_reels', 'golden_pool_start', 'golden_pool_end', 'pelatihan_need_tiktok', 'pelatihan_need_reels', 'duta_week_tiktok', 'duta_week_reels']
     return Object.fromEntries(keys.map((k) => [k, formatNumber(initial[k])])) as Record<NumKey, string>
   })
   const [domains, setDomains] = useState(initial.sharein_domains.join(', '))
@@ -151,11 +151,19 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <Toggle id="pelatihan_open" label="Pengumpulan Pelatihan dibuka" checked={s.pelatihan_open} onChange={(v) => setS({ ...s, pelatihan_open: v })} />
         <Toggle id="duta_open" label="Pengumpulan Duta Teladan dibuka" checked={s.duta_open} onChange={(v) => setS({ ...s, duta_open: v })} />
         <div>
-          <p className="font-bold">Minimal link per orang setiap minggu</p>
-          <p className="muted mb-3 text-sm">Kewajiban mingguan (Senin–Minggu WIB). Isi 0 bila tidak ada target. Peserta melihat progresnya, admin melihat siapa yang belum di Rekap mingguan.</p>
+          <p className="font-bold">Pelatihan: syarat ikut undian spin wheel</p>
+          <p className="muted mb-3 text-sm">Jumlah link yang sudah <b>disetujui</b> sejak putaran undian dimulai. Begitu terpenuhi, peserta otomatis masuk roda undian.</p>
           <div className="grid grid-cols-2 gap-3">
-            {num('weekly_min_pelatihan', 'Pelatihan Content')}
-            {num('weekly_min_duta', 'Duta Teladan')}
+            {num('pelatihan_need_tiktok', 'Link TikTok')}
+            {num('pelatihan_need_reels', 'Link Instagram Reels')}
+          </div>
+        </div>
+        <div>
+          <p className="font-bold">Duta Teladan: target setiap minggu</p>
+          <p className="muted mb-3 text-sm">Senin 00.00 – Minggu 23.59 WIB, berulang otomatis tiap minggu. Dihitung dari link menunggu + disetujui.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {num('duta_week_tiktok', 'Konten TikTok')}
+            {num('duta_week_reels', 'Konten Instagram Reels')}
           </div>
         </div>
       </section>

@@ -78,6 +78,14 @@ export function listSubmissionsCached(): Promise<StoredSubmission[]> {
   return cached('submissions', listSubmissionsFresh)
 }
 
+/**
+ * For admin lists: at most 15 s old (and cleared by every write from this server), so switching
+ * filters or tabs is instant instead of a fresh ~2.5 s spreadsheet read each time.
+ */
+export function listSubmissionsRecent(): Promise<StoredSubmission[]> {
+  return cached('submissions:recent', listSubmissionsFresh, 15_000)
+}
+
 async function header() {
   if (!lastHeader) await listSubmissionsFresh()
   lastHeader = await writeHeader(getStore(), 'submissions', lastHeader)

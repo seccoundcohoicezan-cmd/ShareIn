@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { jsonError } from '@/lib/http'
 import { asProgram } from '@/lib/program-param'
-import { programSummary } from '@/lib/weekly'
+import { programSummary } from '@/lib/progress'
 
 export const dynamic = 'force-dynamic'
 

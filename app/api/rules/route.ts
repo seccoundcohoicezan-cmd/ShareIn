@@ -19,8 +19,8 @@ export async function GET() {
       },
       collected: progress,
       programs: {
-        pelatihan: { open: settings.pelatihan_open, weekly_min: settings.weekly_min_pelatihan },
-        duta: { open: settings.duta_open, weekly_min: settings.weekly_min_duta },
+        pelatihan: { open: settings.pelatihan_open, target: { tiktok: settings.pelatihan_need_tiktok, reels: settings.pelatihan_need_reels } },
+        duta: { open: settings.duta_open, target: { tiktok: settings.duta_week_tiktok, reels: settings.duta_week_reels } },
       },
       sso: Boolean(ssoConfig()),
       golden: {

@@ -16,6 +16,6 @@ export async function POST(req: NextRequest) {
   if (s instanceof NextResponse) return s
   const body = newAdminSchema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
-  const err = await createAdmin(body.data, s.email)
-  return err ? jsonError(409, err) : NextResponse.json({ ok: true }, { status: 201 })
+  const r = await createAdmin(body.data, s.email)
+  return 'error' in r ? jsonError(409, r.error) : NextResponse.json({ ok: true, admins: r.admins }, { status: 201 })
 }

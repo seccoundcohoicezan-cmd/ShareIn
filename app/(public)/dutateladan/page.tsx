@@ -9,7 +9,7 @@ export default function Page() {
     <ProgramPage
       program="duta"
       pill="Kewajiban"
-      intro="Setiap Duta Teladan wajib mengirim link konten TikTok atau Reels setiap minggu sesuai target di bawah. Cara kirimnya sama seperti Golden Ticket, dan statusnya bisa kamu pantau."
+      intro="Setiap Duta Teladan wajib mengumpulkan konten TikTok dan Instagram Reels setiap minggu (Senin–Minggu). Cara kirimnya sama seperti Golden Ticket, dan statusnya bisa kamu pantau."
     />
   )
 }

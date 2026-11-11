@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { hashPassword } from './auth'
 import { withLock } from './lock'
 import { addAdmin, listAdmins, listAdminsStored, updateAdmin } from './repo/admins'
-import { audit } from './repo/audit'
+import type { Admin } from './types'
+import { auditOp } from './repo/store'
 
 const password = z.string().min(10, 'Sandi minimal 10 karakter.').max(200)
 
@@ -17,8 +18,7 @@ export async function changePassword(email: string, current: string, next: strin
     const me = (await listAdminsStored()).find((a) => a.email === email && a.active)
     if (!me) return 'Akun tidak ditemukan.'
     if (!(await bcrypt.compare(current, me.password_hash).catch(() => false))) return 'Sandi saat ini salah.'
-    await updateAdmin({ ...me, password_hash: await hashPassword(next) })
-    await audit(email, 'admin.password', email, '', '')
+    await updateAdmin({ ...me, password_hash: await hashPassword(next) }, auditOp(email, 'admin.password', email, '', ''))
     return null
   })
 }
@@ -39,20 +39,25 @@ export async function publicAdmins() {
   return (await listAdmins()).map(({ email, role, active }) => ({ email, role, active }))
 }
 
-export async function createAdmin(input: z.infer<typeof newAdminSchema>, actor: string): Promise<string | null> {
+type PublicAdmin = { email: string; role: Admin['role']; active: boolean }
+const toPublic = ({ email, role, active }: Admin): PublicAdmin => ({ email, role, active })
+
+/** Adds an admin in one spreadsheet request (row + audit) and returns the new list, so the page needs no reload. */
+export async function createAdmin(input: z.infer<typeof newAdminSchema>, actor: string): Promise<{ error: string } | { admins: PublicAdmin[] }> {
   return withLock('admins', async () => {
-    if ((await listAdmins()).some((a) => a.email === input.email)) return 'Email ini sudah terdaftar sebagai admin.'
-    await addAdmin({ email: input.email, role: input.role, active: true, password_hash: await hashPassword(input.password) })
-    await audit(actor, 'admin.create', input.email, '', { role: input.role })
-    return null
+    const all = await listAdmins()
+    if (all.some((a) => a.email === input.email)) return { error: 'Email ini sudah terdaftar sebagai admin.' }
+    const created: Admin = { email: input.email, role: input.role, active: true, password_hash: await hashPassword(input.password) }
+    await addAdmin(created, auditOp(actor, 'admin.create', input.email, '', { role: input.role }))
+    return { admins: [...all, created].map(toPublic) }
   })
 }
 
-export async function patchAdmin(email: string, input: z.infer<typeof patchAdminSchema>, actor: string): Promise<string | null> {
+export async function patchAdmin(email: string, input: z.infer<typeof patchAdminSchema>, actor: string): Promise<{ error: string } | { admins: PublicAdmin[] }> {
   return withLock('admins', async () => {
     const all = await listAdminsStored()
     const target = all.find((a) => a.email === email.toLowerCase())
-    if (!target) return 'Admin tidak ditemukan.'
+    if (!target) return { error: 'Admin tidak ditemukan.' }
     const next = {
       ...target,
       role: input.role ?? target.role,
@@ -61,9 +66,8 @@ export async function patchAdmin(email: string, input: z.infer<typeof patchAdmin
     }
     const after = all.map((a) => (a.email === target.email ? next : a))
     const ownersLeft = after.filter((a) => a.role === 'owner' && a.active)
-    if (ownersLeft.length === 0) return 'Harus tersisa minimal satu owner aktif.'
-    await updateAdmin(next)
-    await audit(actor, 'admin.update', target.email, { role: target.role, active: target.active }, { role: next.role, active: next.active, password: input.password ? 'diganti' : undefined })
-    return null
+    if (ownersLeft.length === 0) return { error: 'Harus tersisa minimal satu owner aktif.' }
+    await updateAdmin(next, auditOp(actor, 'admin.update', target.email, { role: target.role, active: target.active }, { role: next.role, active: next.active, password: input.password ? 'diganti' : undefined }))
+    return { admins: after.map(toPublic) }
   })
 }

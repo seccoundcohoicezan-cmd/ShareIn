@@ -24,9 +24,14 @@ export interface Settings {
   auto_approve_golden: boolean
   auto_approve_pelatihan: boolean
   auto_approve_duta: boolean
-  /** Links each participant must send per week (Monday–Sunday WIB); 0 = no target. */
-  weekly_min_pelatihan: number
-  weekly_min_duta: number
+  /** Pelatihan: approved links needed (per platform) to enter the spin-wheel draw. */
+  pelatihan_need_tiktok: number
+  pelatihan_need_reels: number
+  /** Start of the current draw round (ISO); links before it no longer count. Empty = from the beginning. */
+  pelatihan_round_start: string
+  /** Duta Teladan: links required every week (Monday–Sunday WIB), per platform. */
+  duta_week_tiktok: number
+  duta_week_reels: number
 }
 
 export interface Participant {
@@ -39,6 +44,23 @@ export interface Participant {
   last_seen_at: string
   /** MyTopstar account id (OIDC `sub`) once the participant signed in through MyTopstar. */
   sso_sub: string
+}
+
+/** One spin-wheel draw. Deleting only hides it (`deleted`), so the history stays auditable. */
+export interface Spin {
+  id: string
+  created_at: string
+  program: Program
+  /** Draw round the spin belongs to (value of the round start setting at the time). */
+  round_start: string
+  participant_id: string
+  name: string
+  whatsapp: string
+  prize: string
+  /** How many people were on the wheel. */
+  entries: number
+  drawn_by: string
+  deleted: boolean
 }
 
 export interface ApiKey {

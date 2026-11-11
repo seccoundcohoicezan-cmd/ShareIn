@@ -1,7 +1,7 @@
 import { cached, invalidate } from '../cache'
 import type { Admin, AdminRole } from '../types'
 import { getStore } from './index'
-import { rowToRecord } from './store'
+import { rowToRecord, writeAll, type WriteOp } from './store'
 
 type StoredAdmin = Admin & { _index: number }
 
@@ -31,12 +31,13 @@ export async function listAdmins(): Promise<Admin[]> {
   })
 }
 
-export async function addAdmin(a: Admin): Promise<void> {
-  await getStore().append('admins', [toRow(a)])
+export async function addAdmin(a: Admin, audit?: WriteOp): Promise<void> {
+  await writeAll(getStore(), [{ action: 'append', table: 'admins', rows: [toRow(a)] }, ...(audit ? [audit] : [])])
   invalidate('admins')
 }
 
-export async function updateAdmin(a: StoredAdmin): Promise<void> {
-  await getStore().update('admins', [{ index: a._index, row: toRow(a) }])
+/** Writes the admin row and its audit entry in one request. */
+export async function updateAdmin(a: StoredAdmin, audit?: WriteOp): Promise<void> {
+  await writeAll(getStore(), [{ action: 'update', table: 'admins', updates: [{ index: a._index, row: toRow(a) }] }, ...(audit ? [audit] : [])])
   invalidate('admins')
 }

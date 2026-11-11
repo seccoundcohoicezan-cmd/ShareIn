@@ -4,7 +4,9 @@ import { formatDateTime, metricsText } from '@/lib/format'
 import { CheckIcon, CrossIcon, ExternalIcon } from './icons'
 import { PantauCard } from './PantauCard'
 import { Toaster } from './Toast'
-import { CHANNEL_INFO, type Channel, type Program } from '@/lib/types'
+import { CHANNEL_INFO, type Channel } from '@/lib/types'
+import type { Progress } from '@/lib/progress'
+import { TargetBars, targetLeft } from './TargetBars'
 
 type Item = {
   id: string
@@ -26,7 +28,7 @@ type Data = {
   whatsapp: string
   token: string
   items: Item[]
-  weekly: { program: Program; min: number; sent: number; approved: number; met: boolean }[]
+  progress: Pick<Progress, 'program' | 'mode' | 'tiktok' | 'reels' | 'target' | 'met'>[]
   counts: { total: number; pending: number; approved: number; rejected: number }
   checkedAt: string
 }
@@ -147,16 +149,14 @@ export function PantauLive({ token }: { token: string }) {
         </p>
       </section>
 
-      {(data.weekly ?? []).map((w) => (
-        <section key={w.program} className={`rounded-panel p-4 ${w.met ? 'bg-green-50 text-green-900' : 'bg-white'}`} aria-label={`Target mingguan ${CHANNEL_INFO[w.program].label}`}>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.15em]">{CHANNEL_INFO[w.program].label} · minggu ini</p>
-              <p className="text-2xl font-extrabold tabular-nums">{w.sent}<span className="text-base">/{w.min} link</span></p>
-              <p className="text-sm">{w.min === 0 ? 'Tidak ada target minimal.' : w.met ? 'Target tercapai.' : `Kurang ${w.min - w.sent} link lagi.`}</p>
-            </div>
+      {(data.progress ?? []).map((w) => (
+        <section key={w.program} className={`rounded-panel p-4 ${w.met ? 'bg-green-50 text-green-900' : 'bg-white'}`} aria-label={`Target ${CHANNEL_INFO[w.program].label}`}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-extrabold uppercase tracking-[0.15em]">{CHANNEL_INFO[w.program].label} · {w.mode === 'draw' ? 'undian' : 'minggu ini'}</p>
             <a href={`${CHANNEL_INFO[w.program].path}/setor`} className="btn-primary btn-sm shrink-0">Kirim link</a>
           </div>
+          <TargetBars tiktok={w.tiktok} reels={w.reels} target={w.target} />
+          <p className="mt-2 text-sm font-bold">{w.met ? (w.mode === 'draw' ? 'Sudah masuk undian spin wheel.' : 'Target minggu ini tercapai.') : targetLeft(w)}</p>
         </section>
       ))}
 
@@ -193,7 +193,7 @@ export function PantauLive({ token }: { token: string }) {
                 {changed.has(it.id) && <span className="text-xs font-bold text-brand-purple">Baru diperbarui</span>}
               </div>
               <p className="mt-2 font-extrabold">{it.title}</p>
-              {typeof it.likes === 'number' && <p className="text-sm tabular-nums">{metricsText(it.likes, it.comments ?? 0)}</p>}
+              {(it.likes ?? 0) + (it.comments ?? 0) > 0 && <p className="text-sm tabular-nums">{metricsText(it.likes ?? 0, it.comments ?? 0)}</p>}
               <div className="mt-1 flex flex-wrap gap-x-4 text-sm font-bold">
                 <a href={it.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Konten asal <ExternalIcon /></a>
                 {it.sharein && <a href={it.sharein} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 text-brand-purple underline underline-offset-4">Link Sharein <ExternalIcon /></a>}

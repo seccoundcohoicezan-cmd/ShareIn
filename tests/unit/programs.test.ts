@@ -11,15 +11,18 @@ import type { TableStore } from '@/lib/repo/store'
 import { collectedFeed, createBatch, getProgress, type SubmissionInput } from '@/lib/service'
 import type { Channel } from '@/lib/types'
 import { inWeek, weekOf } from '@/lib/week'
-import { programSummary, summarize, weeklyProgress, weeklyRecap } from '@/lib/weekly'
+import { programSummary, progressFor, recap, summarize } from '@/lib/progress'
+import { deleteSpins, draw, publicWinners, resetRound, wheel } from '@/lib/spin'
+import { review } from '@/lib/admin-service'
 import { createAppsScriptSim } from './apps-script-sim'
 
 const SECRET = 'p'.repeat(40)
 let n = 0
-function link(program: Channel, wa = '081234567890', name = 'Rina Utami'): SubmissionInput {
+function link(program: Channel, wa = '081234567890', name = 'Rina Utami', platform: 'tiktok' | 'reels' = 'tiktok'): SubmissionInput {
   n++
   return {
-    submitter_name: name, whatsapp: wa, platform: 'tiktok', source_url: `https://www.tiktok.com/@a/video/75000000000000${String(n).padStart(5, '0')}`,
+    submitter_name: name, whatsapp: wa, platform,
+    source_url: platform === 'tiktok' ? `https://www.tiktok.com/@a/video/75000000000000${String(n).padStart(5, '0')}` : `https://www.instagram.com/reel/Reel${String(n).padStart(6, '0')}/`,
     sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual', program,
   }
 }
@@ -72,29 +75,73 @@ describe.each([
     expect(golden.ok && golden.results[0].ok && golden.results[0].submission.status).toBe('pending')
   })
 
-  it('weekly minimum: progress per person, summary and recap with unmet first', async () => {
+  it('Duta: N TikTok + N Reels every week (waiting + approved), recap with unmet first', async () => {
     const s = await getSettingsFresh()
-    await saveSettings({ ...s, weekly_min_duta: 2 })
-    await createBatch([link('duta'), link('duta')])
-    await createBatch([link('duta', '081298765432', 'Budi')])
+    await saveSettings({ ...s, duta_week_tiktok: 2, duta_week_reels: 1 })
+    await createBatch([link('duta'), link('duta'), link('duta', undefined, undefined, 'reels')])
+    await createBatch([link('duta', '081298765432', 'Budi'), link('duta', '081298765432', 'Budi')])
     await createBatch([link('pelatihan', '081298765432', 'Budi')])
     const [all, settings] = await Promise.all([listSubmissionsFresh(), getSettingsFresh()])
-    expect(weeklyProgress(all, settings, 'duta', '6281234567890')).toMatchObject({ sent: 2, min: 2, met: true })
-    expect(weeklyProgress(all, settings, 'duta', '6281298765432')).toMatchObject({ sent: 1, met: false })
-    // Last week's links do not count this week.
+    expect(progressFor(all, settings, 'duta', '6281234567890')).toMatchObject({ mode: 'weekly', tiktok: 2, reels: 1, met: true })
+    // Two TikTok but no Reels: not met.
+    expect(progressFor(all, settings, 'duta', '6281298765432')).toMatchObject({ tiktok: 2, reels: 0, met: false })
+    // A new week starts from zero.
     const nextWeek = new Date(Date.now() + 7 * 86_400_000)
-    expect(weeklyProgress(all, settings, 'duta', '6281234567890', nextWeek)).toMatchObject({ sent: 0, met: false })
+    expect(progressFor(all, settings, 'duta', '6281234567890', nextWeek)).toMatchObject({ tiktok: 0, reels: 0, met: false })
     invalidate()
-    expect(await programSummary('duta')).toMatchObject({ min: 2, active: 2, met: 1, linksThisWeek: 3 })
-    expect(summarize(all, settings, 'pelatihan')).toMatchObject({ active: 1, linksThisWeek: 1 })
-    // Recap lists only people registered as participants.
+    expect(await programSummary('duta')).toMatchObject({ mode: 'weekly', target: { tiktok: 2, reels: 1 }, active: 2, met: 1, links: 5 })
+    expect(summarize(all, settings, 'pelatihan')).toMatchObject({ mode: 'draw', active: 1, met: 0 })
     const { ensureParticipant } = await import('@/lib/participant-service')
     await ensureParticipant('Rina Utami', '081234567890')
     await ensureParticipant('Budi', '081298765432')
     await ensureParticipant('Sari', '081311112222')
-    const recap = await weeklyRecap('duta')
-    expect(recap.rows.map((r) => [r.name, r.sent, r.met])).toEqual([['Budi', 1, false], ['Rina Utami', 2, true]])
-    expect((await weeklyRecap('duta', true)).rows[0].name).toBe('Sari')
+    const r = await recap('duta')
+    expect(r.rows.map((x) => [x.name, x.tiktok, x.reels, x.met])).toEqual([['Budi', 2, 0, false], ['Rina Utami', 2, 1, true]])
+    expect((await recap('duta', true)).rows[0].name).toBe('Sari')
+  })
+
+  it('Pelatihan: approved 5 TikTok + 5 Reels → on the spin wheel; draw, history, delete, reset', async () => {
+    const s = await getSettingsFresh()
+    await saveSettings({ ...s, pelatihan_need_tiktok: 2, pelatihan_need_reels: 1 })
+    const { ensureParticipant } = await import('@/lib/participant-service')
+    for (const [wa, name] of [['081234567890', 'Rina Utami'], ['081298765432', 'Budi Santoso']]) {
+      await ensureParticipant(name, wa)
+      await createBatch([link('pelatihan', wa, name), link('pelatihan', wa, name), link('pelatihan', wa, name, 'reels')])
+    }
+    // Waiting links do not count yet.
+    expect((await wheel('pelatihan')).entries).toHaveLength(0)
+    expect((await draw('pelatihan', '', 'o'))).toEqual({ error: expect.stringContaining('Belum ada') })
+    const all = await listSubmissionsFresh()
+    await review(all.map((x) => x.id), 'approve', '', 'o')
+    invalidate()
+    const w = await wheel('pelatihan')
+    expect(w.entries.map((e) => e.name).sort()).toEqual(['Budi Santoso', 'Rina Utami'])
+
+    const first = await draw('pelatihan', 'Voucher', 'owner@x')
+    if ('error' in first) throw new Error(first.error)
+    expect(first.entries).toHaveLength(2)
+    expect(first.spin).toMatchObject({ prize: 'Voucher', entries: 2, drawn_by: 'owner@x' })
+    // The winner leaves the wheel for this round.
+    const after = await wheel('pelatihan')
+    expect(after.entries.map((e) => e.name)).toEqual(w.entries.map((e) => e.name).filter((x) => x !== first.spin.name))
+    expect(after.history).toHaveLength(1)
+    expect((await publicWinners('pelatihan'))[0]).toMatchObject({ prize: 'Voucher', name: expect.stringMatching(/^(Rina U\.|Budi S\.)$/) })
+
+    // Deleting the history puts the winner back on the wheel.
+    expect(await deleteSpins([first.spin.id], 'owner@x')).toBe(1)
+    expect((await wheel('pelatihan')).entries).toHaveLength(2)
+    expect(await publicWinners('pelatihan')).toHaveLength(0)
+
+    // Reset: a new round, everyone collects again from zero.
+    await draw('pelatihan', '', 'owner@x')
+    await resetRound('owner@x')
+    invalidate()
+    const fresh = await wheel('pelatihan')
+    expect(fresh.round).not.toBe('')
+    expect(fresh.entries).toHaveLength(0)
+    expect(fresh.history).toHaveLength(1) // history kept
+    const [subs, settings] = await Promise.all([listSubmissionsFresh(), getSettingsFresh()])
+    expect(progressFor(subs, settings, 'pelatihan', '6281234567890')).toMatchObject({ tiktok: 0, reels: 0, met: false })
   })
 
   it('MyTopstar sign-in creates a participant once and links an existing WhatsApp account', async () => {

@@ -16,6 +16,11 @@ export async function cached<T>(key: string, load: () => Promise<T>, ttl = CACHE
   return value
 }
 
+/** Stores a value we already know (e.g. right after writing it) so the next read skips the sheet. */
+export function prime<T>(key: string, value: T, ttl = CACHE_TTL_MS) {
+  store.set(key, { value, expires: Date.now() + ttl })
+}
+
 export function invalidate(prefix = '') {
   for (const k of Array.from(store.keys())) if (k.startsWith(prefix)) store.delete(k)
 }

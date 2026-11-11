@@ -107,3 +107,38 @@ describe('review speed', () => {
     expect(JSON.parse(last[5])).toMatchObject({ status: 'rejected', reject_reason: 'Bukan dari FYP' })
   })
 })
+
+describe('admin writes', () => {
+  it('adding an admin and saving settings each write in 1 request (row + audit together)', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore, getStore } = await import('@/lib/repo')
+    const { createAdmin } = await import('@/lib/account-service')
+    const { getSettingsFresh, saveSettings, getSettings } = await import('@/lib/repo/settings')
+    const { listAdmins } = await import('@/lib/repo/admins')
+    const sim = createAppsScriptSim(SECRET)
+    setStore(new AppsScriptStore('https://sim', SECRET, sim.poster))
+    invalidate()
+    await Promise.all([getSettingsFresh(), listAdmins()])
+    const calls: string[] = []
+    setStore(new AppsScriptStore('https://sim', SECRET, async (u, body) => {
+      calls.push((JSON.parse(body).ops as { action: string }[]).map((o) => o.action).join('+'))
+      return sim.poster(u, body)
+    }))
+    await Promise.all([getSettingsFresh(), listAdmins(), getStore().ensureSchema()]) // warmed server, page loaded
+    calls.length = 0
+
+    const r = await createAdmin({ email: 'baru@x.id', role: 'owner', password: 'sandi-panjang-123' }, 'owner@x')
+    expect(r).toEqual({ admins: [{ email: 'baru@x.id', role: 'owner', active: true }] })
+    expect(calls).toEqual(['append+append'])
+
+    calls.length = 0
+    const s = await getSettingsFresh()
+    calls.length = 0
+    await saveSettings({ ...s, duta_week_tiktok: 7 }, { actor: 'owner@x' })
+    expect(calls).toEqual(['update+append'])
+    expect((await getSettings()).duta_week_tiktok).toBe(7) // primed, no re-read
+    expect(calls).toHaveLength(1)
+    const log = await getStore().read('audit_log')
+    expect(log.rows.map((x) => x[2])).toEqual(['admin.create', 'settings.update'])
+  })
+})

@@ -1,8 +1,8 @@
-import { cached, invalidate } from '../cache'
+import { cached, invalidate, prime } from '../cache'
 import { parseSettings, SEED_SETTINGS, serializeSettings, SETTING_KEYS } from '../settings-schema'
 import type { Settings } from '../types'
 import { getStore } from './index'
-import { rowToRecord } from './store'
+import { auditOp, rowToRecord, writeAll } from './store'
 
 async function readRaw() {
   const store = getStore()
@@ -39,7 +39,7 @@ export function getSettings(): Promise<Settings> {
   return cached('settings', getSettingsFresh)
 }
 
-export async function saveSettings(next: Settings): Promise<{ before: Record<string, string>; after: Record<string, string> }> {
+export async function saveSettings(next: Settings, audit?: { actor: string }): Promise<{ before: Record<string, string>; after: Record<string, string> }> {
   const { map, index } = await readRaw()
   const after = serializeSettings(next)
   const before: Record<string, string> = {}
@@ -52,11 +52,15 @@ export async function saveSettings(next: Settings): Promise<{ before: Record<str
     if (i === undefined) appends.push([key, after[key]])
     else updates.push({ index: i, row: [key, after[key]] })
   }
-  const store = getStore()
-  await store.update('settings', updates)
-  if (appends.length) await store.append('settings', appends)
-  invalidate()
   const changed: Record<string, string> = {}
   for (const k of Object.keys(before)) changed[k] = after[k as keyof typeof after]
+  // Settings rows and their audit entry go to the spreadsheet in one request.
+  await writeAll(getStore(), [
+    { action: 'update', table: 'settings', updates },
+    { action: 'append', table: 'settings', rows: appends },
+    ...(audit && Object.keys(changed).length ? [auditOp(audit.actor, 'settings.update', 'settings', before, changed)] : []),
+  ])
+  invalidate()
+  prime('settings', parseSettings(new Map([...Array.from(map.entries()), ...Object.entries(after)])))
   return { before, after: changed }
 }

@@ -15,7 +15,7 @@ export default async function ProgramAdminPage({ params }: { params: { program: 
   return (
     <AdminShell session={session}>
       <h1 className="mb-4 text-2xl font-extrabold">{PROGRAM_INFO[program].label}</h1>
-      <ProgramReview key={program} program={program} />
+      <ProgramReview key={program} program={program} canManage={session.role === 'owner'} />
     </AdminShell>
   )
 }

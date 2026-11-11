@@ -1,4 +1,4 @@
-import type { ApiKey, Participant } from '../types'
+import type { ApiKey, Participant, Spin } from '../types'
 import { recordTable } from './records'
 
 const bool = (v: string) => v.trim().toUpperCase() === 'TRUE'
@@ -15,6 +15,24 @@ export const participantsTable = recordTable<Participant>(
     sso_sub: r.sso_sub ?? '',
   }),
   (p) => ({ ...p }),
+)
+
+export const spinsTable = recordTable<Spin>(
+  'spins',
+  (r) => ({
+    id: r.id,
+    created_at: r.created_at ?? '',
+    program: r.program === 'duta' ? 'duta' : 'pelatihan',
+    round_start: r.round_start ?? '',
+    participant_id: r.participant_id ?? '',
+    name: r.name ?? '',
+    whatsapp: r.whatsapp ?? '',
+    prize: r.prize ?? '',
+    entries: Number(r.entries) || 0,
+    drawn_by: r.drawn_by ?? '',
+    deleted: bool(r.deleted ?? ''),
+  }),
+  (s) => ({ ...s }),
 )
 
 export const apiKeysTable = recordTable<ApiKey>(

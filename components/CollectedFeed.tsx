@@ -17,7 +17,7 @@ function Card({ item, playing, onPlay }: { item: CollectedItem; playing: boolean
         <span className="muted ml-auto text-xs">{formatDate(item.created_at)}</span>
       </div>
       <p className="mt-2 font-extrabold">{item.name}</p>
-      <p className="text-sm tabular-nums">{metricsText(item.likes, item.comments)}</p>
+      {(item.likes > 0 || item.comments > 0) && <p className="text-sm tabular-nums">{metricsText(item.likes, item.comments)}</p>}
       <p className="muted truncate text-xs">{item.source_url.replace('https://www.', '')}</p>
       {playing && embed && (
         <iframe

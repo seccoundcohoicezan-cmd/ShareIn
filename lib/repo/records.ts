@@ -1,6 +1,6 @@
 import { invalidate } from '../cache'
 import { getStore } from './index'
-import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell, type TableName } from './store'
+import { appendThenRead, recordToRow, rowToRecord, writeHeader, type Cell, type TableName, type WriteOp } from './store'
 
 export type Stored<T> = T & { _index: number }
 
@@ -37,6 +37,15 @@ export function recordTable<T extends { id: string }>(
       invalidate(table)
       header = data.header
       return data.rows.map((r, i) => ({ ...from(rowToRecord(data.header, r)), _index: i })).filter((x) => x.id)
+    },
+    /** Write operations for batching with other writes (e.g. the audit row) via writeAll. */
+    async appendOp(items: T[]): Promise<WriteOp> {
+      const h = await head()
+      return { action: 'append', table, rows: items.map((v) => recordToRow(h, to(v))) }
+    },
+    async updateOp(items: Stored<T>[]): Promise<WriteOp> {
+      const h = await head()
+      return { action: 'update', table, updates: items.map((v) => ({ index: v._index, row: recordToRow(h, to(v)) })) }
     },
     async update(items: Stored<T>[]) {
       const h = await head()
