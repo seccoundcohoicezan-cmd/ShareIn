@@ -25,6 +25,7 @@ export const SETTING_KEYS = [
   'duta_week_tiktok',
   'duta_week_reels',
   'spin_overrides',
+  'feed_show_links',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -55,6 +56,7 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   duta_week_tiktok: '10',
   duta_week_reels: '10',
   spin_overrides: '',
+  feed_show_links: 'FALSE',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -99,6 +101,7 @@ export function parseSettings(raw: Map<string, string>): Settings {
     duta_week_tiktok: Math.min(toInt(get('duta_week_tiktok'), 10), 100),
     duta_week_reels: Math.min(toInt(get('duta_week_reels'), 10), 100),
     spin_overrides: parseOverrides(get('spin_overrides')),
+    feed_show_links: toBool(get('feed_show_links')),
   }
 }
 
@@ -142,6 +145,7 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     pelatihan_round_start: s.pelatihan_round_start,
     duta_week_tiktok: String(s.duta_week_tiktok),
     duta_week_reels: String(s.duta_week_reels),
+    feed_show_links: s.feed_show_links ? 'TRUE' : 'FALSE',
     spin_overrides: Object.entries(s.spin_overrides).map(([wa, on]) => `${wa}:${on ? 1 : 0}`).join(','),
   }
 }

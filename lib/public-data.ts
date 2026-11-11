@@ -5,7 +5,7 @@ import type { Channel, Program, Settings } from './types'
 import { programSummary, summarize, type ProgramSummary } from './progress'
 import { publicWinners, type PublicWinner } from './spin'
 
-const EMPTY_FEED: CollectedFeed = { total: 0, tiktok: 0, reels: 0, items: [] }
+const EMPTY_FEED: CollectedFeed = { total: 0, tiktok: 0, reels: 0, hidden: true, items: [] }
 
 /** Public pages must render even when the database is unreachable (e.g. at build time). */
 export async function loadPublic(program: Channel = 'golden'): Promise<{ settings: Settings; feed: CollectedFeed }> {

@@ -128,6 +128,12 @@ describe.each([
     const c = await createSubmission(input({ submitter_name: 'Citra', platform: 'reels', source_url: 'https://www.instagram.com/reel/DeDMIOTB2WD/', comments: 3000 }))
     if (!a.ok || !b.ok || !c.ok) throw new Error('expected ok')
     await review([b.submission.id], 'reject', 'Bukan dari FYP', 'admin@x.id')
+    // Default: counts only, no link leaves the server.
+    const quiet = await collectedFeed()
+    expect(quiet).toMatchObject({ total: 2, tiktok: 1, reels: 1, hidden: true, items: [] })
+    expect(JSON.stringify(quiet)).not.toContain('tiktok.com')
+    const { saveSettings, getSettingsFresh } = await import('@/lib/repo/settings')
+    await saveSettings({ ...(await getSettingsFresh()), feed_show_links: true })
     const feed = await collectedFeed()
     expect(feed).toMatchObject({ total: 2, tiktok: 1, reels: 1 })
     expect(feed.items.map((i) => i.name).sort()).toEqual(['Citra', 'Rina U.'])
@@ -174,7 +180,7 @@ describe('sheets store details', () => {
     expect(s.min_like_tiktok).toBe(100000)
     expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'api_keys', 'audit_log', 'participants', 'settings', 'spins', 'submissions'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
-    expect(fake.tabs.get('settings')!.length).toBe(1 + 24)
+    expect(fake.tabs.get('settings')!.length).toBe(1 + 25)
     const header = fake.tabs.get('submissions')![0] as string[]
     expect(header.slice(0, 3)).toEqual(['status', 'id', 'custom_note'])
     expect(header).toContain('source_key')

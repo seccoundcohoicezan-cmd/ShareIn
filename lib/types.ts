@@ -34,6 +34,8 @@ export interface Settings {
   duta_week_reels: number
   /** Admin choices for the spin wheel by WhatsApp: true = always on the wheel, false = never. */
   spin_overrides: Record<string, boolean>
+  /** Public "Link terkumpul": show each link (with player) or only the counts. */
+  feed_show_links: boolean
 }
 
 export interface Participant {

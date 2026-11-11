@@ -235,6 +235,8 @@ export interface CollectedFeed {
   total: number
   tiktok: number
   reels: number
+  /** Admin chose to show only the counts: no links leave the server. */
+  hidden: boolean
   items: CollectedItem[]
 }
 
@@ -243,13 +245,16 @@ export interface CollectedFeed {
 export const FEED_PAGE = 6
 
 export async function collectedFeed(offset = 0, limit = FEED_PAGE, program: Channel = 'golden'): Promise<CollectedFeed> {
-  const all = (await listSubmissionsCached()).filter((s) => s.program === program && isCollected(s))
+  const [settings, subs] = await Promise.all([getSettings(), listSubmissionsCached()])
+  const all = subs.filter((s) => s.program === program && isCollected(s))
   const sorted = [...all].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))
+  const hidden = !settings.feed_show_links
   return {
     total: sorted.length,
     tiktok: sorted.filter((s) => s.platform === 'tiktok').length,
     reels: sorted.filter((s) => s.platform === 'reels').length,
-    items: sorted.slice(offset, offset + limit).map((s) => ({
+    hidden,
+    items: (hidden ? [] : sorted.slice(offset, offset + limit)).map((s) => ({
       id: s.id,
       created_at: s.created_at,
       platform: s.platform,

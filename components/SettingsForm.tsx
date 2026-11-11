@@ -129,6 +129,17 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <Toggle id="auto_approve_duta" label="Duta Teladan" checked={s.auto_approve_duta} onChange={(v) => setS({ ...s, auto_approve_duta: v })} />
       </section>
 
+      <section className="panel-solid space-y-4">
+        <h2 className="font-extrabold">Link terkumpul di halaman publik</h2>
+        <Toggle
+          id="feed_show_links"
+          label="Tampilkan daftar link (dengan pratinjau)"
+          hint="Mati: pengunjung hanya melihat jumlah link (total, TikTok, Reels). Berlaku untuk Golden Ticket, Pelatihan, dan Duta."
+          checked={s.feed_show_links}
+          onChange={(v) => setS({ ...s, feed_show_links: v })}
+        />
+      </section>
+
       <section className="panel-solid">
         <h2 className="mb-1 font-extrabold">Hadiah berjalan Golden Ticket</h2>
         <p className="muted mb-4 text-sm">Angka di halaman Golden Ticket naik sedikit demi sedikit dari nilai awal ke nilai akhir di antara dua tanggal (WIB).</p>

@@ -5,6 +5,7 @@ import { formatDate, formatNumber, metricsText } from '@/lib/format'
 import type { CollectedFeed as Feed, CollectedItem } from '@/lib/service'
 import type { Channel } from '@/lib/types'
 import { ExternalIcon } from './icons'
+import { CountUp } from './ProgressVisuals'
 import { PillLabel, PlatformTag } from './ui'
 
 function Card({ item, playing, onPlay }: { item: CollectedItem; playing: boolean; onPlay: () => void }) {
@@ -66,8 +67,24 @@ export function CollectedFeed({ initial, program = 'golden' }: { initial: Feed; 
   return (
     <section className="panel" aria-labelledby="terkumpul">
       <PillLabel id="terkumpul">Link terkumpul</PillLabel>
-      <p className="mt-3 text-sm"><b className="text-2xl font-extrabold tabular-nums text-brand-purple">{formatNumber(feed.total)}</b> link · {formatNumber(feed.tiktok)} TikTok · {formatNumber(feed.reels)} Reels</p>
-      {feed.items.length === 0 ? (
+      {feed.hidden ? (
+        // Admin setting: counts only, no link previews.
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          {[
+            ['Total link', feed.total],
+            ['TikTok', feed.tiktok],
+            ['Reels', feed.reels],
+          ].map(([k, v]) => (
+            <div key={k} className="rounded-field bg-white p-3">
+              <p className="text-2xl font-extrabold tabular-nums text-brand-purple"><CountUp value={Number(v)} /></p>
+              <p className="muted text-xs font-bold">{k}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm"><b className="text-2xl font-extrabold tabular-nums text-brand-purple">{formatNumber(feed.total)}</b> link · {formatNumber(feed.tiktok)} TikTok · {formatNumber(feed.reels)} Reels</p>
+      )}
+      {feed.hidden ? null : feed.items.length === 0 ? (
         <p className="muted mt-3 text-sm">Belum ada link terkumpul. Jadilah yang pertama mengirim.</p>
       ) : (
         <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Daftar link terkumpul">
@@ -75,7 +92,7 @@ export function CollectedFeed({ initial, program = 'golden' }: { initial: Feed; 
         </ul>
       )}
       {error && <p role="alert" className="mt-2 text-sm font-bold text-bad">{error}</p>}
-      {feed.items.length < feed.total && (
+      {!feed.hidden && feed.items.length < feed.total && (
         <button type="button" className="btn-ghost mt-3 w-full" onClick={more} disabled={busy}>{busy ? 'Memuat…' : 'Muat lagi'}</button>
       )}
     </section>

@@ -36,7 +36,10 @@ test('golden ticket: tanpa target, link terkumpul, ketentuan, latar ringan', asy
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Golden Ticket')
   await expect(page.getByText('Target periode ini')).toHaveCount(0)
   await expect(page.getByRole('progressbar')).toHaveCount(0)
-  await expect(page.getByText('Belum ada link terkumpul.')).toBeVisible()
+  // Default: only the counts, no link list.
+  const counts = page.locator('section', { hasText: 'Link terkumpul' })
+  await expect(counts).toContainText('Total link')
+  await expect(counts.getByRole('listitem')).toHaveCount(0)
   await expect(page.getByText('≥ 100 rb like · ≥ 5 rb komentar')).toBeVisible()
   // 1 layer + 3 blobs + 6 brand assets, all animated with transform only.
   const layers = await page.evaluate(() => document.getElementById('bg')!.children.length)
@@ -152,6 +155,14 @@ test('lupa centang pernyataan: pesan jelas, tidak terkirim', async ({ page }) =>
 test('admin: login; link terkumpul tampil publik tanpa nomor WA, bisa diputar di halaman', async ({ page }) => {
   await login(page)
   await shot(page, '06-admin-dasbor')
+  await page.goto('/goldenticket')
+  await expect(page.locator('section', { hasText: 'Link terkumpul' }).getByRole('button', { name: 'Putar di sini' })).toHaveCount(0)
+  // The admin chooses to show the link list.
+  await page.goto('/admin/pengaturan')
+  const sw = page.getByRole('switch', { name: 'Tampilkan daftar link (dengan pratinjau)' })
+  if ((await sw.getAttribute('aria-checked')) !== 'true') await sw.click()
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click()
+  await expect(page.getByText('Tersimpan')).toBeVisible()
   await expect
     .poll(async () => {
       await page.goto('/goldenticket')

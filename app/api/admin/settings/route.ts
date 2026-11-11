@@ -33,6 +33,7 @@ const schema = z.object({
   pelatihan_need_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
   pelatihan_need_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
   duta_week_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
+  feed_show_links: z.boolean(),
   duta_week_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
 }).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
   message: 'Tanggal akhir hadiah harus setelah tanggal mulai.',
