@@ -81,7 +81,8 @@ test('golden ticket: hadiah berjalan mulai Rp2 jt dan terus naik', async ({ page
   await page.clock.runFor(10_000)
   await expect.poll(read).toBeGreaterThan(a)
   expect(await read()).toBeLessThan(5_000_000)
-  await expect(page.getByText(/hingga Rp5\.000\.000 pada 5 Desember/)).toBeVisible()
+  await expect(page.getByText('Terus bertambah sampai 5 Desember')).toBeVisible()
+  await expect(page.getByText(/5\.000\.000/)).toHaveCount(0)
   await shot(page, '12-goldenticket-hadiah')
 })
 

@@ -26,7 +26,7 @@ export function GoldenCounter({ pool, size = 'lg' }: { pool: GoldenPool; size?: 
         {formatRupiah(value)}
       </p>
       <p className={`mt-1 font-bold ${size === 'lg' ? 'text-sm' : 'text-xs'} opacity-80`}>
-        Terus bertambah hingga {formatRupiah(pool.golden_pool_end)} pada {endFmt.format(new Date(pool.golden_end_at))}
+        Terus bertambah sampai {endFmt.format(new Date(pool.golden_end_at))}
       </p>
     </div>
   )
