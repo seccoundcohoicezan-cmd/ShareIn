@@ -119,6 +119,8 @@ test('pelatihan: kumpulkan TikTok + Reels → masuk spin wheel; undi, riwayat, h
   await peserta.getByRole('link', { name: /Kirim link konten/ }).click()
   await expect(peserta).toHaveURL(/\/pelatihancontent\/setor$/)
   await expect(peserta.getByText('Kumpulkan 1 link TikTok & 1 link Instagram Reels dan ikuti undian berhadiah.')).toBeVisible()
+  // The pro & kontra topic guide belongs to Golden Ticket only.
+  await expect(peserta.getByText('Cari konten yang memicu pro & kontra')).toHaveCount(0)
   await peserta.getByLabel('Nama penyetor').fill('Pelita Sari')
   await peserta.getByLabel('Nomor WhatsApp').fill('0813 4444 5555')
   await kirimLink(peserta, ['https://www.tiktok.com/@pelita/video/7400000000000055501', 'https://www.instagram.com/reel/PelitaReel1/'])
@@ -202,6 +204,7 @@ test('duta teladan: masuk lewat MyTopstar langsung ke form kirim link, program b
   await duta.getByRole('link', { name: 'Allow' }).click()
   await expect(duta).toHaveURL(/\/dutateladan\/setor$/)
   await expect(duta.getByText('Masuk sebagai Dewi Duta · 6281••••234')).toBeVisible()
+  await expect(duta.getByText('Cari konten yang memicu pro & kontra')).toHaveCount(0)
   await shot(duta, '16-duta-sso-masuk')
   await kirimLink(duta, ['https://www.tiktok.com/@dewi/video/7400000000000066601', 'https://www.instagram.com/reel/DutaReel01/'])
   await expect(duta.getByRole('heading', { name: '2 setoran terkirim' })).toBeVisible()

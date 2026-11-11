@@ -8,9 +8,9 @@ import { loadPublic } from '@/lib/public-data'
 export const revalidate = 60
 
 const SUBLINKS = [
-  { href: '/goldenticket', title: 'Golden Ticket', desc: 'Hadiah berjalan, target, dan ketentuan setor konten viral' },
-  { href: '/pelatihancontent', title: 'Pelatihan Content', desc: 'Kerjakan tugas, kumpulkan bukti, dapat kode' },
-  { href: '/dutateladan', title: 'Duta Teladan', desc: 'Tugas wajib setiap Duta Teladan' },
+  { href: '/goldenticket', title: 'Golden Ticket', desc: 'Hadiah berjalan dan ketentuan setor konten viral pro & kontra' },
+  { href: '/pelatihancontent', title: 'Pelatihan Content', desc: 'Kumpulkan link TikTok & Reels, ikuti undian spin wheel' },
+  { href: '/dutateladan', title: 'Duta Teladan', desc: 'Target konten mingguan setiap Duta Teladan' },
   { href: '/pantau', title: 'Pantau setoran', desc: 'Lihat status disetujui/ditolak dengan link unikmu' },
   { href: '/#tutorial', title: 'Tutorial & panduan', desc: 'Cara kerja Sharein dan cara menyalin link' },
 ]
@@ -35,11 +35,16 @@ export default async function AturanPage() {
       <Panel aria-labelledby="program-kode">
         <PillLabel id="program-kode">Pelatihan Content & Duta Teladan</PillLabel>
         <ol className="mt-4 list-decimal space-y-2 pl-5">
-          <li>Setiap tugas yang dikumpulkan memberi satu kode unik (PC-… untuk Pelatihan, DT-… untuk Duta Teladan).</li>
-          <li>Satu tugas hanya bisa dikumpulkan sekali per nomor WhatsApp.</li>
-          <li>Status tugas (menunggu, disetujui, ditolak) bisa dipantau lewat link pantau unikmu.</li>
-          <li>Tugas Duta Teladan bersifat wajib bagi setiap Duta Teladan.</li>
-          <li>Program ini tidak berhadiah. Hadiah hanya ada di program Golden Ticket.</li>
+          <li>Kirim link konten TikTok dan Instagram Reels lewat form program masing-masing, sampai 10 link sekali kirim. Tidak ada syarat topik pro &amp; kontra.</li>
+          <li>
+            Pelatihan Content: kumpulkan {settings.pelatihan_need_tiktok} link TikTok &amp; {settings.pelatihan_need_reels} link Reels yang disetujui untuk masuk undian spin wheel
+            berhadiah. Pemenang diumumkan di halaman Pelatihan.
+          </li>
+          <li>
+            Duta Teladan: wajib {settings.duta_week_tiktok} konten TikTok &amp; {settings.duta_week_reels} konten Reels setiap minggu (Senin 00.00 – Minggu 23.59 WIB), hitungan mulai
+            lagi setiap Senin.
+          </li>
+          <li>Satu link hanya bisa dikirim sekali di program yang sama. Status (menunggu, disetujui, ditolak) bisa dipantau lewat link pantau unikmu.</li>
         </ol>
       </Panel>
 

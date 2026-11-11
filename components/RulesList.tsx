@@ -8,12 +8,13 @@ function short(n: number) {
   return formatNumber(n)
 }
 
-export function RulesList({ settings }: { settings: Settings }) {
+/** `proKontra` only for Golden Ticket: Pelatihan and Duta have no topic requirement. */
+export function RulesList({ settings, proKontra = true }: { settings: Settings; proKontra?: boolean }) {
   const items = [
     { k: 'TikTok', v: `≥ ${short(settings.min_like_tiktok)} like · ≥ ${short(settings.min_comment_tiktok)} komentar` },
     { k: 'Reels', v: `≥ ${short(settings.min_like_reels)} like · ≥ ${short(settings.min_comment_reels)} komentar` },
     { k: 'Organik', v: 'Muncul sendiri di FYP TikTok / Beranda Reels kamu' },
-    { k: 'Pro & kontra', v: 'Konten yang memancing debat sehat di kolom komentar' },
+    ...(proKontra ? [{ k: 'Pro & kontra', v: 'Konten yang memancing debat sehat di kolom komentar' }] : []),
     { k: 'Cukup tempel link', v: 'Buka link-nya dan pastikan angkanya memenuhi, lalu setor' },
   ]
   return (

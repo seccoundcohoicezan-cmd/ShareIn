@@ -148,7 +148,7 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
 
       <Panel aria-labelledby="ketentuan">
         <PillLabel id="ketentuan">Ketentuan</PillLabel>
-        <RulesList settings={settings} />
+        <RulesList settings={settings} proKontra={false} />
       </Panel>
     </div>
   )

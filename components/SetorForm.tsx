@@ -505,7 +505,7 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
             </div>
           ))}
         </div>
-        <ProKontra />
+        {golden && <ProKontra />}
       </section>
 
       {items.map((it, i) => (

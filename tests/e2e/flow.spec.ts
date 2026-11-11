@@ -21,6 +21,7 @@ let rinaToken = ''
 
 async function fillForm(page: Page, o: { name: string; url: string }) {
   await page.goto('/goldenticket/setor')
+  await expect(page.getByText('Cari konten yang memicu pro & kontra')).toBeVisible()
   await page.getByLabel('Nama penyetor').fill(o.name)
   await page.getByLabel('Nomor WhatsApp').fill(waFor(o.name))
   await page.getByLabel('Link konten').fill(o.url)
