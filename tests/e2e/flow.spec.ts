@@ -64,7 +64,8 @@ test('setor: cukup tempel link (tanpa angka & tanpa link Sharein), syarat minima
   await expect(syarat).toContainText('Komentar min. 3.000')
   await expect(syarat).toContainText('Bumi itu bulat atau datar?')
   await expect(page.getByText('Link valid · TikTok')).toBeVisible()
-  await expect(page.getByText(/Syarat TikTok: minimal 100\.000 like dan 5\.000 komentar/)).toBeVisible()
+  // The minimums are shown once in the Syarat konten box, not repeated on each link card.
+  await expect(page.getByText(/Syarat TikTok: minimal/)).toHaveCount(0)
   await shot(page, '02-setor-sederhana')
   // One button: check + send in one step, enabled as soon as the link is valid.
   await expect(page.getByRole('button', { name: 'Cek setoran' })).toHaveCount(0)
@@ -113,7 +114,6 @@ test('link bukan TikTok/Reels merah, tidak ada kolom link Sharein', async ({ pag
 test('reels: platform terdeteksi otomatis, syarat Reels 3.000 komentar tampil', async ({ page }) => {
   await fillForm(page, { name: 'Dewi', url: 'https://www.instagram.com/reel/C9zYxW8vUtS/?igsh=abc' })
   await expect(page.getByText('Link valid · Instagram Reels')).toBeVisible()
-  await expect(page.getByText(/Syarat Instagram Reels: minimal 100\.000 like dan 3\.000 komentar/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Kirim setoran' })).toBeEnabled()
 })
 

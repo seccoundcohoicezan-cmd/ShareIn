@@ -100,10 +100,6 @@ export function ProgressMe({ program, setorHref }: { program: Program; setorHref
             {p.met ? (draw ? 'Kamu sudah masuk undian spin wheel. Semoga beruntung!' : 'Target minggu ini tercapai. Mantap!') : targetLeft(p)}
           </p>
           {p.pending > 0 && <p className="text-xs opacity-70">{p.pending} link menunggu review admin{draw ? ', dihitung setelah disetujui' : ''}.</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href={setorHref} className="btn-primary btn-sm lift">+ Kirim link</Link>
-            <Link href={`/pantau/${s.user.token}`} className="btn-ghost btn-sm lift">Halaman pantau</Link>
-          </div>
         </div>
       ) : (
         <div className="rounded-field bg-white p-4 text-sm">

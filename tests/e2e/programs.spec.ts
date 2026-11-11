@@ -62,8 +62,11 @@ test('aturan: tanpa tombol setor, ada daftar sublink program', async ({ page }) 
   await shot(page, '19-aturan-sublink')
 })
 
-test('latar: aset ikut bergeser saat scroll', async ({ page }) => {
+test('latar: aset ikut bergeser saat scroll di layar lebar, disembunyikan di HP agar ringan', async ({ page }) => {
   await page.setViewportSize({ width: 412, height: 700 })
+  await page.goto('/aturan')
+  await expect(page.locator('.a-gift')).toBeHidden()
+  await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/aturan')
   const pos = () => page.locator('.a-gift').evaluate((el) => el.getBoundingClientRect().top)
   const before = await pos()

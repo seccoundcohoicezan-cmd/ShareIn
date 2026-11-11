@@ -102,19 +102,16 @@ function linkState(url: string) {
 }
 
 function ContentCard({
-  item, index, total, rules, result, onChange, onRemove,
+  item, index, total, result, onChange, onRemove,
 }: {
   item: Item
   index: number
   total: number
-  rules: Rules | null
   result: ItemResult | null
   onChange: (patch: Partial<Item>) => void
   onRemove: () => void
 }) {
   const link = linkState(item.url)
-  const platform: Platform = detectPlatform(item.url) ?? 'tiktok'
-  const rule = rules?.rules[platform]
   const id = (n: string) => `${n}-${item.key}`
   const failed = result?.checks.filter((c) => !c.pass && !GLOBAL_CHECKS.includes(c.id)) ?? []
   // A wrong link also fails the duplicate check; one message is enough.
@@ -152,7 +149,8 @@ function ContentCard({
           </button>
         </div>
         <div id={id('link-status')} aria-live="polite">
-          {link.state === 'empty' && (
+          {/* The hint is shown once, on the first card, not repeated on every card. */}
+          {link.state === 'empty' && index === 0 && (
             <>
               <Status ok={null}>Wajib dari tiktok.com atau instagram.com/reel/.</Status>
               <a href="/#panduan" className="inline-flex min-h-[44px] items-center text-sm font-bold text-brand-purple underline underline-offset-2">Lihat panduan bergambar</a>
@@ -168,12 +166,6 @@ function ContentCard({
           </a>
         )}
       </div>
-
-      {(link.state === 'ok' || link.state === 'short') && rule && (
-        <p className="rounded-field bg-brand-lavender px-3 py-2 text-sm">
-          Syarat {PLATFORM_LABEL[link.parsed.platform]}: minimal <b>{formatNumber(rule.min_like)} like</b> dan <b>{formatNumber(rule.min_comment)} komentar</b>. Pastikan angkanya sudah memenuhi sebelum menyetor.
-        </p>
-      )}
 
       {result && (
         failed.length === 0 ? (
@@ -514,7 +506,6 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
           item={it}
           index={i}
           total={items.length}
-          rules={rules}
           result={fresh ? results![i] : null}
           onChange={(p) => update(it.key, p)}
           onRemove={() => setItems((xs) => xs.filter((x) => x.key !== it.key))}

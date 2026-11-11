@@ -9,7 +9,6 @@ export default function Page() {
     <ProgramPage
       program="pelatihan"
       pill="Undian berhadiah"
-      intro="Kirim link konten TikTok dan Instagram Reels seperti di Golden Ticket. Lengkapi targetnya, lalu ikuti undian spin wheel berhadiah."
     />
   )
 }

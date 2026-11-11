@@ -1,6 +1,6 @@
 import 'server-only'
 import { parseSettings } from './settings-schema'
-import { collectedFeed, getProgress, type CollectedFeed } from './service'
+import { collectedFeed, FEED_PAGE, getProgress, type CollectedFeed } from './service'
 import type { Channel, Program, Settings } from './types'
 import { programSummary, summarize, type ProgramSummary } from './progress'
 import { publicWinners, type PublicWinner } from './spin'
@@ -10,7 +10,7 @@ const EMPTY_FEED: CollectedFeed = { total: 0, tiktok: 0, reels: 0, items: [] }
 /** Public pages must render even when the database is unreachable (e.g. at build time). */
 export async function loadPublic(program: Channel = 'golden'): Promise<{ settings: Settings; feed: CollectedFeed }> {
   try {
-    const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed(0, 12, program)])
+    const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed(0, FEED_PAGE, program)])
     return { settings, feed }
   } catch (e) {
     console.error('public data unavailable', (e as Error).message)

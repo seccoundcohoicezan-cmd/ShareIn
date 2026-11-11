@@ -189,7 +189,8 @@ export function PantauLive({ token }: { token: string }) {
         </section>
       ))}
 
-      <a href={`${CHANNEL_INFO[data.items[0]?.program ?? 'golden'].path}/setor`} className="btn-secondary w-full text-lg">+ Setor konten lagi</a>
+      {/* The program cards above already carry their own "Kirim link" button. */}
+      {(data.progress ?? []).length === 0 && <a href={`${CHANNEL_INFO[data.items[0]?.program ?? 'golden'].path}/setor`} className="btn-secondary w-full text-lg">+ Setor konten lagi</a>}
       {data.isMe && <p className="muted -mt-2 text-center text-xs">Kamu sudah masuk, jadi tidak perlu isi nama dan WhatsApp lagi.</p>}
 
       <div role="tablist" aria-label="Saring status" className="grid grid-cols-4 gap-1 rounded-field bg-white p-1">

@@ -238,7 +238,10 @@ export interface CollectedFeed {
 }
 
 /** Public list of a program's collected links, newest first. Names are shortened; WhatsApp numbers never leave the server. */
-export async function collectedFeed(offset = 0, limit = 12, program: Channel = 'golden'): Promise<CollectedFeed> {
+// Small pages keep phones light: players and cards only load as people scroll and ask for more.
+export const FEED_PAGE = 6
+
+export async function collectedFeed(offset = 0, limit = FEED_PAGE, program: Channel = 'golden'): Promise<CollectedFeed> {
   const all = (await listSubmissionsCached()).filter((s) => s.program === program && isCollected(s))
   const sorted = [...all].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))
   return {

@@ -133,8 +133,10 @@ body {
 .a-link { --w: clamp(56px, 13vmin, 110px); top: 112vh; left: max(-10px, calc(50vw - 408px - var(--w) - 20px)); opacity: 0.9; --dx: -3vw; --dy: -88vh; --r: 20deg; rotate: -8deg; }
 .a-coin { --w: clamp(50px, 12vmin, 100px); top: 128vh; right: max(6px, calc(50vw - 408px - var(--w) - 50px)); opacity: 0.9; --dx: 4vw; --dy: -100vh; --r: 18deg; }
 @media (max-width: 640px) {
-  /* On phones the reading column is full width: keep assets smaller and fainter. */
-  .asset { opacity: 0.5 !important; }
+  /* Phones: the reading column is full width, so the decorations would sit under the text and
+     cost GPU on every scroll. Keep only the static colour wash. */
+  .asset { display: none; }
+  .blob { animation: none !important; filter: blur(40px); will-change: auto; }
 }
 @supports (animation-timeline: scroll()) {
   html:not([data-motion='off']) .asset {
@@ -246,9 +248,7 @@ html[data-motion='off'] .blob, html[data-motion='off'] .asset { animation: none 
 .lift { transition: transform .18s ease, box-shadow .18s ease; }
 .lift:hover, .lift:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 24px -12px rgb(108 43 217 / .45); }
 .lift:active { transform: translateY(0) scale(.98); }
-@keyframes wheel-idle { to { transform: rotate(360deg); } }
-.wheel-idle { animation: wheel-idle 18s linear infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .slot-on, .wheel-idle { animation: none !important; }
+  .slot-on { animation: none !important; }
   .ring-arc, .lift { transition: none !important; }
 }

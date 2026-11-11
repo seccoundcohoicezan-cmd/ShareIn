@@ -5,8 +5,7 @@ import { CollectedFeed } from './CollectedFeed'
 import { ArrowUpIcon } from './icons'
 import { ProgressMe } from './ProgressMe'
 import { CountUp } from './ProgressVisuals'
-import { RulesList } from './RulesList'
-import { Panel, PillLabel } from './ui'
+import { PillLabel } from './ui'
 
 const fmt = (d: Date) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', timeZone: 'Asia/Jakarta' })
 
@@ -49,7 +48,7 @@ function Steps({ items }: { items: string[][] }) {
 function MiniWheel() {
   const colors = ['#6C2BD9', '#F59E0B', '#8B5CF6', '#F97316', '#4C1D95', '#FBBF24']
   return (
-    <svg viewBox="-50 -50 100 100" className="wheel-idle pointer-events-none absolute -right-8 -top-8 h-32 w-32 opacity-25 sm:opacity-40" aria-hidden="true">
+    <svg viewBox="-50 -50 100 100" className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 opacity-25 sm:opacity-40" aria-hidden="true">
       {colors.map((c, i) => {
         const a0 = (i / 6) * 2 * Math.PI
         const a1 = ((i + 1) / 6) * 2 * Math.PI
@@ -61,8 +60,8 @@ function MiniWheel() {
 }
 
 /** Pelatihan (collect → spin-wheel draw) and Duta (weekly duty): the Golden Ticket link system without cash branding. */
-export async function ProgramPage({ program, pill, intro }: { program: Program; pill: string; intro: string }) {
-  const { settings, feed, summary, winners } = await loadProgram(program)
+export async function ProgramPage({ program, pill }: { program: Program; pill: string }) {
+  const { feed, summary, winners } = await loadProgram(program)
   const { label, path } = CHANNEL_INFO[program]
   const setorHref = `${path}/setor`
   const draw = summary.mode === 'draw'
@@ -72,7 +71,6 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
       <section className="px-1 pt-2">
         <PillLabel as="span">{pill}</PillLabel>
         <h1 className="mt-3 text-[2.25rem] font-extrabold leading-tight tracking-tight">{label}</h1>
-        <p className="muted mt-2 max-w-md">{intro}</p>
         <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${summary.open ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'}`}>
           {summary.open ? 'Pengumpulan dibuka' : 'Pengumpulan ditutup sementara'}
         </p>
@@ -87,9 +85,7 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
             ? `Kumpulkan ${t.tiktok} link TikTok & ${t.reels} link Instagram Reels dan ikuti undian berhadiah`
             : `Kumpulkan ${t.tiktok + t.reels} konten: ${t.tiktok} TikTok & ${t.reels} Instagram Reels`}
         </p>
-        <p className="muted text-sm">
-          {draw ? (summary.auto ? 'Link langsung terhitung begitu terkirim. Begitu lengkap, kamu otomatis masuk roda undian.' : 'Link dihitung setelah disetujui admin. Begitu lengkap, kamu otomatis masuk roda undian.') : `Minggu ini: ${weekLabel(summary.week!.start)} (Senin–Minggu WIB, berulang tiap minggu)`}
-        </p>
+        {!draw && <p className="muted text-sm">Minggu ini: {weekLabel(summary.week!.start)} (Senin–Minggu WIB)</p>}
         <div className="mt-4">
           <ProgressMe program={program} setorHref={setorHref} />
         </div>
@@ -145,11 +141,6 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
       )}
 
       <CollectedFeed initial={feed} program={program} />
-
-      <Panel aria-labelledby="ketentuan">
-        <PillLabel id="ketentuan">Ketentuan</PillLabel>
-        <RulesList settings={settings} proKontra={false} />
-      </Panel>
     </div>
   )
 }
