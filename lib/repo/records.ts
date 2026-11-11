@@ -38,6 +38,17 @@ export function recordTable<T extends { id: string }>(
       header = data.header
       return data.rows.map((r, i) => ({ ...from(rowToRecord(data.header, r)), _index: i })).filter((x) => x.id)
     },
+    /** Rows to append, for a combined write with other tables. */
+    async rowsFor(items: T[]): Promise<{ table: TableName; rows: Cell[][] }> {
+      const h = await head()
+      return { table, rows: items.map((v) => recordToRow(h, to(v))) }
+    },
+    /** Parses a table returned by a combined write and clears its cache. */
+    fromTable(data: { header: string[]; rows: string[][] }): Stored<T>[] {
+      invalidate(table)
+      header = data.header
+      return data.rows.map((r, i) => ({ ...from(rowToRecord(data.header, r)), _index: i })).filter((x) => x.id)
+    },
     /** Write operations for batching with other writes (e.g. the audit row) via writeAll. */
     async appendOp(items: T[]): Promise<WriteOp> {
       const h = await head()

@@ -54,7 +54,8 @@ const defaultPoster: Poster = async (url, body) => {
 type ReadResult = { header: string[]; rows: string[][] }
 
 const BUSY = /too many|simultaneous|Service invoked|Lock timeout|lock busy|try again/i
-const MAX_BUSY_RETRIES = 6
+/** How long to keep retrying while Apps Script is saturated (routes allow 60 s). */
+const BUSY_BUDGET_MS = 35_000
 
 /**
  * Google Sheets through the bound Apps Script Web App (apps-script/Code.js), authenticated by a shared secret.
@@ -69,6 +70,8 @@ export class AppsScriptStore implements TableStore {
   /** Tables whose sheet header already has every column: writes to them can skip the schema check. */
   private verified = new Set<TableName>()
   private recent = new Map<TableName, { at: number; data: Promise<ReadResult> }>()
+  /** Last successful read per table, served if Apps Script stays saturated. */
+  private lastGood = new Map<TableName, ReadResult>()
   private queue: { table: TableName; resolve: (r: ReadResult) => void; reject: (e: unknown) => void }[] = []
 
   constructor(private url: string, private secret: string, private post: Poster = defaultPoster) {}
@@ -77,6 +80,7 @@ export class AppsScriptStore implements TableStore {
     let lastErr: unknown
     // "Too many simultaneous invocations" and lock timeouts mean the script did NOT run, so retrying is
     // safe even for writes. Under a burst (300 people at once) they are expected; back off with jitter.
+    const started = Date.now()
     for (let attempt = 0, busy = 0; attempt <= retries + busy; attempt++) {
       try {
         const res = await this.post(this.url, JSON.stringify({ secret: this.secret, ops }))
@@ -99,9 +103,10 @@ export class AppsScriptStore implements TableStore {
         lastErr = e
         const err = e as Error & { final?: boolean; busy?: boolean }
         if (err.final) break
-        if (err.busy && busy < MAX_BUSY_RETRIES) {
+        if (err.busy && Date.now() - started < BUSY_BUDGET_MS) {
           busy++
-          await new Promise((r) => setTimeout(r, 400 * busy + Math.random() * 600))
+          // Growing pause with jitter so a crowd of servers does not retry in lockstep.
+          await new Promise((r) => setTimeout(r, Math.min(3000, 300 * 2 ** Math.min(busy, 4)) + Math.random() * 700))
           continue
         }
         // A network error on a write may have reached the sheet: never repeat a write blindly.
@@ -131,10 +136,19 @@ export class AppsScriptStore implements TableStore {
         results = await this.send<ReadResult>(tables.map((table) => ({ action: 'read', table })))
       }
       const byTable = new Map(tables.map((t, i) => [t, results[i]]))
-      byTable.forEach((r, t) => this.markVerified(t, r.header))
+      byTable.forEach((r, t) => {
+        this.markVerified(t, r.header)
+        this.lastGood.set(t, r)
+      })
       for (const b of batch) b.resolve(byTable.get(b.table)!)
     } catch (e) {
-      for (const b of batch) b.reject(e)
+      // Apps Script still saturated after retrying: a slightly older copy beats an error page.
+      const busy = (e as { busy?: boolean }).busy
+      for (const b of batch) {
+        const old = this.lastGood.get(b.table)
+        if (busy && old) b.resolve(old)
+        else b.reject(e)
+      }
     }
   }
 
@@ -181,8 +195,25 @@ export class AppsScriptStore implements TableStore {
     this.recent.delete(table)
     const r = await this.call<{ table: ReadResult }>({ action: 'append', table, rows: rows.map((x) => x.map(cellToString)), returnRows: true })
     this.markVerified(table, r.table.header)
+    this.lastGood.set(table, r.table)
     this.recent.set(table, { at: Date.now(), data: Promise.resolve(r.table) })
     return { header: r.table.header.length ? r.table.header : [...TABLES[table]], rows: r.table.rows.map((row) => [...row]) }
+  }
+
+  async appendManyAndRead(parts: { table: TableName; rows: Row[] }[]): Promise<TableData[]> {
+    for (const p of parts) await this.ensureFor(p.table)
+    parts.forEach((p) => this.recent.delete(p.table))
+    const results = await this.send<{ table: ReadResult }>(
+      parts.map((p) => ({ action: 'append', table: p.table, rows: p.rows.map((r) => r.map(cellToString)), returnRows: true })),
+      0,
+    )
+    return parts.map((p, i) => {
+      const t = results[i].table
+      this.markVerified(p.table, t.header)
+      this.lastGood.set(p.table, t)
+      this.recent.set(p.table, { at: Date.now(), data: Promise.resolve(t) })
+      return { header: t.header.length ? t.header : [...TABLES[p.table]], rows: t.rows.map((row) => [...row]) }
+    })
   }
 
   async writeBatch(ops: WriteOp[]): Promise<void> {

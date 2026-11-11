@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { getJson } from '@/lib/get-json'
 
 export type Me = { name: string; whatsapp: string; token: string } | null
 
@@ -7,8 +8,7 @@ export type Me = { name: string; whatsapp: string; token: string } | null
 export function useMe() {
   const [me, setMe] = useState<Me | undefined>(undefined)
   useEffect(() => {
-    fetch('/api/me', { cache: 'no-store' })
-      .then((r) => r.json())
+    getJson<{ user: Me }>('/api/me')
       .then((d) => setMe(d.user ?? null))
       .catch(() => setMe(null))
   }, [])

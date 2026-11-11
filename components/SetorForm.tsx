@@ -6,6 +6,7 @@ import type { Channel, Check, CheckId, Platform, Program } from '@/lib/types'
 import { CHANNEL_INFO, PLATFORM_LABEL } from '@/lib/types'
 import { detectPlatform, LINK_RULE_MESSAGE, parseSourceUrl } from '@/lib/url'
 import { CheckIcon, CrossIcon, GiftSolid } from './icons'
+import { getJson } from '@/lib/get-json'
 import { PantauCard } from './PantauCard'
 import { TargetBars, targetLeft } from './TargetBars'
 import type { Progress } from '@/lib/progress'
@@ -290,16 +291,14 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
   const [round, setRound] = useState(0)
   useEffect(() => {
     if (golden || !me) return setBase(null)
-    fetch(`/api/me?program=${program}`, { cache: 'no-store' })
-      .then((r) => r.json())
+    getJson<{ progress: Progress | null }>(`/api/me?program=${program}`)
       .then((d) => setBase(d.progress ?? null))
       .catch(() => setBase(null))
   }, [me, golden, program, round])
 
   useEffect(() => {
     setName(localStorage.getItem(NAME_KEY) ?? '')
-    fetch('/api/rules', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    getJson<Rules>('/api/rules')
       .then(setRules)
       .catch(() => setLoadError(true))
   }, [])
@@ -391,8 +390,7 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
         const failed = (data.results as { ok: boolean; checks?: Check[] }[]).flatMap((r, i) => (r.ok ? [] : [`Konten ${i + 1}: ${r.checks?.[0]?.message ?? 'gagal disimpan'}`]))
         setDone({ saved: data.saved, total: items.length, token: data.token ?? '', auto: data.status === 'approved', failed })
         if (!golden) {
-          fetch(`/api/me?program=${program}`, { cache: 'no-store' })
-            .then((r) => r.json())
+          getJson<{ progress: Progress | null }>(`/api/me?program=${program}`)
             .then((d) => setProgress(d.progress ?? null))
             .catch(() => {})
         }
@@ -437,7 +435,7 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
     setDone(null)
     setProgress(null)
     setRound((n) => n + 1)
-    fetch('/api/rules', { cache: 'no-store' }).then((r) => r.json()).then(setRules).catch(() => {})
+    getJson<Rules>('/api/rules').then(setRules).catch(() => {})
   }
 
   if (done) {

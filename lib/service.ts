@@ -3,9 +3,15 @@ import { z } from 'zod'
 import { cached } from './cache'
 import { normalizeName, parseCount } from './format'
 import { batcher } from './batcher'
+import { listParticipantsCached, pickRegistered, planRegistrations } from './participant-service'
+import { getStore } from './repo'
+import { participantsTable } from './repo/programs'
+import { strip } from './repo/records'
+import { appendManyThenRead } from './repo/store'
 import { getSettings } from './repo/settings'
 import {
-  appendSubmissionsAndList,
+  submissionRows,
+  submissionsFromTable,
   countCollected,
   findDuplicate,
   isCollected,
@@ -15,7 +21,7 @@ import {
 } from './repo/submissions'
 import { parseAndResolve, type Fetcher, type Resolver } from './resolve'
 import { autoApprove, channelOpen } from './settings-schema'
-import { AUTO_REVIEWER, type Channel, type CheckResult, type Platform, type Settings, type Submission } from './types'
+import { AUTO_REVIEWER, type Channel, type CheckResult, type Participant, type Platform, type Settings, type Submission } from './types'
 import { runChecks } from './validate'
 import { maskName, normalizeWhatsapp } from './identity'
 import type { ParsedLink } from './url'
@@ -135,14 +141,20 @@ export async function checkBatch(inputs: SubmissionInput[], net?: NetOpts): Prom
   return { ok: items.every((i) => i.ok), items }
 }
 
-export type BatchCreateResult = { ok: false; items: CheckResult[] } | { ok: true; results: CreateResult[] }
+export type BatchCreateResult = { ok: false; items: CheckResult[] } | { ok: true; results: CreateResult[]; participant?: Participant | null }
 
 /**
  * Validates the whole batch with fresh data (nothing is saved unless every item passes), appends all
  * rows in one request, then re-reads to settle races between server instances: the earliest row wins
  * a duplicate.
  */
-type SubmitJob = { inputs: SubmissionInput[]; links: Link[]; screenshotUrl: string }
+type SubmitJob = {
+  inputs: SubmissionInput[]
+  links: Link[]
+  screenshotUrl: string
+  /** First-time sender: create their account in the SAME spreadsheet write as their links. */
+  register?: { name: string; wa: string }
+}
 
 function buildRows(job: SubmitJob, evs: ReturnType<typeof evaluateBatch>, settings: Settings, createdAt: string): Submission[] {
   const program = job.inputs[0].program
@@ -199,7 +211,13 @@ async function runSubmitWave(jobs: SubmitJob[]): Promise<BatchCreateResult[]> {
     out.push(null)
   })
   if (accepted.length) {
-    const after = await appendSubmissionsAndList(accepted.flatMap((a) => a.subs))
+    // Accounts of first-time senders and all links travel in ONE Apps Script call (one lock).
+    const regs = accepted.flatMap(({ at }) => (jobs[at].register ? [jobs[at].register!] : []))
+    const fresh = regs.length ? planRegistrations(await listParticipantsCached(), regs) : []
+    const parts = [...(fresh.length ? [await participantsTable.rowsFor(fresh)] : []), await submissionRows(accepted.flatMap((a) => a.subs))]
+    const tables = await appendManyThenRead(getStore(), parts)
+    const people = fresh.length ? participantsTable.fromTable(tables[0]) : null
+    const after = submissionsFromTable(tables[tables.length - 1])
     const voids: StoredSubmission[] = []
     for (const { at, subs } of accepted) {
       const results = subs.map((sub): CreateResult => {
@@ -212,7 +230,9 @@ async function runSubmitWave(jobs: SubmitJob[]): Promise<BatchCreateResult[]> {
         }
         return { ok: true, submission: sub }
       })
-      out[at] = { ok: true, results }
+      const reg = jobs[at].register
+      const participant = reg ? pickRegistered(people ?? (await listParticipantsCached()).map(strip), [reg])[0] : undefined
+      out[at] = { ok: true, results, participant }
     }
     if (voids.length) await updateSubmissions(voids)
   }
@@ -224,9 +244,10 @@ const gq = globalThis as unknown as { __shareinSubmitQueue?: (job: SubmitJob) =>
 const submitQueue = (gq.__shareinSubmitQueue ??= batcher(runSubmitWave))
 
 /** Validates and saves one person's batch; concurrent senders share spreadsheet writes (see runSubmitWave). */
-export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, screenshotUrl = ''): Promise<BatchCreateResult> {
+export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, screenshotUrl = '', register?: { name: string; whatsapp: string }): Promise<BatchCreateResult> {
   const links = await Promise.all(inputs.map((i) => parseAndResolve(i.source_url, net)))
-  return submitQueue({ inputs, links, screenshotUrl })
+  const wa = register ? normalizeWhatsapp(register.whatsapp) : null
+  return submitQueue({ inputs, links, screenshotUrl, register: register && wa ? { name: register.name, wa } : undefined })
 }
 
 export async function createSubmission(input: SubmissionInput, net?: NetOpts, screenshotUrl = ''): Promise<CreateResult> {

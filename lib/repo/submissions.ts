@@ -105,6 +105,21 @@ export async function appendSubmissions(items: Submission[]): Promise<void> {
   invalidate('program:')
 }
 
+/** Rows to append, for writing together with other tables (appendManyThenRead). */
+export async function submissionRows(items: Submission[]): Promise<{ table: 'submissions'; rows: Cell[][] }> {
+  const h = await header()
+  return { table: 'submissions', rows: items.map((s) => recordToRow(h, toRecord(s))) }
+}
+
+/** Reads the table returned by a combined write and clears the caches that depend on it. */
+export function submissionsFromTable(data: { header: string[]; rows: string[][] }): StoredSubmission[] {
+  invalidate('submissions')
+  invalidate('progress')
+  invalidate('program:')
+  lastHeader = data.header
+  return data.rows.map((r, i) => fromRecord(rowToRecord(data.header, r), i)).filter((s) => s.id)
+}
+
 /** Appends and returns the fresh list in one round trip (used to settle races right after writing). */
 export async function appendSubmissionsAndList(items: Submission[]): Promise<StoredSubmission[]> {
   const h = await header()

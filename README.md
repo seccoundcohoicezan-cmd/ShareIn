@@ -132,7 +132,14 @@ APPS_SCRIPT_SECRET=… APPS_SCRIPT_URL=http://127.0.0.1:39200/exec SESSION_SECRE
 node tests/load/load.mjs http://localhost:3300 300 1          # beberapa URL dipisah koma = beberapa instance server
 ```
 
-Hasil 12 Nov 2026 (300 orang menekan Kirim dalam 1 detik, latensi realistis, 3 instance): 0 error, kirim p95 9,3 dtk, 900 link + 300 akun tercatat tanpa duplikat, hanya 26 penulisan ke spreadsheet.
+Hasil 12 Nov 2026 (latensi Apps Script realistis ±2 dtk, 5 instance server, semua dari satu IP):
+
+| Skenario | Error | Kirim p50 / p95 | Penulisan spreadsheet |
+|---|---|---|---|
+| 300 orang menekan Kirim dalam 1 detik | 0 | 16 / 18 dtk | 15 |
+| 300 orang dalam 60 detik | 0 | 5,9 / 7,8 dtk | 93 |
+
+Data tetap utuh: 900 link + 300 akun, tanpa link atau nomor ganda. Satu-satunya batas nyata adalah kunci tulis Apps Script (satu penulisan ±1 dtk); karena itu semua kiriman yang datang bersamaan digabung ke satu penulisan.
 
 ## Batasan yang diketahui
 

@@ -34,7 +34,7 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
   const wa = normalizeWhatsapp(whatsapp)
   if (!wa) return null
   // Known number (the usual case): no spreadsheet request at all.
-  const known = (await listCached()).find((p) => p.whatsapp === wa)
+  const known = (await listParticipantsCached()).find((p) => p.whatsapp === wa)
   if (known) return strip(known)
   return registerQueue({ name, wa })
 }
@@ -43,37 +43,50 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
  * One wave of first-time participants: read once, append every new number in one request, and settle
  * races (earliest row per number wins). 300 newcomers at once cost a few writes, not 300.
  */
-async function registerWave(reqs: { name: string; wa: string }[]): Promise<(Participant | null)[]> {
-  const all = await participantsTable.list()
-  const first = (rows: { whatsapp: string }[], wa: string) => rows.find((p) => p.whatsapp === wa)
-  const taken = new Set(all.map((p) => p.token))
+const firstWith = <P extends { whatsapp: string }>(rows: P[], wa: string) => rows.find((p) => p.whatsapp === wa)
+
+/** New participant rows for the numbers not known yet (one per number, unique tokens). */
+export function planRegistrations(existing: Participant[], reqs: { name: string; wa: string }[]): Participant[] {
+  const taken = new Set(existing.map((p) => p.token))
   const fresh: Participant[] = []
   for (const r of reqs) {
-    if (first(all, r.wa) || first(fresh, r.wa)) continue
+    if (firstWith(existing, r.wa) || firstWith(fresh, r.wa)) continue
     let token = newToken()
     while (taken.has(token)) token = newToken()
     taken.add(token)
     fresh.push({ id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: r.name.trim().replace(/\s+/g, ' '), whatsapp: r.wa, created_at: new Date().toISOString(), last_seen_at: '', sso_sub: '' })
   }
-  const rows = fresh.length ? await participantsTable.appendAndList(fresh) : all
+  return fresh
+}
+
+/** After writing: each number's account is its EARLIEST row (settles races between servers). */
+export function pickRegistered(rows: Participant[], reqs: { wa: string }[]): (Participant | null)[] {
   return reqs.map((r) => {
-    const p = first(rows, r.wa)
+    const p = firstWith(rows, r.wa)
     return p ? strip(p as Stored<Participant>) : null
   })
+}
+
+/** Registration-only wave (no links sent), e.g. MyTopstar-free account creation. */
+async function registerWave(reqs: { name: string; wa: string }[]): Promise<(Participant | null)[]> {
+  const all = await participantsTable.list()
+  const fresh = planRegistrations(all, reqs)
+  const rows = fresh.length ? await participantsTable.appendAndList(fresh) : all
+  return pickRegistered(rows, reqs)
 }
 
 const gq = globalThis as unknown as { __shareinRegisterQueue?: (r: { name: string; wa: string }) => Promise<Participant | null> }
 const registerQueue = (gq.__shareinRegisterQueue ??= batcher(registerWave))
 
 /** Participants change rarely: served from a 60 s cache (cleared on every write from this server). */
-function listCached() {
+export function listParticipantsCached() {
   return cached('participants', () => participantsTable.list())
 }
 
 export async function participantByToken(token: string): Promise<Participant | null> {
   const t = normalizeToken(token)
   if (!t) return null
-  let p = (await listCached()).find((x) => x.token === t)
+  let p = (await listParticipantsCached()).find((x) => x.token === t)
   // Registered moments ago on another server instance: look once more in the sheet itself.
   if (!p) p = (await participantsTable.list()).find((x) => x.token === t)
   return p ? strip(p) : null

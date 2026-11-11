@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { clientIp, jsonError, limitKey, limitOr429 } from '@/lib/http'
 import { normalizeWhatsapp } from '@/lib/identity'
-import { ensureParticipant, participantByToken } from '@/lib/participant-service'
+import { listParticipantsCached, participantByToken } from '@/lib/participant-service'
+import { strip } from '@/lib/repo/records'
 import { revalidatePublic } from '@/lib/revalidate'
 import { batchSchema, checkBatch, createBatch, expandBatch } from '@/lib/service'
 import { MAX_SCREENSHOT_BYTES, saveScreenshot, sniffImage } from '@/lib/storage'
@@ -58,12 +59,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Saving the content and registering the participant run side by side.
-  const [result, account] = await Promise.all([
-    createBatch(inputs, undefined, screenshotUrl),
-    me ? Promise.resolve(me) : ensureParticipant(inputs[0].submitter_name, inputs[0].whatsapp),
-  ])
+  // A known number already has an account (cache, no request). Otherwise the account is created in the
+  // same spreadsheet write as the links.
+  const known = me ? null : (await listParticipantsCached()).find((p) => p.whatsapp === normalizeWhatsapp(inputs[0].whatsapp))
+  const result = await createBatch(inputs, undefined, screenshotUrl, me || known ? undefined : { name: inputs[0].submitter_name, whatsapp: inputs[0].whatsapp })
   if (!result.ok) return NextResponse.json({ ok: false, items: result.items }, { status: 422 })
+  const account = me ?? (known ? strip(known) : result.participant ?? null)
   revalidatePublic()
   const saved = result.results.flatMap((r) => (r.ok ? [r.submission] : []))
   const user = saved.length ? account : null

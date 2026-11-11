@@ -226,3 +226,66 @@ describe('settings under concurrency', () => {
     expect(rows).toEqual([['duta_week_tiktok', '9']])
   })
 })
+
+describe('Apps Script saturated', () => {
+  it('busy answers are retried; if it stays busy a warm server serves its last good copy', async () => {
+    const sim = createAppsScriptSim(SECRET)
+    let busy = 0
+    const store = new AppsScriptStore('https://sim', SECRET, async (u, b) => {
+      if (busy > 0) {
+        busy--
+        return { status: 200, text: JSON.stringify({ ok: false, error: 'Service invoked too many times in a short time' }) }
+      }
+      return sim.poster(u, b)
+    })
+    await store.ensureSchema()
+    await store.append('settings', [['k', 'v1']])
+    // Two busy answers, then success: the caller never sees an error.
+    busy = 2
+    AppsScriptStore.READ_TTL_MS = 0
+    expect((await store.read('settings')).rows).toEqual([['k', 'v1']])
+    // Busy for longer than the retry budget would allow in a test: fall back to the last good copy.
+    busy = Infinity
+    const realNow = Date.now
+    let t = realNow()
+    Date.now = () => (t += 20_000) // each check jumps 20 s ahead: the 35 s budget runs out at once
+    try {
+      expect((await store.read('settings')).rows).toEqual([['k', 'v1']])
+    } finally {
+      Date.now = realNow
+      AppsScriptStore.READ_TTL_MS = 3000
+    }
+  })
+})
+
+describe('first-time sender', () => {
+  it('account and links are written in ONE Apps Script call', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore } = await import('@/lib/repo')
+    const { createBatch } = await import('@/lib/service')
+    const { participantsTable } = await import('@/lib/repo/programs')
+    const sim = createAppsScriptSim(SECRET)
+    const calls: string[] = []
+    const store = new AppsScriptStore('https://sim', SECRET, async (u, b) => {
+      calls.push((JSON.parse(b).ops as { action: string }[]).map((o) => o.action).join('+'))
+      return sim.poster(u, b)
+    })
+    setStore(store)
+    invalidate()
+    await store.ensureSchema()
+    const { getSettings } = await import('@/lib/repo/settings')
+    const { listSubmissionsCached } = await import('@/lib/repo/submissions')
+    const { listParticipantsCached } = await import('@/lib/participant-service')
+    await Promise.all([getSettings(), listSubmissionsCached(), listParticipantsCached()])
+    calls.length = 0
+    const r = await createBatch(
+      [{ submitter_name: 'Baru', whatsapp: '081355550000', platform: 'tiktok', source_url: 'https://www.tiktok.com/@b/video/7400000000000077777', sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual', program: 'duta' }],
+      undefined,
+      '',
+      { name: 'Baru', whatsapp: '081355550000' },
+    )
+    expect(r.ok && r.participant?.whatsapp).toBe('6281355550000')
+    expect(calls).toEqual(['append+append'])
+    expect(await participantsTable.list()).toHaveLength(1)
+  })
+})

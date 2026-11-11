@@ -33,6 +33,8 @@ export interface TableStore {
   update(table: TableName, updates: { index: number; row: Row }[]): Promise<void>
   /** Appends and returns the table afterwards, in one round trip where the backend supports it. */
   appendAndRead?(table: TableName, rows: Row[]): Promise<TableData>
+  /** Appends to several tables and returns each of them afterwards, in one round trip. */
+  appendManyAndRead?(parts: { table: TableName; rows: Row[] }[]): Promise<TableData[]>
   /** Several appends/updates (possibly to different tables) in one round trip. */
   writeBatch?(ops: WriteOp[]): Promise<void>
   /** Changes some columns of rows found by key in one round trip, without reading the table first. */
@@ -73,6 +75,13 @@ export interface PatchRequest {
 export interface PatchResult {
   items: { index: number; record: Record<string, string> }[]
   missing: string[]
+}
+
+export async function appendManyThenRead(store: TableStore, parts: { table: TableName; rows: Row[] }[]): Promise<TableData[]> {
+  if (store.appendManyAndRead) return store.appendManyAndRead(parts)
+  const out: TableData[] = []
+  for (const p of parts) out.push(await appendThenRead(store, p.table, p.rows))
+  return out
 }
 
 export async function appendThenRead(store: TableStore, table: TableName, rows: Row[]): Promise<TableData> {

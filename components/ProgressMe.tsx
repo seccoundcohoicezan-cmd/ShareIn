@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import { getJson } from '@/lib/get-json'
 import type { Progress } from '@/lib/progress'
 import type { Program } from '@/lib/types'
 import { Confetti, ProgressRing, SlotRow, WeekStrip } from './ProgressVisuals'
@@ -28,8 +29,7 @@ export function ProgressMe({ program, setorHref }: { program: Program; setorHref
   const [loginError, setLoginError] = useState('')
 
   const load = useCallback(() => {
-    return fetch(`/api/me?program=${program}`, { cache: 'no-store' })
-      .then((r) => r.json())
+    return getJson<State>(`/api/me?program=${program}`)
       .then(setS)
       .catch(() => setS({ user: null, sso: false, progress: null }))
   }, [program])
