@@ -15,9 +15,9 @@ function weekLabel(startIso: string) {
   return `${fmt(start)} – ${fmt(new Date(start.getTime() + 6 * 86_400_000))}`
 }
 
-const DRAW_STEPS = (t: { tiktok: number; reels: number }) => [
+const DRAW_STEPS = (t: { tiktok: number; reels: number }, auto: boolean) => [
   ['Kirim link', `Tempel link TikTok & Reels, sampai 10 sekali kirim.`],
-  ['Disetujui admin', 'Link dicek admin. Status terlihat di halaman pantau.'],
+  auto ? ['Langsung disetujui', 'Link yang lolos cek otomatis langsung terhitung.'] : ['Disetujui admin', 'Link dicek admin. Status terlihat di halaman pantau.'],
   ['Masuk roda', `Lengkap ${t.tiktok} TikTok + ${t.reels} Reels = otomatis ikut undian.`],
   ['Diundi', 'Pemenang diumumkan di halaman ini.'],
 ]
@@ -88,7 +88,7 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
             : `Kumpulkan ${t.tiktok + t.reels} konten: ${t.tiktok} TikTok & ${t.reels} Instagram Reels`}
         </p>
         <p className="muted text-sm">
-          {draw ? 'Link dihitung setelah disetujui admin. Begitu lengkap, kamu otomatis masuk roda undian.' : `Minggu ini: ${weekLabel(summary.week!.start)} (Senin–Minggu WIB, berulang tiap minggu)`}
+          {draw ? (summary.auto ? 'Link langsung terhitung begitu terkirim. Begitu lengkap, kamu otomatis masuk roda undian.' : 'Link dihitung setelah disetujui admin. Begitu lengkap, kamu otomatis masuk roda undian.') : `Minggu ini: ${weekLabel(summary.week!.start)} (Senin–Minggu WIB, berulang tiap minggu)`}
         </p>
         <div className="mt-4">
           <ProgressMe program={program} setorHref={setorHref} />
@@ -121,7 +121,7 @@ export async function ProgramPage({ program, pill, intro }: { program: Program; 
         <Link href="/pantau" className="btn-ghost w-full sm:w-auto">Pantau setoranku</Link>
       </div>
 
-      <Steps items={draw ? DRAW_STEPS(t) : WEEK_STEPS(t)} />
+      <Steps items={draw ? DRAW_STEPS(t, summary.auto) : WEEK_STEPS(t)} />
 
       {draw && (
         <section className="panel-solid" aria-labelledby="pemenang">

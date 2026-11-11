@@ -144,6 +144,22 @@ describe.each([
     expect(progressFor(subs, settings, 'pelatihan', '6281234567890')).toMatchObject({ tiktok: 0, reels: 0, met: false })
   })
 
+  it('turning auto-approve on approves links already waiting in that program only', async () => {
+    const { approveWaiting } = await import('@/lib/admin-service')
+    await createBatch([link('pelatihan'), link('pelatihan', undefined, undefined, 'reels')])
+    await createBatch([link('duta')])
+    const before = await getSettingsFresh()
+    const after = { ...before, auto_approve_pelatihan: true }
+    await saveSettings(after)
+    expect(await approveWaiting(before, after)).toBe(2)
+    const all = await listSubmissionsFresh()
+    expect(all.map((x) => [x.program, x.status, x.reviewed_by]).sort()).toEqual([['duta', 'pending', ''], ['pelatihan', 'approved', 'otomatis'], ['pelatihan', 'approved', 'otomatis']])
+    // Already on → nothing more to do; new links are approved on arrival.
+    expect(await approveWaiting(after, after)).toBe(0)
+    const r = await createBatch([link('pelatihan')])
+    expect(r.ok && r.results[0].ok && r.results[0].submission.status).toBe('approved')
+  })
+
   it('MyTopstar sign-in creates a participant once and links an existing WhatsApp account', async () => {
     const { ensureParticipant } = await import('@/lib/participant-service')
     const old = await ensureParticipant('Rina Utami', '081234567890')

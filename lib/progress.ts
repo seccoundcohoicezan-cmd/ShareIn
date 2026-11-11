@@ -3,7 +3,7 @@ import { participantsTable } from './repo/programs'
 import { strip } from './repo/records'
 import { getSettings } from './repo/settings'
 import { isCollected, listSubmissionsCached } from './repo/submissions'
-import { channelOpen, targetFor } from './settings-schema'
+import { autoApprove, channelOpen, targetFor } from './settings-schema'
 import type { Program, Settings, Submission } from './types'
 import { weekOf, type Week } from './week'
 
@@ -93,6 +93,8 @@ function perPerson(all: Submission[], settings: Settings, program: Program, now:
 
 export interface ProgramSummary {
   open: boolean
+  /** New links are approved without admin review. */
+  auto: boolean
   mode: ProgressMode
   target: Target
   week: Week | null
@@ -108,6 +110,7 @@ export function summarize(all: Submission[], settings: Settings, program: Progra
   const { mode, w, target, groups, tallies } = perPerson(all, settings, program, now)
   return {
     open: channelOpen(settings, program),
+    auto: autoApprove(settings, program),
     mode,
     target,
     week: w.week,

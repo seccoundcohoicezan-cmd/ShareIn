@@ -2,6 +2,7 @@ import { revalidatePublic } from '@/lib/revalidate'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
+import { approveWaiting } from '@/lib/admin-service'
 import { getSettings, getSettingsFresh, saveSettings } from '@/lib/repo/settings'
 
 export const dynamic = 'force-dynamic'
@@ -50,7 +51,9 @@ export async function PUT(req: NextRequest) {
   if (s instanceof NextResponse) return s
   const body = schema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
+  const before = await getSettingsFresh()
   await saveSettings(body.data, { actor: s.email })
+  await approveWaiting(before, body.data)
   revalidatePublic()
   return NextResponse.json({ ok: true, settings: await getSettings() })
 }

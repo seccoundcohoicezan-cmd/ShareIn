@@ -5,7 +5,8 @@ import { withLock } from './lock'
 import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
 import { listSubmissionsCached, listSubmissionsFresh, listSubmissionsRecent, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
-import type { Submission } from './types'
+import { autoApprove } from './settings-schema'
+import { AUTO_REVIEWER, type Settings, type Submission } from './types'
 
 export const REJECT_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid'] as const
 
@@ -91,6 +92,18 @@ export async function review(ids: string[], action: 'approve' | 'reject' | 'rese
     )
     return updated.map(strip)
   })
+}
+
+/**
+ * Turning auto-approve on also approves links already waiting in that program, so nobody is left
+ * behind because they sent a moment before the switch.
+ */
+export async function approveWaiting(before: Settings, after: Pick<Settings, 'auto_approve_golden' | 'auto_approve_pelatihan' | 'auto_approve_duta'>) {
+  const turnedOn = (['golden', 'pelatihan', 'duta'] as const).filter((c) => autoApprove(after as Settings, c) && !autoApprove(before, c))
+  if (!turnedOn.length) return 0
+  const waiting = (await listSubmissionsFresh()).filter((s) => s.status === 'pending' && (turnedOn as readonly string[]).includes(s.program))
+  if (!waiting.length) return 0
+  return (await review(waiting.map((s) => s.id), 'approve', '', AUTO_REVIEWER)).length
 }
 
 function csvCell(v: unknown): string {

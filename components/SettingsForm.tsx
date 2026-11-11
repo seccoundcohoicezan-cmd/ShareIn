@@ -122,7 +122,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
       <section className="panel-solid space-y-4">
         <div>
           <h2 className="font-extrabold">Setujui otomatis</h2>
-          <p className="muted text-sm">Bila aktif, setoran baru langsung berstatus Disetujui tanpa menunggu admin. Golden Ticket tetap harus lolos semua cek (like, komentar, duplikat, kuota). Setoran lama tidak berubah, dan admin tetap bisa menolak setelahnya.</p>
+          <p className="muted text-sm">Bila aktif, link baru langsung berstatus Disetujui tanpa menunggu admin, asal lolos cek otomatis (link TikTok/Reels valid, bukan duplikat, program dibuka). Link yang masih menunggu ikut disetujui saat tombol dinyalakan. Admin tetap bisa menolak setelahnya.</p>
         </div>
         <Toggle id="auto_approve_golden" label="Golden Ticket" checked={s.auto_approve_golden} onChange={(v) => setS({ ...s, auto_approve_golden: v })} />
         <Toggle id="auto_approve_pelatihan" label="Pelatihan Content" checked={s.auto_approve_pelatihan} onChange={(v) => setS({ ...s, auto_approve_pelatihan: v })} />
