@@ -1,11 +1,11 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Spin } from '@/lib/types'
-import type { WheelEntry } from '@/lib/spin'
+import type { Candidate, WheelEntry } from '@/lib/spin'
 import { toast } from './Toast'
 import { EmptyState, Spinner, TopProgress } from './ui'
 
-type State = { round: string; target: { tiktok: number; reels: number }; entries: WheelEntry[]; history: Spin[] }
+type State = { round: string; target: { tiktok: number; reels: number }; entries: WheelEntry[]; candidates: Candidate[]; history: Spin[] }
 
 const COLORS = ['#6C2BD9', '#F59E0B', '#8B5CF6', '#F97316', '#4C1D95', '#FBBF24']
 const SPIN_MS = 4500
@@ -52,6 +52,43 @@ function Wheel({ names, rotation, spinning }: { names: string[]; rotation: numbe
         )}
         <circle r="12" fill="#fff" stroke="#6C2BD9" strokeWidth="3" />
       </svg>
+    </div>
+  )
+}
+
+/** Choose who appears on the wheel: everyone who sent links this round is listed. */
+function WheelPicker({ state, disabled, onChange }: { state: State; disabled: boolean; onChange: (list: Candidate[], on: boolean | 'rule') => void }) {
+  const [q, setQ] = useState('')
+  const list = state.candidates.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()) || c.whatsapp.includes(q))
+  if (state.candidates.length === 0) return null
+  const free = state.candidates.filter((c) => !c.won)
+  return (
+    <div className="rounded-field border border-brand-purple/15 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-extrabold">Peserta di roda <span className="muted font-bold">({state.entries.length} dari {state.candidates.length})</span></p>
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" className="btn-ghost btn-sm" disabled={disabled} onClick={() => onChange(free, 'rule')}>Hanya yang lengkap</button>
+          <button type="button" className="btn-ghost btn-sm" disabled={disabled} onClick={() => onChange(free, true)}>Pilih semua</button>
+          <button type="button" className="btn-ghost btn-sm" disabled={disabled} onClick={() => onChange(free, false)}>Kosongkan</button>
+        </div>
+      </div>
+      {state.candidates.length > 6 && <input className="field mt-2" placeholder="Cari nama atau nomor" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari peserta" />}
+      <ul className="mt-2 max-h-80 divide-y divide-brand-purple/10 overflow-y-auto">
+        {list.map((c) => (
+          <li key={c.id}>
+            <label className={`flex min-h-[48px] cursor-pointer items-center gap-3 py-2 ${c.won ? 'cursor-not-allowed opacity-60' : ''}`}>
+              <input type="checkbox" className="h-5 w-5 shrink-0 accent-[#6C2BD9]" checked={c.onWheel} disabled={disabled || c.won} onChange={(e) => onChange([c], e.target.checked)} aria-label={`Tampilkan ${c.name} di roda`} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-bold">{c.name}</span>
+                <span className="muted block text-xs">TT {c.tiktok}/{state.target.tiktok} · IG {c.reels}/{state.target.reels}{c.override !== null ? ' · dipilih manual' : ''}</span>
+              </span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${c.won ? 'bg-amber-100 text-amber-900' : c.met ? 'bg-green-100 text-green-900' : 'bg-brand-purple/10 text-brand-purple'}`}>
+                {c.won ? 'Sudah menang' : c.met ? 'Lengkap' : 'Belum lengkap'}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -110,7 +147,16 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
     const finish = () => {
       setSpinning(false)
       setWinner(d.spin)
-      setState((s) => (s ? { ...s, entries: s.entries.filter((e) => e.whatsapp !== d.spin.whatsapp), history: [d.spin, ...s.history] } : s))
+      setState((s) =>
+        s
+          ? {
+              ...s,
+              entries: s.entries.filter((e) => e.whatsapp !== d.spin.whatsapp),
+              candidates: s.candidates.map((c) => (c.whatsapp === d.spin.whatsapp ? { ...c, won: true, onWheel: false } : c)),
+              history: [d.spin, ...s.history],
+            }
+          : s,
+      )
     }
     if (reduce) {
       setRotation(target)
@@ -131,6 +177,31 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
     if (!res?.ok) return toast('Gagal menghapus. Coba lagi.', 'bad')
     toast('Riwayat dihapus')
     await load()
+  }
+
+  /** Tick = on the wheel. Choosing what the target rule would pick anyway clears the override. */
+  async function choose(list: Candidate[], pick: boolean | 'rule') {
+    const want = (c: Candidate) => (pick === 'rule' ? c.met : pick)
+    const choices = Object.fromEntries(list.map((c) => [c.whatsapp, want(c) === c.met ? null : want(c)]))
+    // Show it on the wheel right away; the server confirms with the saved list.
+    setState((st) => {
+      if (!st) return st
+      const set = new Set(list.map((c) => c.whatsapp))
+      const candidates = st.candidates.map((c) => (set.has(c.whatsapp) && !c.won ? { ...c, onWheel: want(c), override: want(c) === c.met ? null : want(c) } : c))
+      const entries = candidates.filter((c) => c.onWheel)
+      setNames(entries.map((e) => e.name))
+      return { ...st, candidates, entries }
+    })
+    setBusy('choose')
+    const res = await fetch('/api/admin/spin', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choices }) }).catch(() => null)
+    setBusy(null)
+    if (!res?.ok) {
+      toast('Pilihan belum tersimpan. Coba lagi.', 'bad')
+      return load()
+    }
+    const d = await res.json()
+    setState(d)
+    setNames(d.entries.map((e: WheelEntry) => e.name))
   }
 
   async function reset() {
@@ -176,15 +247,8 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
             {busy === 'draw' ? <><Spinner /> Mengundi…</> : spinning ? 'Memutar…' : 'Putar roda'}
           </button>
         </div>
-        {state.entries.length === 0 && <p className="muted text-sm">Belum ada peserta yang memenuhi syarat. Lihat tab Progres peserta.</p>}
-        {state.entries.length > 0 && (
-          <details className="rounded-field bg-brand-lavender/60 p-3 text-sm">
-            <summary className="cursor-pointer font-bold">Daftar peserta di roda ({state.entries.length})</summary>
-            <ul className="mt-2 space-y-1">
-              {state.entries.map((e) => <li key={e.id}>{e.name} <span className="muted">· {e.whatsapp} · TT {e.tiktok} · IG {e.reels}</span></li>)}
-            </ul>
-          </details>
-        )}
+        {state.entries.length === 0 && <p className="muted text-sm">Belum ada peserta di roda. Centang peserta di daftar bawah.</p>}
+        <WheelPicker state={state} disabled={spinning || busy !== null} onChange={choose} />
       </section>
 
       <section className="panel-solid space-y-3">

@@ -24,6 +24,7 @@ export const SETTING_KEYS = [
   'pelatihan_round_start',
   'duta_week_tiktok',
   'duta_week_reels',
+  'spin_overrides',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -53,6 +54,7 @@ export const SEED_SETTINGS: Record<SettingKey, string> = {
   pelatihan_round_start: '',
   duta_week_tiktok: '10',
   duta_week_reels: '10',
+  spin_overrides: '',
 }
 
 const ADAPTERS: MetricsAdapterMode[] = ['off', 'rapidapi', 'apify']
@@ -96,7 +98,18 @@ export function parseSettings(raw: Map<string, string>): Settings {
     pelatihan_round_start: get('pelatihan_round_start').trim() ? toIso(get('pelatihan_round_start'), '1970-01-01T00:00:00Z') : '',
     duta_week_tiktok: Math.min(toInt(get('duta_week_tiktok'), 10), 100),
     duta_week_reels: Math.min(toInt(get('duta_week_reels'), 10), 100),
+    spin_overrides: parseOverrides(get('spin_overrides')),
   }
+}
+
+/** "628…:1,628…:0" → { "628…": true, "628…": false } */
+function parseOverrides(v: string): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const part of v.split(',')) {
+    const [wa, flag] = part.trim().split(':')
+    if (/^\d{8,16}$/.test(wa ?? '') && (flag === '1' || flag === '0')) out[wa] = flag === '1'
+  }
+  return out
 }
 
 function toIso(v: string | undefined, fallback: string): string {
@@ -129,6 +142,7 @@ export function serializeSettings(s: Settings): Record<SettingKey, string> {
     pelatihan_round_start: s.pelatihan_round_start,
     duta_week_tiktok: String(s.duta_week_tiktok),
     duta_week_reels: String(s.duta_week_reels),
+    spin_overrides: Object.entries(s.spin_overrides).map(([wa, on]) => `${wa}:${on ? 1 : 0}`).join(','),
   }
 }
 

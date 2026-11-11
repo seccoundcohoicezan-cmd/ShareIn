@@ -3,14 +3,13 @@ import { z } from 'zod'
 import { cached } from './cache'
 import { normalizeName, parseCount } from './format'
 import { withLock } from './lock'
-import { getSettings, getSettingsFresh } from './repo/settings'
+import { getSettings } from './repo/settings'
 import {
   appendSubmissionsAndList,
   countCollected,
   findDuplicate,
   isCollected,
   listSubmissionsCached,
-  listSubmissionsFresh,
   updateSubmissions,
   type StoredSubmission,
 } from './repo/submissions'
@@ -146,7 +145,9 @@ export type BatchCreateResult = { ok: false; items: CheckResult[] } | { ok: true
 export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, screenshotUrl = ''): Promise<BatchCreateResult> {
   const links = await Promise.all(inputs.map((i) => parseAndResolve(i.source_url, net)))
   return withLock('submissions', async () => {
-    const [settings, all] = await Promise.all([getSettingsFresh(), listSubmissionsFresh()])
+    // Cached data is enough to validate: the append returns the fresh table, and any duplicate that
+    // slipped past a stale cache is voided right after (the earliest row wins).
+    const [settings, all] = await Promise.all([getSettings(), listSubmissionsCached()])
     const evs = evaluateBatch(inputs.map((i) => ({ ...i, has_screenshot: Boolean(screenshotUrl) })), settings, all, links)
     if (!evs.every((e) => e.result.ok)) return { ok: false, items: evs.map((e) => e.result) }
 
@@ -188,7 +189,7 @@ export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, scre
       const firstSame = after.find((s) => s.program === program && s.source_key === sub.source_key && s.status !== 'void')
       if (firstSame && firstSame.id !== sub.id) {
         voids.push({ ...mine, status: 'void', reject_reason: 'Duplikat bersamaan (otomatis)' })
-        return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini baru saja disetor orang lain. Cari konten lain.' }] }
+        return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini sudah disetor sebelumnya. Cari konten lain.' }] }
       }
       return { ok: true, submission: sub }
     })

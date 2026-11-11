@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429 } from '@/lib/http'
 import { ensureParticipant, participantByToken } from '@/lib/participant-service'
-import { getSettingsFresh } from '@/lib/repo/settings'
-import { participantsTable } from '@/lib/repo/programs'
-import { listSubmissionsFresh } from '@/lib/repo/submissions'
 import { revalidatePublic } from '@/lib/revalidate'
 import { batchSchema, checkBatch, createBatch, expandBatch } from '@/lib/service'
 import { MAX_SCREENSHOT_BYTES, saveScreenshot, sniffImage } from '@/lib/storage'
@@ -24,14 +21,10 @@ export async function POST(req: NextRequest) {
   }
   const f = form.get('screenshot')
   const file = f && typeof f !== 'string' && f.size > 0 ? f : null
-  // Every read this request needs is issued in the same tick, so they travel in ONE spreadsheet request;
-  // createBatch then reuses them (shared for a few seconds) instead of asking again.
+  // Account, settings and existing links come from short-lived caches; the only spreadsheet request
+  // on a warm server is the append itself (which returns the table to settle duplicates).
   const token = req.cookies.get(USER_COOKIE)?.value
-  const [me] = await Promise.all([
-    token ? participantByToken(token) : participantsTable.list().then(() => null),
-    getSettingsFresh(),
-    listSubmissionsFresh(),
-  ])
+  const me = token ? await participantByToken(token) : null
 
   // Logged in with the unique link: identity comes from the account, not from the form.
   const body = me && raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), submitter_name: me.name, whatsapp: me.whatsapp } : raw

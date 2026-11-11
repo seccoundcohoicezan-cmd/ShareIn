@@ -32,6 +32,8 @@ export interface Settings {
   /** Duta Teladan: links required every week (Monday–Sunday WIB), per platform. */
   duta_week_tiktok: number
   duta_week_reels: number
+  /** Admin choices for the spin wheel by WhatsApp: true = always on the wheel, false = never. */
+  spin_overrides: Record<string, boolean>
 }
 
 export interface Participant {

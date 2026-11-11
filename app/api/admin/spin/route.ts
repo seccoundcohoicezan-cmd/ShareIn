@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { jsonError, readJson, requireAdmin, sameOrigin } from '@/lib/http'
 import { revalidatePublic } from '@/lib/revalidate'
-import { deleteSpins, draw, wheel } from '@/lib/spin'
+import { deleteSpins, draw, setWheelChoices, wheel } from '@/lib/spin'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,4 +41,17 @@ export async function DELETE(req: NextRequest) {
   const count = await deleteSpins(body.data.ids, s.email)
   revalidatePublic()
   return NextResponse.json({ ok: true, count })
+}
+
+const choiceSchema = z.object({ choices: z.record(z.string().regex(/^\d{8,16}$/), z.boolean().nullable()).refine((v) => Object.keys(v).length <= 500) })
+
+/** Choose who appears on the wheel. */
+export async function PATCH(req: NextRequest) {
+  if (!sameOrigin(req)) return jsonError(403, 'Permintaan ditolak.')
+  const s = await requireAdmin(req)
+  if (s instanceof NextResponse) return s
+  const body = choiceSchema.safeParse(await readJson(req))
+  if (!body.success) return jsonError(400, 'Pilihan peserta tidak valid.')
+  await setWheelChoices(body.data.choices, s.email)
+  return NextResponse.json({ ok: true, ...(await wheel(PROGRAM)) })
 }

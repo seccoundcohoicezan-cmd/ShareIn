@@ -42,29 +42,41 @@ describe('AppsScriptStore round trips', () => {
 })
 
 describe('submission speed', () => {
-  it('a new participant submitting costs 3 spreadsheet requests (was 9), the two writes in parallel', async () => {
+  it('on a warm server a returning participant submits with ONE spreadsheet request (was 3, before that 9)', async () => {
     const { invalidate } = await import('@/lib/cache')
     const { setStore } = await import('@/lib/repo')
-    const { ensureParticipant } = await import('@/lib/participant-service')
-    const { participantsTable } = await import('@/lib/repo/programs')
-    const { getSettingsFresh } = await import('@/lib/repo/settings')
-    const { listSubmissionsFresh } = await import('@/lib/repo/submissions')
+    const { ensureParticipant, participantByToken } = await import('@/lib/participant-service')
+    const { getSettings } = await import('@/lib/repo/settings')
+    const { listSubmissionsCached, listSubmissionsFresh } = await import('@/lib/repo/submissions')
     const { createBatch } = await import('@/lib/service')
     const sim = createAppsScriptSim(SECRET)
     setStore(new AppsScriptStore('https://sim', SECRET, sim.poster))
     invalidate()
-    await getSettingsFresh() // sheet already set up, as in production
+    const me = await ensureParticipant('A', '081234567890') // registered earlier
     const calls: string[] = []
-    setStore(new AppsScriptStore('https://sim', SECRET, async (u, b) => {
+    const store = new AppsScriptStore('https://sim', SECRET, async (u, b) => {
       calls.push((JSON.parse(b).ops as { action: string }[]).map((o) => o.action).join('+'))
       return sim.poster(u, b)
-    }))
+    })
+    setStore(store)
     invalidate()
+    await store.ensureSchema()
+    await Promise.all([getSettings(), listSubmissionsCached(), participantByToken(me!.token)]) // warm caches
+    calls.length = 0
+
     const input = { submitter_name: 'A', whatsapp: '081234567890', platform: 'tiktok' as const, source_url: 'https://www.tiktok.com/@a/video/7400000000000012345', sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const, program: 'golden' as const }
-    await Promise.all([participantsTable.list(), getSettingsFresh(), listSubmissionsFresh()])
+    expect(await participantByToken(me!.token)).toMatchObject({ name: 'A' })
     const [r] = await Promise.all([createBatch([input]), ensureParticipant('A', '081234567890')])
     expect(r.ok).toBe(true)
-    expect(calls.sort()).toEqual(['append', 'append', 'read+read+read'])
+    expect(calls).toEqual(['append'])
+
+    // A duplicate that a stale cache let through is voided right after the append.
+    const { prime } = await import('@/lib/cache')
+    prime('submissions', [])
+    const again = await createBatch([{ ...input }])
+    expect(again.ok && again.results[0].ok).toBe(false)
+    const rows = await listSubmissionsFresh()
+    expect(rows.map((x) => x.status)).toEqual(['pending', 'void'])
   })
 })
 

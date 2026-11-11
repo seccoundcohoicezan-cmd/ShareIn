@@ -32,7 +32,6 @@ const schema = z.object({
   auto_approve_duta: z.boolean(),
   pelatihan_need_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
   pelatihan_need_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
-  pelatihan_round_start: z.union([z.literal(''), z.string().datetime({ offset: true })]),
   duta_week_tiktok: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
   duta_week_reels: z.number().int().min(0).max(100, 'Target maksimal 100 link.'),
 }).refine((v) => new Date(v.golden_end_at) > new Date(v.golden_start_at), {
@@ -52,8 +51,11 @@ export async function PUT(req: NextRequest) {
   const body = schema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, body.error.issues[0]?.message ?? 'Data tidak valid.')
   const before = await getSettingsFresh()
-  await saveSettings(body.data, { actor: s.email })
-  await approveWaiting(before, body.data)
+  // Merge onto the current values: keys this form does not edit (draw round, wheel choices) must not
+  // be reverted by a settings page that was opened before they changed.
+  const next = { ...before, ...body.data }
+  await saveSettings(next, { actor: s.email })
+  await approveWaiting(before, next)
   revalidatePublic()
   return NextResponse.json({ ok: true, settings: await getSettings() })
 }

@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto'
 import { maskWhatsapp, normalizeWhatsapp } from './identity'
+import { cached } from './cache'
 import { withLock } from './lock'
 import { participantsTable } from './repo/programs'
 import { strip } from './repo/records'
@@ -31,6 +32,9 @@ export function formatToken(t: string): string {
 export async function ensureParticipant(name: string, whatsapp: string): Promise<Participant | null> {
   const wa = normalizeWhatsapp(whatsapp)
   if (!wa) return null
+  // Known number (the usual case): no spreadsheet request at all.
+  const known = (await listCached()).find((p) => p.whatsapp === wa)
+  if (known) return strip(known)
   return withLock('participants', async () => {
     const all = await participantsTable.list()
     const found = all.find((p) => p.whatsapp === wa)
@@ -46,11 +50,17 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
   })
 }
 
+/** Participants change rarely: served from a 60 s cache (cleared on every write from this server). */
+function listCached() {
+  return cached('participants', () => participantsTable.list())
+}
+
 export async function participantByToken(token: string): Promise<Participant | null> {
   const t = normalizeToken(token)
   if (!t) return null
-  const all = await participantsTable.list()
-  const p = all.find((x) => x.token === t)
+  let p = (await listCached()).find((x) => x.token === t)
+  // Registered moments ago on another server instance: look once more in the sheet itself.
+  if (!p) p = (await participantsTable.list()).find((x) => x.token === t)
   return p ? strip(p) : null
 }
 

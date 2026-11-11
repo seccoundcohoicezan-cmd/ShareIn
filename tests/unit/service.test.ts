@@ -174,7 +174,7 @@ describe('sheets store details', () => {
     expect(s.min_like_tiktok).toBe(100000)
     expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'api_keys', 'audit_log', 'participants', 'settings', 'spins', 'submissions'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
-    expect(fake.tabs.get('settings')!.length).toBe(1 + 23)
+    expect(fake.tabs.get('settings')!.length).toBe(1 + 24)
     const header = fake.tabs.get('submissions')![0] as string[]
     expect(header.slice(0, 3)).toEqual(['status', 'id', 'custom_note'])
     expect(header).toContain('source_key')

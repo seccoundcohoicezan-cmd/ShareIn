@@ -187,6 +187,49 @@ function ContentCard({
   )
 }
 
+/**
+ * Live count while pasting, before anything is sent: what already counts plus the valid links in the
+ * form, per platform. Pasted chips are striped until sent.
+ */
+function LiveTally({ target, base, inForm, mode }: { target: { tiktok: number; reels: number }; base: Progress | null; inForm: { tiktok: number; reels: number }; mode: 'draw' | 'weekly' }) {
+  const rows = [
+    { k: 'TikTok', done: base?.tiktok ?? 0, add: inForm.tiktok, of: target.tiktok },
+    { k: 'Instagram', done: base?.reels ?? 0, add: inForm.reels, of: target.reels },
+  ]
+  const total = rows.every((r) => r.done + r.add >= r.of)
+  return (
+    <div className="mb-2 px-1" aria-live="polite">
+      <div className="grid grid-cols-2 gap-3">
+        {rows.map((r) => {
+          const sum = r.done + r.add
+          return (
+            <div key={r.k}>
+              <p className="flex items-baseline justify-between text-xs font-bold">
+                <span>{r.k}</span>
+                <span className={`tabular-nums ${sum >= r.of ? 'text-ok' : ''}`}>
+                  {Math.min(sum, r.of)}/{r.of}
+                  {r.add > 0 && <span className="ml-1 text-brand-purple">(+{r.add})</span>}
+                </span>
+              </p>
+              <div className="mt-1 flex gap-0.5" role="progressbar" aria-label={`Hitungan ${r.k} di form`} aria-valuemin={0} aria-valuemax={r.of} aria-valuenow={Math.min(sum, r.of)}>
+                {Array.from({ length: r.of }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 flex-1 rounded-full ${i < r.done ? 'bg-brand-purple' : i < sum ? 'bg-[repeating-linear-gradient(45deg,#a855f7_0_3px,#e9d5ff_3px_6px)]' : 'bg-brand-purple/10'}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-1 text-center text-[11px] font-bold">
+        {total ? (mode === 'draw' ? 'Lengkap! Kirim untuk masuk undian.' : 'Target minggu ini terpenuhi setelah dikirim.') : 'Bergaris = link di form ini, terhitung setelah dikirim.'}
+      </p>
+    </div>
+  )
+}
+
 export function SetorForm({ program = 'golden' }: { program?: Channel }) {
   const golden = program === 'golden'
   const [rules, setRules] = useState<Rules | null>(null)
@@ -242,6 +285,17 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
     }
   }, [me])
 
+  // What already counts toward the target, so the live tally below can add the pasted links to it.
+  const [base, setBase] = useState<Progress | null>(null)
+  const [round, setRound] = useState(0)
+  useEffect(() => {
+    if (golden || !me) return setBase(null)
+    fetch(`/api/me?program=${program}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setBase(d.progress ?? null))
+      .catch(() => setBase(null))
+  }, [me, golden, program, round])
+
   useEffect(() => {
     setName(localStorage.getItem(NAME_KEY) ?? '')
     fetch('/api/rules', { cache: 'no-store' })
@@ -256,6 +310,16 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
   )
   const fresh = results !== null && checkedKey === formKey
   const anyRedLink = items.some((i) => linkState(i.url).state === 'bad')
+  // Valid links in the form right now, per platform (the same link pasted twice counts once).
+  const inForm = useMemo(() => {
+    const seen = new Map<string, Platform>()
+    for (const i of items) {
+      const l = linkState(i.url)
+      if (l.state === 'ok' || l.state === 'short') seen.set(l.parsed.url, l.parsed.platform)
+    }
+    const all = Array.from(seen.values())
+    return { tiktok: all.filter((p) => p === 'tiktok').length, reels: all.filter((p) => p === 'reels').length }
+  }, [items])
   const globalFails = results ? Array.from(new Map(results.flatMap((r) => r.checks).filter((c) => !c.pass && GLOBAL_CHECKS.includes(c.id)).map((c) => [c.id, c])).values()) : []
 
   const update = (key: number, patch: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...patch } : x)))
@@ -321,6 +385,8 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
       const data = await res.json()
       if (res.ok && data.ok) {
         localStorage.setItem(NAME_KEY, name.trim())
+        // A first-time sender now has an account (cookie): pick it up so "Setor lagi" needs no typing.
+        if (!me) fetch('/api/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => d.user && setMe(d.user)).catch(() => {})
         toast('Terkirim')
         const failed = (data.results as { ok: boolean; checks?: Check[] }[]).flatMap((r, i) => (r.ok ? [] : [`Konten ${i + 1}: ${r.checks?.[0]?.message ?? 'gagal disimpan'}`]))
         setDone({ saved: data.saved, total: items.length, token: data.token ?? '', auto: data.status === 'approved', failed })
@@ -370,6 +436,7 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
     setCheckedKey('')
     setDone(null)
     setProgress(null)
+    setRound((n) => n + 1)
     fetch('/api/rules', { cache: 'no-store' }).then((r) => r.json()).then(setRules).catch(() => {})
   }
 
@@ -559,6 +626,7 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
       )}
 
       <div className="sticky bottom-3 z-10 rounded-panel border border-brand-purple/10 bg-white/90 p-2 backdrop-blur">
+        {target && <LiveTally target={target} base={base} inForm={inForm} mode={program === 'pelatihan' ? 'draw' : 'weekly'} />}
         <button type="button" className="btn-primary w-full" onClick={send} disabled={busy !== null || !rules || Boolean(closed) || anyRedLink} aria-describedby="kirim-hint">
           {busy === 'send' ? 'Memeriksa & mengirim…' : items.length > 1 ? `Kirim ${items.length} setoran` : 'Kirim setoran'}
         </button>

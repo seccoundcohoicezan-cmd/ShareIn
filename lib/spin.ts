@@ -18,20 +18,49 @@ export interface WheelEntry {
   reels: number
 }
 
+export interface Candidate extends WheelEntry {
+  /** Reached the target this round. */
+  met: boolean
+  /** Already won in this round (stays off the wheel until the win is deleted or the round reset). */
+  won: boolean
+  /** Admin choice: true = on, false = off, null = follow the target rule. */
+  override: boolean | null
+  onWheel: boolean
+}
+
 function listSpins(): Promise<Spin[]> {
   return cached('spins', async () => (await spinsTable.list()).map(strip))
 }
 
 const sameRound = (s: Spin, round: string) => s.round_start === round
 
-/** People on the wheel: reached the target this round and have not already won this round. */
+/**
+ * Who is on the wheel: by default everyone who reached the target this round, but the admin can
+ * take people off or put others on. Winners of this round stay off until their win is deleted.
+ */
 export async function wheel(program: Program) {
   const [settings, r, spins] = await Promise.all([getSettings(), recap(program), listSpins()])
   const round = settings.pelatihan_round_start
   const won = new Set(spins.filter((s) => s.program === program && !s.deleted && sameRound(s, round)).map((s) => s.whatsapp))
-  const entries: WheelEntry[] = r.rows.filter((x) => x.met && !won.has(x.whatsapp)).map((x) => ({ id: x.id, name: x.name, whatsapp: x.whatsapp, tiktok: x.tiktok, reels: x.reels }))
+  const candidates: Candidate[] = r.rows.map((x) => {
+    const override = x.whatsapp in settings.spin_overrides ? settings.spin_overrides[x.whatsapp] : null
+    const isWon = won.has(x.whatsapp)
+    return { id: x.id, name: x.name, whatsapp: x.whatsapp, tiktok: x.tiktok, reels: x.reels, met: x.met, won: isWon, override, onWheel: !isWon && (override ?? x.met) }
+  })
+  const entries: WheelEntry[] = candidates.filter((c) => c.onWheel).map(({ id, name, whatsapp, tiktok, reels }) => ({ id, name, whatsapp, tiktok, reels }))
   const history = spins.filter((s) => s.program === program && !s.deleted).sort((a, b) => b.created_at.localeCompare(a.created_at))
-  return { round, target: r.target, entries, history, progress: r.rows.length }
+  return { round, target: r.target, entries, candidates, history, progress: r.rows.length }
+}
+
+/** Saves the admin's wheel choices (one settings write); `null` returns a person to the target rule. */
+export async function setWheelChoices(changes: Record<string, boolean | null>, actor: string) {
+  const settings = await getSettingsFresh()
+  const next = { ...settings.spin_overrides }
+  for (const [wa, v] of Object.entries(changes)) {
+    if (v === null) delete next[wa]
+    else next[wa] = v
+  }
+  await saveSettings({ ...settings, spin_overrides: next }, { actor })
 }
 
 /** Picks a winner with a cryptographic random draw and records it together with its audit entry. */
@@ -39,7 +68,7 @@ export async function draw(program: Program, prize: string, actor: string) {
   return withLock('spins', async () => {
     invalidate('spins')
     const state = await wheel(program)
-    if (state.entries.length === 0) return { error: 'Belum ada peserta yang memenuhi syarat undian.' as const }
+    if (state.entries.length === 0) return { error: 'Belum ada peserta di roda. Centang peserta yang mau diundi.' as const }
     const index = randomInt(state.entries.length)
     const w = state.entries[index]
     const spin: Spin = {
