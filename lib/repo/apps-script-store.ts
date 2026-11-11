@@ -1,3 +1,5 @@
+import http from 'node:http'
+import https from 'node:https'
 import { cellToString, TABLES, type PatchRequest, type PatchResult, type Row, type WriteOp, type TableData, type TableName, type TableStore } from './store'
 
 type Op =
@@ -9,19 +11,50 @@ type Op =
 
 export type Poster = (url: string, body: string) => Promise<{ status: number; text: string }>
 
-const defaultPoster: Poster = async (url, body) => {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body,
-    redirect: 'follow',
-    cache: 'no-store',
-    signal: AbortSignal.timeout(25_000),
+// Node's own HTTP client, not Next's patched fetch: a `no-store` fetch inside an ISR page makes Next
+// abort the regeneration with "static to dynamic" (HTTP 500). Keep-alive saves a TLS handshake per call.
+const agents = { http: new http.Agent({ keepAlive: true, maxSockets: 64 }), https: new https.Agent({ keepAlive: true, maxSockets: 64 }) }
+
+function request(url: string, method: 'POST' | 'GET', body: string | null, deadline: number): Promise<{ status: number; text: string; location?: string }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url)
+    const mod = u.protocol === 'https:' ? https : http
+    const req = mod.request(
+      u,
+      {
+        method,
+        agent: u.protocol === 'https:' ? agents.https : agents.http,
+        headers: body === null ? {} : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+        timeout: Math.max(1000, deadline - Date.now()),
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8'), location: res.headers.location }))
+        res.on('error', reject)
+      },
+    )
+    req.on('timeout', () => req.destroy(new Error('Apps Script tidak menjawab (timeout)')))
+    req.on('error', reject)
+    if (body !== null) req.write(body)
+    req.end()
   })
-  return { status: res.status, text: await res.text() }
+}
+
+const defaultPoster: Poster = async (url, body) => {
+  const deadline = Date.now() + 25_000
+  let r = await request(url, 'POST', body, deadline)
+  // The Web App answers a POST with a redirect to the result, which is fetched with GET (as browsers do).
+  for (let hops = 0; r.location && r.status >= 300 && r.status < 400 && hops < 5; hops++) {
+    r = await request(new URL(r.location, url).toString(), 'GET', null, deadline)
+  }
+  return { status: r.status, text: r.text }
 }
 
 type ReadResult = { header: string[]; rows: string[][] }
+
+const BUSY = /too many|simultaneous|Service invoked|Lock timeout|lock busy|try again/i
+const MAX_BUSY_RETRIES = 6
 
 /**
  * Google Sheets through the bound Apps Script Web App (apps-script/Code.js), authenticated by a shared secret.
@@ -42,25 +75,37 @@ export class AppsScriptStore implements TableStore {
 
   private async send<T>(ops: Op[], retries = 1): Promise<T[]> {
     let lastErr: unknown
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    // "Too many simultaneous invocations" and lock timeouts mean the script did NOT run, so retrying is
+    // safe even for writes. Under a burst (300 people at once) they are expected; back off with jitter.
+    for (let attempt = 0, busy = 0; attempt <= retries + busy; attempt++) {
       try {
         const res = await this.post(this.url, JSON.stringify({ secret: this.secret, ops }))
         let data: { ok: boolean; error?: string; results?: T[] }
         try {
           data = JSON.parse(res.text)
         } catch {
+          if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`Apps Script sibuk (${res.status})`), { busy: true })
           throw new Error(`Apps Script membalas ${res.status} bukan JSON (izin belum diberikan atau URL salah)`)
         }
         if (!data.ok) {
-          // Logical errors (missing tab, bad secret) won't fix themselves on retry.
-          const err = new Error(`Apps Script: ${data.error}`)
-          ;(err as Error & { final?: boolean }).final = true
+          const err = new Error(`Apps Script: ${data.error}`) as Error & { final?: boolean; busy?: boolean }
+          if (BUSY.test(String(data.error))) err.busy = true
+          // Other logical errors (missing tab, bad secret) won't fix themselves on retry.
+          else err.final = true
           throw err
         }
         return data.results!
       } catch (e) {
         lastErr = e
-        if ((e as Error & { final?: boolean }).final) break
+        const err = e as Error & { final?: boolean; busy?: boolean }
+        if (err.final) break
+        if (err.busy && busy < MAX_BUSY_RETRIES) {
+          busy++
+          await new Promise((r) => setTimeout(r, 400 * busy + Math.random() * 600))
+          continue
+        }
+        // A network error on a write may have reached the sheet: never repeat a write blindly.
+        if (ops.some((o) => o.action !== 'read')) break
       }
     }
     throw lastErr

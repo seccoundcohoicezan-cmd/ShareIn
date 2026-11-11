@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { jsonError, limitOr429 } from '@/lib/http'
+import { clientIp, jsonError, limitKey, limitOr429 } from '@/lib/http'
+import { normalizeWhatsapp } from '@/lib/identity'
 import { ensureParticipant, participantByToken } from '@/lib/participant-service'
 import { revalidatePublic } from '@/lib/revalidate'
 import { batchSchema, checkBatch, createBatch, expandBatch } from '@/lib/service'
@@ -9,7 +10,7 @@ import { setUserCookie, USER_COOKIE } from '@/lib/user-session'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  const limited = limitOr429(req, 'submit', 10)
+  const limited = limitOr429(req, 'submit', 3000)
   if (limited) return limited
   const form = await req.formData().catch(() => null)
   if (!form) return jsonError(400, 'Data tidak terbaca. Muat ulang halaman lalu coba lagi.')
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
   const parsed = batchSchema.safeParse(body)
   if (!parsed.success) return jsonError(400, parsed.error.issues[0]?.message ?? 'Data tidak lengkap.')
   const inputs = expandBatch({ ...parsed.data, has_screenshot: Boolean(file) })
+  // Per person: 12 sends a minute is plenty for a human (10 links each).
+  const perPerson = limitKey(`submit-wa:${normalizeWhatsapp(parsed.data.whatsapp) ?? clientIp(req)}`, 12)
+  if (perPerson) return perPerson
 
   let buf: Buffer | null = null
   let mime: ReturnType<typeof sniffImage> = null

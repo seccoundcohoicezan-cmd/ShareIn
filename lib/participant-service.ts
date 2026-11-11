@@ -1,11 +1,12 @@
 import { randomInt } from 'node:crypto'
 import { maskWhatsapp, normalizeWhatsapp } from './identity'
+import { batcher } from './batcher'
 import { cached } from './cache'
 import { withLock } from './lock'
 import { participantsTable } from './repo/programs'
-import { strip } from './repo/records'
-import { getSettingsFresh } from './repo/settings'
-import { listSubmissionsFresh, listSubmissionsRecent } from './repo/submissions'
+import { strip, type Stored } from './repo/records'
+import { getSettings } from './repo/settings'
+import { listSubmissionsRecent } from './repo/submissions'
 import { AUTO_REVIEWER, CHANNEL_INFO, type Channel, type Participant, type Program } from './types'
 import { progressFor } from './progress'
 
@@ -35,20 +36,34 @@ export async function ensureParticipant(name: string, whatsapp: string): Promise
   // Known number (the usual case): no spreadsheet request at all.
   const known = (await listCached()).find((p) => p.whatsapp === wa)
   if (known) return strip(known)
-  return withLock('participants', async () => {
-    const all = await participantsTable.list()
-    const found = all.find((p) => p.whatsapp === wa)
-    if (found) return strip(found)
-    const taken = new Set(all.map((p) => p.token))
+  return registerQueue({ name, wa })
+}
+
+/**
+ * One wave of first-time participants: read once, append every new number in one request, and settle
+ * races (earliest row per number wins). 300 newcomers at once cost a few writes, not 300.
+ */
+async function registerWave(reqs: { name: string; wa: string }[]): Promise<(Participant | null)[]> {
+  const all = await participantsTable.list()
+  const first = (rows: { whatsapp: string }[], wa: string) => rows.find((p) => p.whatsapp === wa)
+  const taken = new Set(all.map((p) => p.token))
+  const fresh: Participant[] = []
+  for (const r of reqs) {
+    if (first(all, r.wa) || first(fresh, r.wa)) continue
     let token = newToken()
     while (taken.has(token)) token = newToken()
-    const now = new Date().toISOString()
-    const p: Participant = { id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: name.trim().replace(/\s+/g, ' '), whatsapp: wa, created_at: now, last_seen_at: '', sso_sub: '' }
-    // Another server may have registered the same number at the same moment: earliest row wins.
-    const after = await participantsTable.appendAndList([p])
-    return strip(after.find((x) => x.whatsapp === wa) ?? { ...p, _index: -1 })
+    taken.add(token)
+    fresh.push({ id: 'usr_' + token.slice(0, 6).toLowerCase() + Date.now().toString(36), token, name: r.name.trim().replace(/\s+/g, ' '), whatsapp: r.wa, created_at: new Date().toISOString(), last_seen_at: '', sso_sub: '' })
+  }
+  const rows = fresh.length ? await participantsTable.appendAndList(fresh) : all
+  return reqs.map((r) => {
+    const p = first(rows, r.wa)
+    return p ? strip(p as Stored<Participant>) : null
   })
 }
+
+const gq = globalThis as unknown as { __shareinRegisterQueue?: (r: { name: string; wa: string }) => Promise<Participant | null> }
+const registerQueue = (gq.__shareinRegisterQueue ??= batcher(registerWave))
 
 /** Participants change rarely: served from a 60 s cache (cleared on every write from this server). */
 function listCached() {
@@ -84,7 +99,8 @@ export interface TrackItem {
 export async function tracking(token: string) {
   const me = await participantByToken(token)
   if (!me) return null
-  const [all, settings] = await Promise.all([listSubmissionsFresh(), getSettingsFresh()])
+  // At most 15 s old: 300 people polling every 15 s must not each trigger a spreadsheet read.
+  const [all, settings] = await Promise.all([listSubmissionsRecent(), getSettings()])
   const mine = all.filter((s) => s.whatsapp === me.whatsapp && s.status !== 'void')
   const items: TrackItem[] = mine
     .map((s): TrackItem => ({

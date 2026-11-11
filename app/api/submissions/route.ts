@@ -7,7 +7,7 @@ import { ensureParticipant } from '@/lib/participant-service'
 import { setUserCookie } from '@/lib/user-session'
 
 export async function POST(req: NextRequest) {
-  const limited = limitOr429(req, 'submit', 10)
+  const limited = limitOr429(req, 'submit', 3000)
   if (limited) return limited
 
   let raw: unknown

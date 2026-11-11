@@ -6,7 +6,7 @@ import { collectedFeed, FEED_PAGE } from '@/lib/service'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const limited = limitOr429(req, 'collected', 60)
+  const limited = limitOr429(req, 'collected', 3000)
   if (limited) return limited
   const program = asChannel(req.nextUrl.searchParams.get('program') ?? 'golden')
   if (!program) return jsonError(404, 'Program tidak ditemukan.')

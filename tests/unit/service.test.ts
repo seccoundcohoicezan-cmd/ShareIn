@@ -177,7 +177,10 @@ describe('sheets store details', () => {
     setStore(new SheetsStore(fake.client as unknown as SheetsClient, 'x'))
     invalidate()
     const s = await getSettingsFresh()
-    expect(s.min_like_tiktok).toBe(100000)
+    expect(s.min_like_tiktok).toBe(100000) // defaults without writing anything
+    expect(fake.tabs.get('settings')!.length).toBe(1)
+    const { seedSettings } = await import('@/lib/repo/settings')
+    await seedSettings() // setup script / first save writes the rows
     expect(Array.from(fake.tabs.keys()).sort()).toEqual(['admins', 'api_keys', 'audit_log', 'participants', 'settings', 'spins', 'submissions'])
     expect(fake.tabs.get('settings')![0]).toEqual(['key', 'value'])
     expect(fake.tabs.get('settings')!.length).toBe(1 + 25)

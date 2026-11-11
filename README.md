@@ -121,6 +121,19 @@ lib/metrics/       adapter RapidAPI / Apify (default mati)
 
 Ganti database ke Postgres/Supabase cukup dengan menulis implementasi `TableStore` baru di `lib/repo/` — UI dan API tidak berubah.
 
+## Uji beban (300 pengguna bersamaan)
+
+`tests/load/apps-script-server.ts` meniru Web App Apps Script (menjalankan `apps-script/Code.js` asli, ±1–2 dtk per panggilan, maks. 30 eksekusi bersamaan, penulisan dikunci LockService 25 dtk). `tests/load/load.mjs` menjalankan N peserta sekaligus dari SATU IP (seperti wifi kampus): buka halaman → cek progres → kirim 3 link (akun baru) → cek lagi → pantau.
+
+```bash
+npx next build
+APPS_SCRIPT_SECRET=$(printf 'y%.0s' {1..40}) npx tsx tests/load/apps-script-server.ts &      # SIM_BASE_MS=2000 untuk latensi realistis
+APPS_SCRIPT_SECRET=… APPS_SCRIPT_URL=http://127.0.0.1:39200/exec SESSION_SECRET=… npx next start -p 3300 &
+node tests/load/load.mjs http://localhost:3300 300 1          # beberapa URL dipisah koma = beberapa instance server
+```
+
+Hasil 12 Nov 2026 (300 orang menekan Kirim dalam 1 detik, latensi realistis, 3 instance): 0 error, kirim p95 9,3 dtk, 900 link + 300 akun tercatat tanpa duplikat, hanya 26 penulisan ke spreadsheet.
+
 ## Batasan yang diketahui
 
 - Angka like/komentar diisi manual oleh penyetor; "muncul organik di FYP" tidak bisa diverifikasi otomatis — mengandalkan pernyataan, tangkapan layar, dan review admin.

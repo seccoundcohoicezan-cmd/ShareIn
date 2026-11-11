@@ -8,7 +8,7 @@ const schema = z.object({ link: z.string().trim().min(1).max(300) })
 
 /** Log in by pasting the unique monitoring link (or just its code). */
 export async function POST(req: NextRequest) {
-  const limited = limitOr429(req, 'me-login', 20)
+  const limited = limitOr429(req, 'me-login', 600)
   if (limited) return limited
   const body = schema.safeParse(await readJson(req))
   if (!body.success) return jsonError(400, 'Tempel link pantau atau kodenya.')

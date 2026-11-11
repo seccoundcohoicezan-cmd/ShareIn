@@ -17,9 +17,17 @@ export function jsonError(status: number, message: string, extra: Record<string,
   return NextResponse.json({ ok: false, error: message, ...extra }, { status })
 }
 
-/** 30 requests/minute/IP for public routes unless a tighter limit is given. */
-export function limitOr429(req: NextRequest, bucket: string, limit = 30, windowMs = 60_000) {
-  const r = rateLimit(`${bucket}:${clientIp(req)}`, limit, windowMs)
+/**
+ * Per-IP limit. Kept generous on purpose: a campus or event wifi puts hundreds of participants behind
+ * ONE public IP. Abuse is limited per person instead (limitKey with the WhatsApp number or token).
+ */
+export function limitOr429(req: NextRequest, bucket: string, limit = 600, windowMs = 60_000) {
+  return limitKey(`${bucket}:${clientIp(req)}`, limit, windowMs)
+}
+
+/** Limit on any key, e.g. one WhatsApp number or one personal link. */
+export function limitKey(key: string, limit: number, windowMs = 60_000) {
+  const r = rateLimit(key, limit, windowMs)
   if (r.ok) return null
   return NextResponse.json(
     { ok: false, error: `Terlalu banyak permintaan. Coba lagi dalam ${r.retryAfter} detik.` },

@@ -136,7 +136,10 @@ describe('admin writes', () => {
       calls.push((JSON.parse(body).ops as { action: string }[]).map((o) => o.action).join('+'))
       return sim.poster(u, body)
     }))
-    await Promise.all([getSettingsFresh(), listAdmins(), getStore().ensureSchema()]) // warmed server, page loaded
+    const { seedSettings } = await import('@/lib/repo/settings')
+    await getStore().ensureSchema()
+    await seedSettings()
+    await Promise.all([getSettingsFresh(), listAdmins()]) // warmed server, page loaded
     calls.length = 0
 
     const r = await createAdmin({ email: 'baru@x.id', role: 'owner', password: 'sandi-panjang-123' }, 'owner@x')
@@ -147,10 +150,79 @@ describe('admin writes', () => {
     const s = await getSettingsFresh()
     calls.length = 0
     await saveSettings({ ...s, duta_week_tiktok: 7 }, { actor: 'owner@x' })
-    expect(calls).toEqual(['update+append'])
+    // Saving reads the sheet fresh first (row positions must be exact), then writes rows + audit at once.
+    expect(calls).toEqual(['read', 'update+append'])
     expect((await getSettings()).duta_week_tiktok).toBe(7) // primed, no re-read
-    expect(calls).toHaveLength(1)
+    expect(calls).toHaveLength(2)
     const log = await getStore().read('audit_log')
     expect(log.rows.map((x) => x[2])).toEqual(['admin.create', 'settings.update'])
+  })
+})
+
+describe('300 at once', () => {
+  it('concurrent senders share writes; the same link from two people is accepted once', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore } = await import('@/lib/repo')
+    const { ensureParticipant } = await import('@/lib/participant-service')
+    const { listSubmissionsFresh } = await import('@/lib/repo/submissions')
+    const { participantsTable } = await import('@/lib/repo/programs')
+    const { createBatch } = await import('@/lib/service')
+    const sim = createAppsScriptSim(SECRET)
+    const calls: string[] = []
+    const store = new AppsScriptStore('https://sim', SECRET, async (u, b) => {
+      calls.push((JSON.parse(b).ops as { action: string }[]).map((o) => o.action).join('+'))
+      await new Promise((r) => setTimeout(r, 20)) // every call takes time, like the real Web App
+      return sim.poster(u, b)
+    })
+    setStore(store)
+    invalidate()
+    await store.ensureSchema()
+    calls.length = 0
+    const base = { sharein_url: '', likes: null, comments: null, organic_declared: true, checked_declared: true, has_screenshot: false, metrics_source: 'manual' as const, program: 'pelatihan' as const, platform: 'tiktok' as const }
+    const people = Array.from({ length: 60 }, (_, i) => ({ name: `P${i}`, wa: `0812${String(40000000 + i)}` }))
+    const results = await Promise.all(
+      people.flatMap((p, i) => [
+        createBatch([{ ...base, submitter_name: p.name, whatsapp: p.wa, source_url: `https://www.tiktok.com/@p/video/7400000000${String(100000000 + i)}` }]),
+        ensureParticipant(p.name, p.wa),
+      ]),
+    )
+    // Two people send the very same link at the same moment.
+    const same = 'https://www.tiktok.com/@same/video/7499999999999999999'
+    const [a, b] = await Promise.all([
+      createBatch([{ ...base, submitter_name: 'X', whatsapp: '081300000001', source_url: same }]),
+      createBatch([{ ...base, submitter_name: 'Y', whatsapp: '081300000002', source_url: same }]),
+    ])
+    expect(results.filter((r) => r && 'ok' in r && r.ok).length).toBe(60)
+    expect([a, b].filter((r) => r.ok).length).toBe(1)
+    const appends = calls.filter((c) => c.includes('append')).length
+    expect(appends).toBeLessThan(12) // 60 sends + 60 registrations + 2, not 122 writes
+    const rows = await listSubmissionsFresh()
+    expect(rows.filter((r) => r.status !== 'void')).toHaveLength(61)
+    expect(new Set(rows.filter((r) => r.status !== 'void').map((r) => r.source_key)).size).toBe(61)
+    expect(await participantsTable.list()).toHaveLength(60)
+  })
+})
+
+describe('settings under concurrency', () => {
+  it('many servers reading settings at once never append duplicate keys; saving cleans old duplicates', async () => {
+    const { invalidate } = await import('@/lib/cache')
+    const { setStore, getStore } = await import('@/lib/repo')
+    const { getSettingsFresh, saveSettings } = await import('@/lib/repo/settings')
+    const sim = createAppsScriptSim(SECRET)
+    const servers = Array.from({ length: 5 }, () => new AppsScriptStore('https://sim', SECRET, sim.poster))
+    // Old duplicates left by the previous seeding behaviour.
+    setStore(servers[0])
+    await servers[0].ensureSchema()
+    await servers[0].append('settings', [['duta_week_tiktok', '3'], ['duta_week_tiktok', '8']])
+    for (const s of servers) {
+      setStore(s)
+      invalidate()
+      expect((await getSettingsFresh()).duta_week_tiktok).toBe(8) // last row wins
+    }
+    expect((await getStore().read('settings')).rows).toHaveLength(2) // reading wrote nothing
+    invalidate()
+    await saveSettings({ ...(await getSettingsFresh()), duta_week_tiktok: 9 })
+    const rows = (await getStore().read('settings')).rows.filter((r) => r[0] === 'duta_week_tiktok')
+    expect(rows).toEqual([['duta_week_tiktok', '9']])
   })
 })

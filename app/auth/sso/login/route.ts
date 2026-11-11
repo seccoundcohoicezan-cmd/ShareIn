@@ -12,7 +12,7 @@ const HOME = '/dutateladan/setor'
  * start here. Registered in MyTopstar as the client's Initiate Login URI.
  */
 export async function GET(req: NextRequest) {
-  const limited = limitOr429(req, 'sso', 30)
+  const limited = limitOr429(req, 'sso', 600)
   if (limited) return limited
   const origin = publicOrigin(req)
   const config = ssoConfig()

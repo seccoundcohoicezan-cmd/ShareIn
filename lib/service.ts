@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { cached } from './cache'
 import { normalizeName, parseCount } from './format'
-import { withLock } from './lock'
+import { batcher } from './batcher'
 import { getSettings } from './repo/settings'
 import {
   appendSubmissionsAndList,
@@ -142,60 +142,91 @@ export type BatchCreateResult = { ok: false; items: CheckResult[] } | { ok: true
  * rows in one request, then re-reads to settle races between server instances: the earliest row wins
  * a duplicate.
  */
+type SubmitJob = { inputs: SubmissionInput[]; links: Link[]; screenshotUrl: string }
+
+function buildRows(job: SubmitJob, evs: ReturnType<typeof evaluateBatch>, settings: Settings, createdAt: string): Submission[] {
+  const program = job.inputs[0].program
+  const auto = autoApprove(settings, program)
+  return job.inputs.map((input, i): Submission => {
+    const link = job.links[i] as ParsedLink
+    const likes = evs[i].likes!
+    const comments = evs[i].comments!
+    return {
+      id: newId(),
+      created_at: createdAt,
+      period_id: settings.period_id,
+      submitter_name: input.submitter_name.trim().replace(/\s+/g, ' '),
+      platform: link.platform,
+      source_url: link.url,
+      source_key: link.source_key!,
+      sharein_url: input.sharein_url.trim(),
+      likes,
+      comments,
+      metrics_source: input.metrics_source,
+      organic_declared: true,
+      screenshot_url: job.screenshotUrl,
+      status: auto ? 'approved' : 'pending',
+      reject_reason: '',
+      reviewed_by: auto ? AUTO_REVIEWER : '',
+      reviewed_at: auto ? createdAt : '',
+      needs_review: input.metrics_source === 'api' ? false : apiDiffers(input, likes, comments),
+      whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
+      program,
+    }
+  })
+}
+
+/**
+ * One wave of submissions from many people: validated together (a link sent twice in the same wave is
+ * refused for the later sender), written in ONE append that returns the table, then any duplicate that
+ * slipped past the cache is voided (the earliest row wins).
+ */
+async function runSubmitWave(jobs: SubmitJob[]): Promise<BatchCreateResult[]> {
+  const [settings, cachedRows] = await Promise.all([getSettings(), listSubmissionsCached()])
+  let known: Submission[] = cachedRows
+  const createdAt = new Date().toISOString()
+  const out: (BatchCreateResult | null)[] = []
+  const accepted: { at: number; subs: Submission[] }[] = []
+  jobs.forEach((job, at) => {
+    const evs = evaluateBatch(job.inputs.map((i) => ({ ...i, has_screenshot: Boolean(job.screenshotUrl) })), settings, known, job.links)
+    if (!evs.every((e) => e.result.ok)) {
+      out.push({ ok: false, items: evs.map((e) => e.result) })
+      return
+    }
+    const subs = buildRows(job, evs, settings, createdAt)
+    known = known.concat(subs)
+    accepted.push({ at, subs })
+    out.push(null)
+  })
+  if (accepted.length) {
+    const after = await appendSubmissionsAndList(accepted.flatMap((a) => a.subs))
+    const voids: StoredSubmission[] = []
+    for (const { at, subs } of accepted) {
+      const results = subs.map((sub): CreateResult => {
+        const mine = after.find((s) => s.id === sub.id)
+        if (!mine) return { ok: true, submission: sub }
+        const firstSame = after.find((s) => s.program === sub.program && s.source_key === sub.source_key && s.status !== 'void')
+        if (firstSame && firstSame.id !== sub.id) {
+          voids.push({ ...mine, status: 'void', reject_reason: 'Duplikat bersamaan (otomatis)' })
+          return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini sudah disetor sebelumnya. Cari konten lain.' }] }
+        }
+        return { ok: true, submission: sub }
+      })
+      out[at] = { ok: true, results }
+    }
+    if (voids.length) await updateSubmissions(voids)
+  }
+  return out as BatchCreateResult[]
+}
+
+// On globalThis so every route bundle in this server shares one queue.
+const gq = globalThis as unknown as { __shareinSubmitQueue?: (job: SubmitJob) => Promise<BatchCreateResult> }
+const submitQueue = (gq.__shareinSubmitQueue ??= batcher(runSubmitWave))
+
+/** Validates and saves one person's batch; concurrent senders share spreadsheet writes (see runSubmitWave). */
 export async function createBatch(inputs: SubmissionInput[], net?: NetOpts, screenshotUrl = ''): Promise<BatchCreateResult> {
   const links = await Promise.all(inputs.map((i) => parseAndResolve(i.source_url, net)))
-  return withLock('submissions', async () => {
-    // Cached data is enough to validate: the append returns the fresh table, and any duplicate that
-    // slipped past a stale cache is voided right after (the earliest row wins).
-    const [settings, all] = await Promise.all([getSettings(), listSubmissionsCached()])
-    const evs = evaluateBatch(inputs.map((i) => ({ ...i, has_screenshot: Boolean(screenshotUrl) })), settings, all, links)
-    if (!evs.every((e) => e.result.ok)) return { ok: false, items: evs.map((e) => e.result) }
-
-    const createdAt = new Date().toISOString()
-    const program = inputs[0].program
-    const auto = autoApprove(settings, program)
-    const subs = inputs.map((input, i): Submission => {
-      const link = links[i] as ParsedLink
-      const likes = evs[i].likes!
-      const comments = evs[i].comments!
-      return {
-        id: newId(),
-        created_at: createdAt,
-        period_id: settings.period_id,
-        submitter_name: input.submitter_name.trim().replace(/\s+/g, ' '),
-        platform: link.platform,
-        source_url: link.url,
-        source_key: link.source_key!,
-        sharein_url: input.sharein_url.trim(),
-        likes,
-        comments,
-        metrics_source: input.metrics_source,
-        organic_declared: true,
-        screenshot_url: screenshotUrl,
-        status: auto ? 'approved' : 'pending',
-        reject_reason: '',
-        reviewed_by: auto ? AUTO_REVIEWER : '',
-        reviewed_at: auto ? createdAt : '',
-        needs_review: input.metrics_source === 'api' ? false : apiDiffers(input, likes, comments),
-        whatsapp: normalizeWhatsapp(input.whatsapp) ?? '',
-        program,
-      }
-    })
-    const after = await appendSubmissionsAndList(subs)
-    const voids: StoredSubmission[] = []
-    const results = subs.map((sub): CreateResult => {
-      const mine = after.find((s) => s.id === sub.id)
-      if (!mine) return { ok: true, submission: sub }
-      const firstSame = after.find((s) => s.program === program && s.source_key === sub.source_key && s.status !== 'void')
-      if (firstSame && firstSame.id !== sub.id) {
-        voids.push({ ...mine, status: 'void', reject_reason: 'Duplikat bersamaan (otomatis)' })
-        return { ok: false, checks: [{ id: 'not_duplicate', pass: false, message: 'Link ini sudah disetor sebelumnya. Cari konten lain.' }] }
-      }
-      return { ok: true, submission: sub }
-    })
-    if (voids.length) await updateSubmissions(voids)
-    return { ok: true, results }
-  })
+  return submitQueue({ inputs, links, screenshotUrl })
 }
 
 export async function createSubmission(input: SubmissionInput, net?: NetOpts, screenshotUrl = ''): Promise<CreateResult> {
