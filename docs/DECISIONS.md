@@ -123,3 +123,11 @@ Keputusan #19–21 tentang spin wheel dibatalkan.
 | 60 | Duta = `duta_week_tiktok` (10) + `duta_week_reels` (10) konten per minggu Senin–Minggu WIB, berulang otomatis; dihitung link menunggu + disetujui. | Permintaan pengguna (20 konten/minggu). |
 | 61 | Tambah admin, ubah admin, ganti sandi, dan simpan pengaturan menulis baris + audit_log dalam 1 request; bcrypt cost 12 → 10 (bcryptjs murni JS, ±1 dtk per hash); daftar admin dikembalikan langsung tanpa muat ulang; tombol menampilkan spinner. Daftar setoran admin memakai cache 15 dtk. | "Menambahkan akun admin/owner masih lag". |
 | 62 | Baris "Like & komentar: cek di link" disembunyikan bila tidak ada angka. | Tampilan lebih ringkas. |
+
+## Putaran 18 (11 Nov 2026)
+
+| # | Keputusan | Alasan |
+|---|-----------|--------|
+| 63 | Membuka `/pantau/<kode>` TIDAK lagi membuat browser masuk sebagai pemilik link. Halaman pantau menampilkan tombol "Ya, ini saya — masuk" bila belum masuk, dan "Bukan saya, keluar" bila sudah. Kartu progres menampilkan identitas + "Bukan kamu? Keluar", dan bila belum masuk ada form tempel link/kode langsung. | Pengguna melihat "Halo, Fauzan Daffa" padahal belum login: admin pernah membuka link pantau Fauzan (dari Peserta) dan browser otomatis masuk sebagai Fauzan. |
+| 64 | Kartu progres interaktif: cincin persen yang terisi, satu chip per link (terisi berurutan, chip putus-putus = menunggu review), strip Senin–Minggu dengan sisa hari (Duta), konfeti saat target tercapai, angka count-up, langkah "Cara ikut", roda kecil berputar di kartu undian. Semua CSS/SVG tanpa library, mati saat reduced-motion. | "Tampilannya interaktif, tidak kaku". |
+| 65 | Warna Tailwind memakai hex (bukan `var(--…)`) agar modifier opasitas (`bg-brand-purple/10`, dst.) benar-benar tampil; sebelumnya 38 latar/garis tipis tidak muncul. | Ditemukan saat merapikan kartu progres. |

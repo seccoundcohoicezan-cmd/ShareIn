@@ -31,6 +31,8 @@ type Data = {
   progress: Pick<Progress, 'program' | 'mode' | 'tiktok' | 'reels' | 'target' | 'met'>[]
   counts: { total: number; pending: number; approved: number; rejected: number }
   checkedAt: string
+  /** This browser is logged in as the owner of this link. */
+  isMe: boolean
 }
 
 const POLL_MS = 15_000
@@ -83,6 +85,19 @@ export function PantauLive({ token }: { token: string }) {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
   const [loading, setLoading] = useState(false)
   const [changed, setChanged] = useState<Set<string>>(new Set())
+  const [switching, setSwitching] = useState(false)
+
+  async function setLogin(on: boolean) {
+    setSwitching(true)
+    try {
+      const res = on
+        ? await fetch('/api/me/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ link: token }) })
+        : await fetch('/api/me/logout', { method: 'POST' })
+      if (res.ok) setData((d) => (d ? { ...d, isMe: on } : d))
+    } finally {
+      setSwitching(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,6 +164,20 @@ export function PantauLive({ token }: { token: string }) {
         </p>
       </section>
 
+      {data.isMe ? (
+        <p className="flex flex-wrap items-center justify-between gap-2 rounded-field bg-green-50 px-4 py-2 text-sm text-green-900">
+          <span>Kamu masuk sebagai <b>{data.name}</b> di perangkat ini.</span>
+          <button type="button" className="min-h-[44px] font-bold underline" disabled={switching} onClick={() => setLogin(false)}>Bukan saya, keluar</button>
+        </p>
+      ) : (
+        <div className="rounded-field border border-brand-purple/20 bg-white p-4 text-sm">
+          <p>Ini halaman pantau milik <b>{data.name}</b>. Kalau ini kamu, masuk supaya form setor terisi otomatis.</p>
+          <button type="button" className="btn-primary btn-sm mt-3 gap-2" disabled={switching} onClick={() => setLogin(true)}>
+            {switching ? 'Memproses…' : `Ya, ini saya — masuk sebagai ${data.name.split(' ')[0]}`}
+          </button>
+        </div>
+      )}
+
       {(data.progress ?? []).map((w) => (
         <section key={w.program} className={`rounded-panel p-4 ${w.met ? 'bg-green-50 text-green-900' : 'bg-white'}`} aria-label={`Target ${CHANNEL_INFO[w.program].label}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -161,7 +190,7 @@ export function PantauLive({ token }: { token: string }) {
       ))}
 
       <a href={`${CHANNEL_INFO[data.items[0]?.program ?? 'golden'].path}/setor`} className="btn-secondary w-full text-lg">+ Setor konten lagi</a>
-      <p className="muted -mt-2 text-center text-xs">Kamu sudah masuk lewat link ini, jadi tidak perlu isi nama dan WhatsApp lagi.</p>
+      {data.isMe && <p className="muted -mt-2 text-center text-xs">Kamu sudah masuk, jadi tidak perlu isi nama dan WhatsApp lagi.</p>}
 
       <div role="tablist" aria-label="Saring status" className="grid grid-cols-4 gap-1 rounded-field bg-white p-1">
         {tabs.map(([k, label, n]) => (

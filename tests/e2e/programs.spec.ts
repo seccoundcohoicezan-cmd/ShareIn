@@ -250,6 +250,40 @@ test('admin peserta: link unik per nomor WA bisa dikirim ulang', async ({ page }
   await shot(page, '18-admin-peserta')
 })
 
+test('membuka link pantau orang lain tidak membuat login; masuk/keluar jelas di kartu progres', async ({ browser }) => {
+  const ctx = await browser.newContext()
+  const page = await ctx.newPage()
+  // An admin opens Pelita's personal link from the participant list.
+  await page.goto('/admin/login')
+  await page.getByLabel('Email').fill('owner@sharein.test')
+  await page.getByLabel('Sandi').fill('rahasia-e2e-123')
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
+  await page.goto('/admin/peserta')
+  const pantau = await page.locator('li', { hasText: 'Pelita Sari' }).getByRole('link', { name: 'Lihat seperti peserta' }).getAttribute('href')
+  expect(pantau).toMatch(/^\/pantau\/[A-HJ-NP-Z2-9]{12}$/)
+  await page.goto(pantau!)
+  await expect(page.getByText('Ini halaman pantau milik Pelita Sari', { exact: false })).toBeVisible()
+  expect((await (await page.request.get('/api/me')).json()).user).toBeNull()
+  await page.goto('/pelatihancontent')
+  await expect(page.getByText('Belum masuk')).toBeVisible()
+  await expect(page.getByText(/Halo, Pelita/)).toHaveCount(0)
+
+  // The owner confirms explicitly; logging out is one tap from the progress card.
+  await page.goto(pantau!)
+  await page.getByRole('button', { name: /Ya, ini saya/ }).click()
+  await expect(page.getByText('Kamu masuk sebagai Pelita Sari di perangkat ini.', { exact: false })).toBeVisible()
+  await page.goto('/pelatihancontent')
+  await expect(page.getByText('Halo, Pelita Sari')).toBeVisible()
+  await shot(page, '17-progres-interaktif')
+  await page.getByRole('button', { name: 'Bukan kamu? Keluar' }).click()
+  await expect(page.getByText('Belum masuk')).toBeVisible()
+  await page.getByLabel('Sudah pernah kirim? Tempel link atau kode pantaumu').fill(`http://localhost:3123${pantau}`)
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click()
+  await expect(page.getByText('Halo, Pelita Sari')).toBeVisible()
+  await ctx.close()
+})
+
 test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async ({ page }) => {
   await login(page)
   await page.goto('/admin/akun')

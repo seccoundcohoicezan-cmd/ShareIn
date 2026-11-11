@@ -48,9 +48,12 @@ function tally(mine: Submission[], mode: ProgressMode, target: Target) {
   const done = mine.filter((s) => counts(s, mode))
   const tiktok = done.filter((s) => s.platform === 'tiktok').length
   const reels = done.filter((s) => s.platform === 'reels').length
+  // Waiting links not yet counted (draw mode only), per platform for the progress chips.
+  const waiting = mine.filter((s) => !counts(s, mode) && s.status === 'pending')
   return {
     tiktok,
     reels,
+    waiting: { tiktok: waiting.filter((s) => s.platform === 'tiktok').length, reels: waiting.filter((s) => s.platform === 'reels').length },
     pending: mine.filter((s) => s.status === 'pending').length,
     met: tiktok >= target.tiktok && reels >= target.reels && target.tiktok + target.reels > 0,
   }
@@ -64,6 +67,8 @@ export interface Progress {
   reels: number
   /** Links still waiting for review (in draw mode they count once approved). */
   pending: number
+  /** Waiting links not counted yet, per platform (always 0 in weekly mode, where waiting links count). */
+  waiting: Target
   met: boolean
   week: Week | null
   since: string
@@ -139,11 +144,14 @@ export async function recap(program: Program, everyone = false, now = new Date()
   const [settings, all, people] = await Promise.all([getSettings(), listSubmissionsCached(), participantsTable.list()])
   const { mode, w, target, tallies } = perPerson(all, settings, program, now)
   const members = new Set(all.filter((s) => s.program === program).map((s) => s.whatsapp))
-  const empty = { tiktok: 0, reels: 0, pending: 0, met: false }
+  const empty = { tiktok: 0, reels: 0, waiting: { tiktok: 0, reels: 0 }, pending: 0, met: false }
   const rows: RecapRow[] = people
     .map(strip)
     .filter((p) => everyone || members.has(p.whatsapp) || tallies.has(p.whatsapp))
-    .map((p) => ({ id: p.id, name: p.name, whatsapp: p.whatsapp, token: p.token, ...(tallies.get(p.whatsapp) ?? empty) }))
+    .map((p) => {
+      const t = tallies.get(p.whatsapp) ?? empty
+      return { id: p.id, name: p.name, whatsapp: p.whatsapp, token: p.token, tiktok: t.tiktok, reels: t.reels, pending: t.pending, met: t.met }
+    })
     .sort((a, b) => Number(a.met) - Number(b.met) || a.tiktok + a.reels - (b.tiktok + b.reels) || a.name.localeCompare(b.name))
   return { mode, target, week: w.week, since: w.since, rows }
 }

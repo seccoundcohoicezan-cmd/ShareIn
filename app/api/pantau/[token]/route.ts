@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError, limitOr429 } from '@/lib/http'
 import { tracking } from '@/lib/participant-service'
-import { setUserCookie } from '@/lib/user-session'
+import { USER_COOKIE } from '@/lib/user-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   if (limited) return limited
   const data = await tracking(params.token)
   if (!data) return jsonError(404, 'Kode pantau tidak ditemukan. Periksa lagi kodenya.')
-  const res = NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
-  // Opening the unique link logs the participant in on this device.
-  return setUserCookie(res, data.token)
+  // Opening a link does NOT log in: admins open participants' links too, and a shared link would
+  // otherwise silently switch this browser to someone else. The page offers an explicit button.
+  const isMe = req.cookies.get(USER_COOKIE)?.value?.toUpperCase().replace(/[^A-Z0-9]/g, '') === data.token
+  return NextResponse.json({ ...data, isMe }, { headers: { 'Cache-Control': 'no-store' } })
 }

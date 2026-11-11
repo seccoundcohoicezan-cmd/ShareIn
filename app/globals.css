@@ -238,3 +238,17 @@ html[data-motion='off'] .blob, html[data-motion='off'] .asset { animation: none 
 @media (prefers-reduced-motion: reduce) {
   .top-progress { animation: none; width: 100%; opacity: 0.6; }
 }
+
+/* Program progress card: slots pop in one by one, ring fills, lift on hover. */
+@keyframes slot-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.slot-on { animation: slot-pop .35s cubic-bezier(.34, 1.56, .64, 1) both; }
+.ring-arc { transition: stroke-dashoffset 1.1s cubic-bezier(.22, 1, .36, 1); }
+.lift { transition: transform .18s ease, box-shadow .18s ease; }
+.lift:hover, .lift:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 24px -12px rgb(108 43 217 / .45); }
+.lift:active { transform: translateY(0) scale(.98); }
+@keyframes wheel-idle { to { transform: rotate(360deg); } }
+.wheel-idle { animation: wheel-idle 18s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .slot-on, .wheel-idle { animation: none !important; }
+  .ring-arc, .lift { transition: none !important; }
+}
