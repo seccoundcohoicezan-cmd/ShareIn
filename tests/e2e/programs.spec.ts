@@ -124,6 +124,7 @@ test('pelatihan: kumpulkan TikTok + Reels → masuk spin wheel; undi, riwayat, h
   await expect(peserta.getByText('Kumpulkan 1 link TikTok & 1 link Instagram Reels dan ikuti undian berhadiah.')).toBeVisible()
   // The pro & kontra topic guide belongs to Golden Ticket only.
   await expect(peserta.getByText('Cari konten yang memicu pro & kontra')).toHaveCount(0)
+  await expect(peserta.getByText('Harus muncul organik di FYP / Beranda Reels')).toBeVisible()
   await peserta.getByLabel('Nama penyetor').fill('Pelita Sari')
   await peserta.getByLabel('Nomor WhatsApp').fill('0813 4444 5555')
   // Live tally while pasting, before sending.

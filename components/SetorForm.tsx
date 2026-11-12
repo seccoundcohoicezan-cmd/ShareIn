@@ -552,6 +552,10 @@ export function SetorForm({ program = 'golden' }: { program?: Channel }) {
 
       <section className="panel-solid space-y-3" aria-labelledby="syarat">
         <PillLabel id="syarat">Syarat konten</PillLabel>
+        <div className="rounded-field border border-brand-purple/20 bg-brand-lavender/60 p-3 text-sm">
+          <p className="font-extrabold">Harus muncul organik di FYP / Beranda Reels</p>
+          <p className="mt-0.5">Setor konten yang muncul sendiri saat kamu menggulir FYP TikTok atau Beranda/Reels Instagram. <b>Bukan</b> hasil cari manual (kolom pencarian, hashtag, atau buka profil akun).</p>
+        </div>
         <p className="text-sm">Cukup tempel link-nya. Sebelum menyetor, buka kontennya dan pastikan angkanya sudah memenuhi:</p>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {(['tiktok', 'reels'] as Platform[]).map((p) => (

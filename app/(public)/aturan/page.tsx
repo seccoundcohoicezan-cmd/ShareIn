@@ -35,7 +35,7 @@ export default async function AturanPage() {
       <Panel aria-labelledby="program-kode">
         <PillLabel id="program-kode">Pelatihan Content & Duta Teladan</PillLabel>
         <ol className="mt-4 list-decimal space-y-2 pl-5">
-          <li>Kirim link konten TikTok dan Instagram Reels lewat form program masing-masing, sampai 10 link sekali kirim. Tidak ada syarat topik pro &amp; kontra.</li>
+          <li>Kirim link konten TikTok dan Instagram Reels lewat form program masing-masing, sampai 10 link sekali kirim. Kontennya harus muncul organik di FYP TikTok / Beranda Reels kamu, bukan hasil cari manual. Tidak ada syarat topik pro &amp; kontra.</li>
           <li>
             Pelatihan Content: kumpulkan {settings.pelatihan_need_tiktok} link TikTok &amp; {settings.pelatihan_need_reels} link Reels yang disetujui untuk masuk undian spin wheel
             berhadiah. Pemenang diumumkan di halaman Pelatihan.

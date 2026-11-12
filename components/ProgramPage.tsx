@@ -15,13 +15,13 @@ function weekLabel(startIso: string) {
 }
 
 const DRAW_STEPS = (t: { tiktok: number; reels: number }, auto: boolean) => [
-  ['Kirim link', `Tempel link TikTok & Reels, sampai 10 sekali kirim.`],
+  ['Kirim link', 'Konten yang muncul sendiri di FYP/Reels (bukan cari manual), sampai 10 link sekali kirim.'],
   auto ? ['Langsung disetujui', 'Link yang lolos cek otomatis langsung terhitung.'] : ['Disetujui admin', 'Link dicek admin. Status terlihat di halaman pantau.'],
   ['Masuk roda', `Lengkap ${t.tiktok} TikTok + ${t.reels} Reels = otomatis ikut undian.`],
   ['Diundi', 'Pemenang diumumkan di halaman ini.'],
 ]
 const WEEK_STEPS = (t: { tiktok: number; reels: number }) => [
-  ['Kirim konten', 'Tempel link TikTok & Reels, sampai 10 sekali kirim.'],
+  ['Kirim konten', 'Konten yang muncul sendiri di FYP/Reels (bukan cari manual), sampai 10 link sekali kirim.'],
   ['Pantau progres', 'Setiap link langsung terhitung di kartu progresmu.'],
   ['Capai target', `${t.tiktok} TikTok + ${t.reels} Reels sebelum Minggu 23.59 WIB.`],
   ['Ulangi', 'Hitungan mulai lagi dari 0 setiap Senin.'],
