@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Spin } from '@/lib/types'
 import type { Candidate, WheelEntry } from '@/lib/spin'
 import { toast } from './Toast'
+import { Confetti } from './ProgressVisuals'
 import { EmptyState, Spinner, TopProgress } from './ui'
 
 type State = { round: string; target: { tiktok: number; reels: number }; entries: WheelEntry[]; candidates: Candidate[]; history: Spin[] }
 
 const COLORS = ['#6C2BD9', '#F59E0B', '#8B5CF6', '#F97316', '#4C1D95', '#FBBF24']
-const SPIN_MS = 4500
+const LAND_MS = 3200
+const maskWa = (wa: string) => (wa.length > 7 ? `${wa.slice(0, 4)}••••${wa.slice(-3)}` : wa)
 const fmt = (iso: string) => new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
 
 function slice(i: number, n: number) {
@@ -19,16 +21,27 @@ function slice(i: number, n: number) {
 }
 
 /** Plain SVG + one CSS transform: light enough for phones, no canvas or animation library. */
-function Wheel({ names, rotation, spinning }: { names: string[]; rotation: number; spinning: boolean }) {
+type Phase = 'idle' | 'free' | 'landing'
+
+/**
+ * 'free' = turning at full speed while the server draws (starts the instant the button is pressed),
+ * 'landing' = easing out onto the winner's slice.
+ */
+function Wheel({ names, rotation, phase, big, svgRef }: { names: string[]; rotation: number; phase: Phase; big: boolean; svgRef: React.RefObject<SVGSVGElement> }) {
   const n = Math.max(names.length, 1)
   const labels = n <= 30
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[340px]">
-      <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1 text-3xl text-ink drop-shadow" aria-hidden="true">▼</div>
+    <div className={`relative mx-auto aspect-square w-full ${big ? 'max-w-[min(62vh,92vw)]' : 'max-w-[340px]'}`}>
+      <div className={`absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1 drop-shadow ${big ? 'text-6xl text-white' : 'text-3xl text-ink'}`} aria-hidden="true">▼</div>
       <svg
+        ref={svgRef}
         viewBox="-104 -104 208 208"
-        className="h-full w-full"
-        style={{ transform: `rotate(${rotation}deg)`, transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.17, 0.67, 0.12, 1)` : 'none' }}
+        className={`h-full w-full ${phase === 'free' ? 'wheel-free' : ''}`}
+        style={
+          phase === 'free'
+            ? ({ ['--from' as string]: `${rotation}deg` } as React.CSSProperties)
+            : { transform: `rotate(${rotation}deg)`, transition: phase === 'landing' ? `transform ${LAND_MS}ms cubic-bezier(0.15, 0.6, 0.15, 1)` : 'none' }
+        }
         role="img"
         aria-label={`Roda undian berisi ${names.length} peserta`}
       >
@@ -99,7 +112,11 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
   const [prize, setPrize] = useState('')
   const [names, setNames] = useState<string[]>([])
   const [rotation, setRotation] = useState(0)
-  const [spinning, setSpinning] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const spinning = phase !== 'idle'
+  const [full, setFull] = useState(false)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [winner, setWinner] = useState<Spin | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,8 +142,22 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
     }
   }, [load])
 
+  /** Current visual angle of the wheel (also mid-animation). */
+  function currentAngle(): number {
+    const el = svgRef.current
+    if (!el) return rotation
+    const m = getComputedStyle(el).transform
+    if (!m || m === 'none') return rotation
+    const [a, b] = m.slice(m.indexOf('(') + 1).split(',').map(Number)
+    return ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360
+  }
+
   async function spin() {
+    if (spinning || !state || state.entries.length === 0) return
     setWinner(null)
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Start turning right away; the server draws meanwhile (one spreadsheet write).
+    if (!reduce) setPhase('free')
     setBusy('draw')
     let d: { ok?: boolean; error?: string; spin: Spin; index: number; entries: WheelEntry[] }
     try {
@@ -135,17 +166,19 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
       if (!res.ok) throw new Error(d.error)
     } catch (e) {
       setBusy(null)
+      setRotation(currentAngle())
+      setPhase('idle')
       return toast((e as Error).message || 'Gagal mengundi. Coba lagi.', 'bad')
     }
     setBusy(null)
-    // The server already picked the winner; the wheel only shows it.
+    // The server picked the winner; the wheel lands on that slice.
     const n = d.entries.length
     setNames(d.entries.map((e) => e.name))
     const center = ((d.index + 0.5) / n) * 360
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const target = rotation - (rotation % 360) + (reduce ? 0 : 360 * 6) + (360 - center)
+    const from = currentAngle()
+    const target = from + (reduce ? 0 : 360 * 3) + ((360 - center - from) % 360 + 360) % 360
     const finish = () => {
-      setSpinning(false)
+      setPhase('idle')
       setWinner(d.spin)
       setState((s) =>
         s
@@ -162,12 +195,47 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
       setRotation(target)
       return finish()
     }
-    requestAnimationFrame(() => {
-      setSpinning(true)
-      setRotation(target)
-    })
-    timer.current = setTimeout(finish, SPIN_MS + 100)
+    // Freeze at the current angle, then ease out onto the winner on the next frame.
+    setRotation(from)
+    setPhase('idle')
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setPhase('landing')
+        setRotation(target)
+      }),
+    )
+    timer.current = setTimeout(finish, LAND_MS + 150)
   }
+
+  async function toggleFull(on: boolean) {
+    setFull(on)
+    try {
+      if (on) await stageRef.current?.requestFullscreen?.()
+      else if (document.fullscreenElement) await document.exitFullscreen()
+    } catch {
+      // No Fullscreen API (e.g. iPhone): the fixed overlay still fills the screen.
+    }
+  }
+
+  useEffect(() => {
+    const onChange = () => !document.fullscreenElement && setFull(false)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  useEffect(() => {
+    if (!full) return
+    // Presenter keys: Space/Enter spins, Esc leaves full screen.
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === ' ' || e.key === 'Enter') && !(e.target instanceof HTMLInputElement)) {
+        e.preventDefault()
+        spin()
+      }
+      if (e.key === 'Escape') toggleFull(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   async function remove(ids: string[], label: string) {
     if (!confirm(label)) return
@@ -229,23 +297,57 @@ export function SpinAdmin({ canManage }: { canManage: boolean }) {
             {state.round ? ` sejak ${fmt(state.round)}` : ''}. Pemenang di putaran ini tidak ikut lagi sampai riwayatnya dihapus atau putaran direset.
           </p>
         </div>
-        <Wheel names={names} rotation={rotation} spinning={spinning} />
-        <p className="text-center text-sm font-bold">{state.entries.length} peserta di roda</p>
-        {winner && !spinning && (
-          <div role="status" className="bounce-once rounded-field bg-gradient-to-br from-brand-amber to-brand-orange p-4 text-center text-ink">
-            <p className="text-xs font-extrabold tracking-[0.2em]">PEMENANG</p>
-            <p className="text-2xl font-extrabold">{winner.name}</p>
-            <p className="text-sm font-bold">{winner.whatsapp}{winner.prize ? ` · ${winner.prize}` : ''}</p>
+        <div
+          ref={stageRef}
+          className={full ? 'fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 overflow-auto bg-gradient-to-br from-[#2a0f5c] via-brand-purple to-brand-orange p-4 text-white sm:gap-6 sm:p-8' : 'space-y-4'}
+        >
+          {full && (
+            <div className="flex w-full max-w-5xl items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-extrabold tracking-[0.25em] opacity-80">UNDIAN PELATIHAN CONTENT</p>
+                {prize && <p className="text-2xl font-extrabold sm:text-4xl">{prize}</p>}
+              </div>
+              <button type="button" className="btn-ghost btn-sm !border-white/40 !bg-white/10 !text-white" onClick={() => toggleFull(false)}>Keluar layar penuh</button>
+            </div>
+          )}
+          <div className={full ? 'relative w-full' : ''}>
+            <Wheel names={names} rotation={rotation} phase={phase} big={full} svgRef={svgRef} />
+            {/* Full screen: the winner card sits over the wheel so everything fits one screen. */}
+            {full && winner && !spinning && (
+              <div role="status" className="bounce-once absolute inset-x-0 top-1/2 mx-auto w-[min(92vw,640px)] -translate-y-1/2 rounded-panel bg-gradient-to-br from-brand-amber to-brand-orange p-6 text-center text-ink shadow-2xl">
+                <Confetti />
+                <p className="text-sm font-extrabold tracking-[0.25em]">PEMENANG</p>
+                <p className="text-4xl font-extrabold sm:text-6xl">{winner.name}</p>
+                <p className="text-lg font-bold">{maskWa(winner.whatsapp)}{winner.prize ? ` · ${winner.prize}` : ''}</p>
+              </div>
+            )}
           </div>
-        )}
+          <p className={`text-center font-bold ${full ? 'text-lg' : 'text-sm'}`}>{state.entries.length} peserta di roda</p>
+          {!full && winner && !spinning && (
+            <div role="status" className="bounce-once rounded-field bg-gradient-to-br from-brand-amber to-brand-orange p-4 text-center text-ink">
+              <p className="text-xs font-extrabold tracking-[0.2em]">PEMENANG</p>
+              <p className="text-2xl font-extrabold">{winner.name}</p>
+              <p className="text-sm font-bold">{winner.whatsapp}{winner.prize ? ` · ${winner.prize}` : ''}</p>
+            </div>
+          )}
+          {full && (
+            <button type="button" className="btn min-w-[220px] bg-white text-lg text-brand-purple shadow-xl" disabled={spinning || state.entries.length === 0} onClick={spin}>
+              {spinning ? 'Memutar…' : winner ? 'Putar lagi' : 'Putar roda'}
+            </button>
+          )}
+          {full && <p className="text-xs opacity-70">Spasi / Enter = putar · Esc = keluar</p>}
+        </div>
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
             <label htmlFor="hadiah" className="label">Hadiah (opsional)</label>
             <input id="hadiah" className="field" maxLength={80} value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Contoh: Voucher Rp100.000" />
           </div>
-          <button type="button" className="btn-primary gap-2" disabled={spinning || busy !== null || state.entries.length === 0} onClick={spin}>
-            {busy === 'draw' ? <><Spinner /> Mengundi…</> : spinning ? 'Memutar…' : 'Putar roda'}
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="btn-primary flex-1 gap-2" disabled={spinning || busy !== null || state.entries.length === 0} onClick={spin}>
+              {spinning ? <><Spinner /> Memutar…</> : 'Putar roda'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => toggleFull(true)} aria-label="Layar penuh">⛶ Layar penuh</button>
+          </div>
         </div>
         {state.entries.length === 0 && <p className="muted text-sm">Belum ada peserta di roda. Centang peserta di daftar bawah.</p>}
         <WheelPicker state={state} disabled={spinning || busy !== null} onChange={choose} />

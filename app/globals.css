@@ -252,3 +252,8 @@ html[data-motion='off'] .blob, html[data-motion='off'] .asset { animation: none 
   .slot-on { animation: none !important; }
   .ring-arc, .lift { transition: none !important; }
 }
+
+/* Spin wheel: free spin while the server draws, starting from the wheel's current angle. */
+@keyframes wheel-free { from { transform: rotate(var(--from, 0deg)); } to { transform: rotate(calc(var(--from, 0deg) + 360deg)); } }
+.wheel-free { animation: wheel-free 0.55s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .wheel-free { animation: none; } }

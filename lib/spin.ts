@@ -66,7 +66,8 @@ export async function setWheelChoices(changes: Record<string, boolean | null>, a
 /** Picks a winner with a cryptographic random draw and records it together with its audit entry. */
 export async function draw(program: Program, prize: string, actor: string) {
   return withLock('spins', async () => {
-    invalidate('spins')
+    // Cached data (cleared on every draw/delete from this server): the only spreadsheet call is the
+    // write itself, so the wheel lands about 2 s after the click instead of 5+ s.
     const state = await wheel(program)
     if (state.entries.length === 0) return { error: 'Belum ada peserta di roda. Centang peserta yang mau diundi.' as const }
     const index = randomInt(state.entries.length)
