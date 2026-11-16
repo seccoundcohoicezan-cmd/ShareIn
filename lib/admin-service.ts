@@ -39,7 +39,11 @@ function strip(s: StoredSubmission): Submission {
 export async function adminList(f: Filters) {
   const all = (await listSubmissionsRecent()).map(strip)
   const periods = Array.from(new Set(all.filter((s) => s.program === f.program).map((s) => s.period_id))).filter(Boolean).sort().reverse()
-  return { items: applyFilters(all, f), periods }
+  // Per-status totals for the same program/platform/period/name, so the tabs match the public counts.
+  const scope = applyFilters(all, { ...f, status: 'all' })
+  const counts = { all: scope.length, pending: 0, approved: 0, rejected: 0 }
+  for (const s of scope) if (s.status !== 'void') counts[s.status]++
+  return { items: f.status === 'all' ? scope : scope.filter((s) => s.status === f.status), periods, counts }
 }
 
 export async function dashboard() {

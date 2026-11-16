@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { countOrDash, formatDateTime, formatNumber, metricsText } from '@/lib/format'
 import { CHANNEL_INFO, type Channel, type Submission } from '@/lib/types'
 import { DecisionButtons, type Decision } from './DecisionButtons'
@@ -11,6 +11,16 @@ import { EmptyState, PlatformTag, Spinner, StatusBadge, TopProgress } from './ui
 const QUICK_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid']
 
 type Filters = { status: string; platform: string; period: string; name: string }
+type Counts = { all: number; pending: number; approved: number; rejected: number }
+
+const STATUS_TABS: { key: keyof Counts; label: string; tone: string }[] = [
+  { key: 'all', label: 'Semua', tone: 'text-brand-purple' },
+  { key: 'pending', label: 'Menunggu', tone: 'text-warn' },
+  { key: 'approved', label: 'Disetujui', tone: 'text-ok' },
+  { key: 'rejected', label: 'Ditolak', tone: 'text-bad' },
+]
+// Rendering hundreds of rows at once made the admin page heavy on phones.
+const PAGE = 30
 
 function query(f: Filters, program?: Channel) {
   const p = new URLSearchParams()
@@ -71,6 +81,10 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   const [filters, setFilters] = useState<Filters>({ status: 'pending', platform: 'all', period: '', name: '' })
   const [items, setItems] = useState<Submission[] | null>(null)
   const [periods, setPeriods] = useState<string[]>([])
+  const [counts, setCounts] = useState<Counts | null>(null)
+  const [shown, setShown] = useState(PAGE)
+  // With auto-approve on, the waiting queue is always empty; then open on "Semua" instead of a blank list.
+  const autoAll = useRef(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [rejecting, setRejecting] = useState<Submission | null>(null)
   const [previewing, setPreviewing] = useState<Submission | null>(null)
@@ -91,6 +105,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
 
   useEffect(() => {
     const p = new URLSearchParams(location.search)
+    if (p.has('status')) autoAll.current = false
     setFilters((f) => ({ status: p.get('status') ?? f.status, platform: p.get('platform') ?? 'all', period: p.get('period') ?? '', name: p.get('name') ?? '' }))
     setReady(true)
   }, [])
@@ -105,6 +120,12 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
       if (!res.ok) throw new Error(data.error)
       setItems(data.items)
       setPeriods(data.periods)
+      setCounts(data.counts ?? null)
+      if (autoAll.current) {
+        autoAll.current = false
+        if (f.status === 'pending' && data.counts?.pending === 0 && data.counts.all > 0) setFilters((x) => ({ ...x, status: 'all' }))
+      }
+      setShown(PAGE)
       setSelected(new Set())
     } catch (e) {
       setError((e as Error).message || 'Data belum termuat.')
@@ -121,6 +142,11 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   }, [filters, load, ready])
 
   function replace(s: Submission) {
+    const old = items?.find((x) => x.id === s.id)
+    if (old && old.status !== s.status && old.status !== 'void' && s.status !== 'void') {
+      const from = old.status, to = s.status
+      setCounts((c) => (c ? { ...c, [from]: c[from] - 1, [to]: c[to] + 1 } : c))
+    }
     setItems((xs) => {
       if (!xs) return xs
       if (filters.status !== 'all' && s.status !== filters.status) return xs.filter((x) => x.id !== s.id)
@@ -179,7 +205,8 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
   }
 
   const set = (k: keyof Filters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFilters((f) => ({ ...f, [k]: e.target.value }))
-  const pendingIds = (items ?? []).filter((s) => s.status === 'pending').map((s) => s.id)
+  const visible = (items ?? []).slice(0, shown)
+  const pendingIds = visible.filter((s) => s.status === 'pending').map((s) => s.id)
   const allPicked = pendingIds.length > 0 && pendingIds.every((id) => selected.has(id))
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
@@ -206,17 +233,19 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
 
   return (
     <div>
+      <div role="tablist" aria-label="Status setoran" className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {STATUS_TABS.map((t) => {
+          const on = filters.status === t.key
+          return (
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => setFilters((f) => ({ ...f, status: t.key }))} className={`rounded-field border px-3 py-2 text-left ${on ? 'border-brand-purple bg-white shadow-sm' : 'border-transparent bg-white/60 hover:bg-white'}`}>
+              <span className="muted block text-xs font-bold">{t.label}</span>
+              <span className={`text-2xl font-extrabold tabular-nums ${t.tone}`}>{counts ? formatNumber(counts[t.key]) : '…'}</span>
+            </button>
+          )
+        })}
+      </div>
       <div className="panel-solid !p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <div>
-            <label htmlFor="f-status" className="label">Status</label>
-            <select id="f-status" className="field" value={filters.status} onChange={set('status')}>
-              <option value="all">Semua</option>
-              <option value="pending">Menunggu</option>
-              <option value="approved">Disetujui</option>
-              <option value="rejected">Ditolak</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div>
             <label htmlFor="f-platform" className="label">Platform</label>
             <select id="f-platform" className="field" value={filters.platform} onChange={set('platform')}>
@@ -261,7 +290,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
       {items && items.length > 0 && (
         <>
           <ul className="mt-3 space-y-3 md:hidden">
-            {items.map((s) => (
+            {visible.map((s) => (
               <li key={s.id} className="panel-solid !p-4">
                 <div className="flex items-start gap-3">
                   {s.status === 'pending' && <input type="checkbox" aria-label={`Pilih setoran ${s.submitter_name}`} className="mt-1 h-5 w-5 accent-[#6C2BD9]" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />}
@@ -295,7 +324,7 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
                 </tr>
               </thead>
               <tbody>
-                {items.map((s) => (
+                {visible.map((s) => (
                   <tr key={s.id} className="border-t border-brand-purple/10 align-top">
                     <td className="px-3 py-3">
                       {s.status === 'pending' && <input type="checkbox" aria-label={`Pilih setoran ${s.submitter_name}`} className="h-5 w-5 accent-[#6C2BD9]" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />}
@@ -318,6 +347,13 @@ export function SubmissionsAdmin({ program = 'golden' }: { program?: Channel }) 
               </tbody>
             </table>
           </div>
+          {items.length > shown && (
+            <div className="mt-3 flex justify-center">
+              <button type="button" className="btn-ghost" onClick={() => setShown((n) => n + PAGE)}>
+                Tampilkan {Math.min(PAGE, items.length - shown)} lagi · {formatNumber(items.length - shown)} tersisa
+              </button>
+            </div>
+          )}
         </>
       )}
       {previewing && (

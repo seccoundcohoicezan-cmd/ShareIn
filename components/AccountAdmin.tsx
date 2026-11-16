@@ -15,6 +15,32 @@ async function send(url: string, method: string, body: unknown): Promise<{ error
   }
 }
 
+// No 0/O/1/I/l so the password survives being read out or typed from a WhatsApp message.
+const PW_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+export function generatePassword(len = 12) {
+  const bytes = new Uint32Array(len)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => PW_ALPHABET[b % PW_ALPHABET.length]).join('')
+}
+
+type Credential = { email: string; password: string; reset: boolean }
+
+function CredentialBox({ cred, onClose }: { cred: Credential; onClose: () => void }) {
+  const text = `Akun admin ShareIn\nLink: ${location.origin}/admin/login\nEmail: ${cred.email}\nSandi: ${cred.password}\nSetelah masuk, ganti sandi di menu Akun.`
+  return (
+    <div role="status" aria-label="Data login admin" className="rounded-field border-2 border-ok/50 bg-green-50 p-4 text-sm">
+      <p className="font-extrabold">{cred.reset ? 'Sandi baru' : 'Admin ditambahkan'}: kirim data ini ke {cred.email}</p>
+      <p className="muted mt-1 text-xs">Sandi hanya tampil sekarang. Setelah ditutup, sandi tidak bisa dilihat lagi (atur ulang bila lupa).</p>
+      <pre className="mt-2 whitespace-pre-wrap break-all rounded-field bg-white p-3 font-mono text-[13px]">{text}</pre>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" className="btn-primary btn-sm" onClick={() => navigator.clipboard.writeText(text).then(() => toast('Tersalin'), () => toast('Salin manual dari kotak di atas', 'bad'))}>Salin</button>
+        <a className="btn-ghost btn-sm" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">Kirim via WhatsApp</a>
+        <button type="button" className="btn-ghost btn-sm" onClick={onClose}>Tutup</button>
+      </div>
+    </div>
+  )
+}
+
 function ChangePassword() {
   const [f, setF] = useState({ current: '', next: '', confirm: '' })
   const [error, setError] = useState('')
@@ -56,7 +82,8 @@ function ChangePassword() {
 
 function Admins({ me }: { me: string }) {
   const [admins, setAdmins] = useState<AdminRow[] | null>(null)
-  const [f, setF] = useState({ email: '', role: 'reviewer' as AdminRow['role'], password: '' })
+  const [f, setF] = useState(() => ({ email: '', role: 'reviewer' as AdminRow['role'], password: generatePassword() }))
+  const [cred, setCred] = useState<Credential | null>(null)
   const [error, setError] = useState('')
   // Which row (email) or the add form ('new') is saving.
   const [busy, setBusy] = useState<string | null>(null)
@@ -77,6 +104,7 @@ function Admins({ me }: { me: string }) {
     if (r.error) return toast(r.error, 'bad')
     toast('Tersimpan')
     if (r.admins) setAdmins(r.admins)
+    if (body.password) setCred({ email, password: body.password, reset: true })
   }
 
   return (
@@ -84,6 +112,7 @@ function Admins({ me }: { me: string }) {
       <h2 className="font-extrabold">Daftar admin</h2>
       <TopProgress active={busy !== null} />
       {admins === null && <div className="h-24 animate-pulse rounded-field bg-brand-lavender" aria-label="Memuat daftar admin" />}
+      {cred && <CredentialBox cred={cred} onClose={() => setCred(null)} />}
       <ul className="divide-y divide-brand-purple/10">
         {admins?.map((a) => (
           <li key={a.email} aria-busy={busy === a.email} className={`flex flex-wrap items-center gap-2 py-3 ${a.active ? '' : 'opacity-60'} ${busy === a.email ? 'pointer-events-none animate-pulse' : ''}`}>
@@ -99,8 +128,7 @@ function Admins({ me }: { me: string }) {
                 type="button"
                 className="btn-ghost btn-sm"
                 onClick={() => {
-                  const pw = prompt(`Sandi baru untuk ${a.email} (min. 10 karakter):`)
-                  if (pw) patch(a.email, { password: pw })
+                  if (confirm(`Buat sandi baru untuk ${a.email}? Sandi lama langsung tidak berlaku.`)) patch(a.email, { password: generatePassword() })
                 }}
               >
                 Atur ulang sandi
@@ -119,7 +147,8 @@ function Admins({ me }: { me: string }) {
           setError(r.error ?? '')
           if (!r.error) {
             toast('Admin ditambahkan')
-            setF({ email: '', role: 'reviewer', password: '' })
+            setCred({ email: f.email.trim().toLowerCase(), password: f.password, reset: false })
+            setF({ email: '', role: 'reviewer', password: generatePassword() })
             if (r.admins) setAdmins(r.admins)
           }
         }}
@@ -138,7 +167,12 @@ function Admins({ me }: { me: string }) {
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="new-password" className="label">Sandi awal (min. 10 karakter)</label>
-          <input id="new-password" type="password" className="field" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          <p className="muted mb-1 text-xs">Sengaja terlihat dan dibuat acak, supaya sama persis dengan yang dikirim ke admin baru.</p>
+          <div className="flex gap-2">
+            {/* Plain text + autocomplete off: a masked field let the browser silently fill in a saved or generated password. */}
+            <input id="new-password" type="text" className="field font-mono" autoComplete="off" spellCheck={false} data-lpignore="true" data-1p-ignore value={f.password} onChange={(e) => setF({ ...f, password: e.target.value.trim() })} />
+            <button type="button" className="btn-ghost btn-sm shrink-0" onClick={() => setF({ ...f, password: generatePassword() })}>Acak lagi</button>
+          </div>
         </div>
         {error && <p role="alert" className="text-sm font-bold text-bad sm:col-span-2">{error}</p>}
         <button className="btn-primary gap-2 sm:col-span-2 sm:w-fit" disabled={busy === 'new'}>{busy === 'new' ? <><Spinner /> Menambahkan…</> : 'Tambah admin'}</button>

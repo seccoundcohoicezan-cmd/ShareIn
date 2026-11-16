@@ -330,7 +330,18 @@ test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async 
   await page.getByLabel('Sandi awal (min. 10 karakter)').fill('reviewer-e2e-789')
   await page.getByRole('button', { name: 'Tambah admin' }).click()
   await expect(page.getByText('reviewer@sharein.test', { exact: true })).toBeVisible()
+  // The initial password is shown once, exactly as saved, ready to send (no hidden browser autofill).
+  const box = page.getByRole('status', { name: 'Data login admin' })
+  await expect(box).toContainText('Sandi: reviewer-e2e-789')
   await shot(page, '17-admin-akun')
+  // Reset = a fresh random password, shown in the same box.
+  page.once('dialog', (d) => d.accept())
+  await page.locator('li', { hasText: 'reviewer@sharein.test' }).getByRole('button', { name: 'Atur ulang sandi' }).click()
+  const resetBox = page.getByRole('status', { name: 'Data login admin' })
+  await expect(resetBox).toContainText('Sandi baru')
+  await expect(resetBox).toContainText('reviewer@sharein.test')
+  const reviewerPw = /Sandi: (\S+)/.exec((await resetBox.locator('pre').textContent()) ?? '')![1]
+  expect(reviewerPw).toMatch(/^[A-Za-z2-9]{12}$/)
 
   // Owner cannot demote the last owner.
   await page.getByLabel('Peran owner@sharein.test').selectOption('reviewer')
@@ -345,6 +356,16 @@ test('akun admin: ganti sandi, login dengan sandi baru, tambah reviewer', async 
   await page.getByLabel('Sandi').fill('sandi-baru-e2e-456')
   await page.getByRole('button', { name: 'Masuk' }).click()
   await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
+
+  // The reviewer logs in with the reset password, even pasted with a trailing space from WhatsApp.
+  await page.getByRole('button', { name: 'Keluar' }).click()
+  await page.getByLabel('Email').fill('reviewer@sharein.test')
+  await page.getByLabel('Sandi').fill(`${reviewerPw} `)
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await expect(page.getByRole('heading', { name: 'Dasbor' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Menu admin' }).getByRole('link')).toHaveText(['Dasbor', 'Golden Ticket', 'Pelatihan', 'Duta Teladan', 'Peserta'])
+  await page.getByRole('button', { name: 'Keluar' }).click()
+  await login(page, 'sandi-baru-e2e-456')
 })
 
 test('setujui otomatis per program + API Golden Ticket dengan kunci', async ({ page, request, browser }) => {

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ApiKeysAdmin } from '@/components/ApiKeysAdmin'
 import { AdminShell, requirePageSession } from '../shell'
@@ -11,7 +12,8 @@ export default async function ApiPage() {
   if (session.role !== 'owner') redirect('/admin')
   return (
     <AdminShell session={session}>
-      <h1 className="mb-1 text-2xl font-extrabold">API Golden Ticket</h1>
+      <Link href="/admin/pengaturan" className="text-sm font-bold text-brand-purple underline underline-offset-4">← Pengaturan</Link>
+      <h1 className="mb-1 mt-2 text-2xl font-extrabold">API Golden Ticket</h1>
       <p className="muted mb-4 text-sm">Untuk menarik data Golden Ticket ke sistem lain. Hanya baca, dan hanya bisa diakses dengan kunci API.</p>
       <ApiKeysAdmin />
     </AdminShell>

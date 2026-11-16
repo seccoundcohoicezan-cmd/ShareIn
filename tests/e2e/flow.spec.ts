@@ -225,7 +225,7 @@ test('admin: tolak wajib alasan, setujui, ekspor CSV; halaman pantau ikut beruba
   await page.locator('li', { hasText: 'Paralel' }).first().getByRole('button', { name: 'Setujui' }).click()
   await expect(page.getByRole('status').getByText('Disetujui', { exact: true })).toBeVisible()
 
-  await page.getByLabel('Status').selectOption('all')
+  await page.getByRole('tab', { name: /^Semua/ }).click()
   await shot(page, '09-admin-setoran')
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Ekspor CSV' }).click()])
   const csv = await (await dl.createReadStream()).toArray()

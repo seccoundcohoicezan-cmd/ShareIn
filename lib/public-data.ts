@@ -7,13 +7,22 @@ import { publicWinners, type PublicWinner } from './spin'
 
 const EMPTY_FEED: CollectedFeed = { total: 0, tiktok: 0, reels: 0, hidden: true, items: [] }
 
-/** Public pages must render even when the database is unreachable (e.g. at build time). */
+/**
+ * At build time the pages must render even without the database. At runtime we rethrow instead: an
+ * ISR regeneration that throws keeps serving the last good page, while a "0 links" fallback would be
+ * cached for everyone and contradict the admin numbers.
+ */
+function fallbackOrThrow(e: unknown, what: string) {
+  console.error(what, (e as Error).message)
+  if (process.env.NEXT_PHASE !== 'phase-production-build') throw e
+}
+
 export async function loadPublic(program: Channel = 'golden'): Promise<{ settings: Settings; feed: CollectedFeed }> {
   try {
     const [{ settings }, feed] = await Promise.all([getProgress(), collectedFeed(0, FEED_PAGE, program)])
     return { settings, feed }
   } catch (e) {
-    console.error('public data unavailable', (e as Error).message)
+    fallbackOrThrow(e, 'public data unavailable')
     return { settings: parseSettings(new Map()), feed: EMPTY_FEED }
   }
 }
@@ -27,7 +36,7 @@ export async function loadProgram(program: Program): Promise<{ settings: Setting
     ])
     return { settings, feed, summary, winners }
   } catch (e) {
-    console.error('program data unavailable', (e as Error).message)
+    fallbackOrThrow(e, 'program data unavailable')
     const settings = parseSettings(new Map())
     return { settings, feed: EMPTY_FEED, summary: summarize([], settings, program), winners: [] }
   }
