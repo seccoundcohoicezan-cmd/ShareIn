@@ -141,6 +141,23 @@ Hasil 12 Nov 2026 (latensi Apps Script realistis ±2 dtk, 5 instance server, sem
 
 Data tetap utuh: 900 link + 300 akun, tanpa link atau nomor ganda. Satu-satunya batas nyata adalah kunci tulis Apps Script (satu penulisan ±1 dtk); karena itu semua kiriman yang datang bersamaan digabung ke satu penulisan.
 
+## Database utama + spreadsheet sebagai cermin
+
+Sejak MRKT-54, web tidak lagi menunggu Google Sheets. Server self-host (Dokploy, env `DATA_PRIMARY=1`)
+menjalankan `apps-script/Code.js` yang sama di dalam proses Node, di atas spreadsheet di memori yang
+disimpan ke `DATA_DIR/primary.json` (`lib/primary/engine.ts`). Endpointnya `/api/internal/store`, protokolnya
+sama persis dengan Apps Script (rahasia = `APPS_SCRIPT_SECRET`).
+
+- Vercel (dan server lain) memakai database utama ini lewat `DATA_PRIMARY_URL`
+  (bawaan: server Dokploy ShareIn; `off` = langsung ke Sheets seperti dulu).
+- Setiap penulisan menandai tab yang berubah; beberapa detik kemudian tab itu disalin ke Google Sheet
+  (tambahan baris = append, perubahan lain = `replace` seluruh tab). Status sinkron tampil di Dasbor admin.
+- **Spreadsheet hanya cermin.** Ubah data lewat admin web; ketikan manual di sheet akan tertimpa.
+- Pertama kali jalan, database utama menyalin isi sheet lalu menulis `data_primary_since` ke tab settings.
+  Sesudah tanda itu ada, web tidak pernah menulis ke sheet langsung (saat server utama restart, permintaan
+  dicoba ulang sampai ~35 detik).
+- Cadangan: `primary.json` di volume `sharein-data` + salinan di Google Sheet.
+
 ## Batasan yang diketahui
 
 - Angka like/komentar diisi manual oleh penyetor; "muncul organik di FYP" tidak bisa diverifikasi otomatis — mengandalkan pernyataan, tangkapan layar, dan review admin.

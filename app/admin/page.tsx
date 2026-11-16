@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { PlatformTag, StatusBadge, EmptyState } from '@/components/ui'
-import { dashboard } from '@/lib/admin-service'
+import { dashboard, sheetSync } from '@/lib/admin-service'
 import { formatDateTime, formatNumber, metricsText } from '@/lib/format'
 import { programSummary } from '@/lib/progress'
 import { getProgress } from '@/lib/service'
@@ -11,11 +11,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function AdminHome() {
   const session = await requirePageSession()
-  const [{ stats, recent, settings, pendingByProgram }, { progress }, pel, dut] = await Promise.all([
+  const [{ stats, recent, settings, pendingByProgram }, { progress }, pel, dut, sync] = await Promise.all([
     dashboard(),
     getProgress(),
     programSummary('pelatihan'),
     programSummary('duta'),
+    sheetSync(),
   ])
   const programs = [
     { key: 'pelatihan' as const, label: 'Pelatihan Content', s: pel },
@@ -40,6 +41,15 @@ export default async function AdminHome() {
           Periode {settings.period_id} · {settings.period_open ? 'Dibuka' : 'Ditutup'}
         </span>
       </div>
+      {sync && (
+        <p className={`mb-3 rounded-field px-3 py-2 text-xs font-bold ${sync.lastError && sync.pending.length ? 'bg-amber-50 text-amber-900' : 'bg-green-50 text-green-900'}`}>
+          {sync.pending.length === 0
+            ? `Spreadsheet tersinkron${sync.lastSyncAt ? ` · terakhir ${formatDateTime(sync.lastSyncAt)}` : ''}`
+            : sync.lastError
+              ? `Spreadsheet tertunda (${sync.pending.length} tab), dicoba ulang otomatis. Data aman di server.`
+              : 'Mengirim perubahan ke spreadsheet…'}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {cards.map((c) => (
           <Link key={c.t} href={c.href} className="panel-solid !p-4 hover:border-brand-violet">

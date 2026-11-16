@@ -1,7 +1,7 @@
 /**
  * ShareIn — API database untuk web (Next.js).
  * Web memanggil doPost dengan rahasia bersama; hanya operasi tabel generik:
- * ensure (buat tab + header), read, append, update, patch. Semua dijalankan di bawah
+ * ensure (buat tab + header), read, append, update, patch, replace. Semua dijalankan di bawah
  * LockService agar penulisan dari beberapa server tidak bertabrakan.
  */
 
@@ -44,6 +44,7 @@ function jalankan_(op) {
     }
     case 'update': return update_(op.table, op.updates || []);
     case 'patch': return patch_(op);
+    case 'replace': return replace_(op.table, op.header || [], op.rows || []);
     default: throw new Error('aksi tidak dikenal: ' + op.action);
   }
 }
@@ -153,6 +154,28 @@ function update_(table, updates) {
     range.setValues([u.row.map(tulis_)]);
   });
   return { updated: updates.length };
+}
+
+/**
+ * Timpa seluruh isi tab (header + baris) dengan salinan dari database utama web.
+ * Spreadsheet hanya cermin: baris sisa di bawah dikosongkan, format kolom tetap.
+ */
+function replace_(table, header, rows) {
+  var sh = sheet_(table);
+  var data = [header].concat(rows);
+  var width = Math.max.apply(null, [1].concat(data.map(function (r) { return r.length; })));
+  var oldRows = sh.getLastRow();
+  var oldCols = sh.getLastColumn();
+  var range = sh.getRange(1, 1, data.length, width);
+  range.setNumberFormat('@');
+  range.setValues(data.map(function (r) {
+    var out = r.map(tulis_);
+    while (out.length < width) out.push('');
+    return out;
+  }));
+  if (oldRows > data.length) sh.getRange(data.length + 1, 1, oldRows - data.length, Math.max(width, oldCols)).clearContent();
+  if (oldCols > width) sh.getRange(1, width + 1, data.length, oldCols - width).clearContent();
+  return { replaced: rows.length };
 }
 
 /**

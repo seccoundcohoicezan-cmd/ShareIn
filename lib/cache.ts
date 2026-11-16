@@ -8,7 +8,14 @@ const store = (g.__shareinCache ??= new Map<string, Entry<unknown>>())
 
 export const CACHE_TTL_MS = 60_000
 
+// With the fast primary database, long caches only cause stale screens across server instances.
+const limits = ((globalThis as unknown as { __shareinTtlCap?: { max: number } }).__shareinTtlCap ??= { max: Infinity })
+export function capCacheTtl(ms: number) {
+  limits.max = ms
+}
+
 export async function cached<T>(key: string, load: () => Promise<T>, ttl = CACHE_TTL_MS): Promise<T> {
+  ttl = Math.min(ttl, limits.max)
   const hit = store.get(key) as Entry<T> | undefined
   if (hit && hit.expires > Date.now()) return hit.value
   const value = await load()
@@ -18,6 +25,7 @@ export async function cached<T>(key: string, load: () => Promise<T>, ttl = CACHE
 
 /** Stores a value we already know (e.g. right after writing it) so the next read skips the sheet. */
 export function prime<T>(key: string, value: T, ttl = CACHE_TTL_MS) {
+  ttl = Math.min(ttl, limits.max)
   store.set(key, { value, expires: Date.now() + ttl })
 }
 

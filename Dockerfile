@@ -18,6 +18,8 @@ RUN addgroup -S app && adduser -S app -G app && mkdir -p /data && chown app:app 
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# The primary database runs the same Code.js as the Google Sheet (lib/primary/engine.ts).
+COPY --from=build /app/apps-script/Code.js ./apps-script/Code.js
 USER app
 VOLUME ["/data"]
 EXPOSE 3000

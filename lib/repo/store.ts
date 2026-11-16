@@ -25,7 +25,7 @@ export interface TableData {
 
 /** Minimal tabular storage; implemented by Google Sheets and by a local JSON file store. */
 export interface TableStore {
-  readonly kind: 'sheets' | 'apps_script' | 'file' | 'memory'
+  readonly kind: 'sheets' | 'apps_script' | 'primary' | 'file' | 'memory'
   ensureSchema(): Promise<void>
   read(table: TableName): Promise<TableData>
   append(table: TableName, rows: Row[]): Promise<void>

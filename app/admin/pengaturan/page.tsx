@@ -21,7 +21,7 @@ export default async function PengaturanPage() {
           <Link href="/admin/api" className="btn-ghost btn-sm">Kunci API</Link>
         </span>
       </div>
-      <p className="muted mb-4 text-sm">Disimpan ke sheet settings. Halaman publik ikut berubah paling lama 60 detik.</p>
+      <p className="muted mb-4 text-sm">Tersimpan langsung di server. Spreadsheet ikut diperbarui otomatis beberapa detik kemudian; halaman publik paling lama 60 detik.</p>
       <SettingsForm initial={settings} />
     </AdminShell>
   )

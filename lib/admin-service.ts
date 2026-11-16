@@ -2,6 +2,9 @@ import 'server-only'
 import { z } from 'zod'
 import { normalizeName } from './format'
 import { withLock } from './lock'
+import type { SyncStatus } from './primary/engine'
+import { getStore } from './repo'
+import { AppsScriptStore } from './repo/apps-script-store'
 import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
 import { listSubmissionsCached, listSubmissionsFresh, listSubmissionsRecent, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
@@ -124,4 +127,15 @@ export function toCsv(items: Submission[]): string {
     'reviewed_at', 'needs_review', 'whatsapp', 'program',
   ]
   return '﻿' + [cols.join(','), ...items.map((s) => cols.map((c) => csvCell(s[c])).join(','))].join('\r\n') + '\r\n'
+}
+
+/** Status of the copy to Google Sheets, when the primary database is in use (null otherwise). */
+export async function sheetSync(): Promise<SyncStatus | null> {
+  const store = getStore()
+  if (store.kind !== 'primary' || !(store instanceof AppsScriptStore)) return null
+  try {
+    return await store.rawCall<SyncStatus>({ action: 'status' })
+  } catch {
+    return null
+  }
 }

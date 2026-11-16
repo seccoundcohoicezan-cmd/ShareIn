@@ -41,7 +41,7 @@ function request(url: string, method: 'POST' | 'GET', body: string | null, deadl
   })
 }
 
-const defaultPoster: Poster = async (url, body) => {
+export const defaultPoster: Poster = async (url, body) => {
   const deadline = Date.now() + 25_000
   let r = await request(url, 'POST', body, deadline)
   // The Web App answers a POST with a redirect to the result, which is fetched with GET (as browsers do).
@@ -64,7 +64,7 @@ const BUSY_BUDGET_MS = 35_000
  * and (3) never preceded by the schema check (that runs once, before the first write).
  */
 export class AppsScriptStore implements TableStore {
-  readonly kind = 'apps_script' as const
+  readonly kind: 'apps_script' | 'primary'
   static READ_TTL_MS = 3000
   private ensured: Promise<void> | null = null
   /** Tables whose sheet header already has every column: writes to them can skip the schema check. */
@@ -74,7 +74,17 @@ export class AppsScriptStore implements TableStore {
   private lastGood = new Map<TableName, ReadResult>()
   private queue: { table: TableName; resolve: (r: ReadResult) => void; reject: (e: unknown) => void }[] = []
 
-  constructor(private url: string, private secret: string, private post: Poster = defaultPoster) {}
+  private readTtl: number
+
+  constructor(private url: string, private secret: string, private post: Poster = defaultPoster, opts: { readTtlMs?: number; kind?: 'apps_script' | 'primary' } = {}) {
+    this.readTtl = opts.readTtlMs ?? AppsScriptStore.READ_TTL_MS
+    this.kind = opts.kind ?? 'apps_script'
+  }
+
+  /** One raw operation (e.g. the primary database's `status`). */
+  rawCall<T>(op: { action: string }): Promise<T> {
+    return this.call<T>(op as unknown as Op)
+  }
 
   private async send<T>(ops: Op[], retries = 1): Promise<T[]> {
     let lastErr: unknown
@@ -154,7 +164,7 @@ export class AppsScriptStore implements TableStore {
 
   private readRaw(table: TableName): Promise<ReadResult> {
     const hit = this.recent.get(table)
-    if (hit && Date.now() - hit.at < AppsScriptStore.READ_TTL_MS) return hit.data
+    if (hit && Date.now() - hit.at < this.readTtl) return hit.data
     const data = new Promise<ReadResult>((resolve, reject) => {
       if (this.queue.length === 0) setTimeout(this.flush, 0)
       this.queue.push({ table, resolve, reject })
