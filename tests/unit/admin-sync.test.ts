@@ -46,3 +46,21 @@ describe('review status counts', () => {
     expect(r.counts).toEqual({ all: 3, pending: 1, approved: 2, rejected: 0 })
   })
 })
+
+describe('dashboard overview', () => {
+  it('counts every program (not only Golden), ignores void rows, and fills the last 7 days', async () => {
+    const { dashboard } = await import('@/lib/admin-service')
+    const h = TABLES.submissions
+    const now = new Date().toISOString()
+    const row = (id: string, status: string, program: string, platform = 'tiktok') => h.map((k) => ({ id, status, program, platform, created_at: now, period_id: 'P', submitter_name: 'X' } as Record<string, string>)[k] ?? '')
+    await getStore().append('submissions', [row('1', 'approved', 'pelatihan'), row('2', 'approved', 'pelatihan', 'reels'), row('3', 'pending', 'duta'), row('4', 'void', ''), row('5', 'rejected', '')])
+    invalidate('')
+    const d = await dashboard()
+    expect(d.totals).toMatchObject({ total: 4, approved: 2, pending: 1, rejected: 1, today: 4, tiktok: 3, reels: 1 })
+    expect(d.byChannel.pelatihan).toMatchObject({ total: 2, approved: 2, tiktok: 1, reels: 1 })
+    expect(d.byChannel.golden).toMatchObject({ total: 1, rejected: 1 })
+    expect(d.daily).toHaveLength(7)
+    expect(d.daily[6]).toMatchObject({ pelatihan: 2, duta: 1, golden: 1 })
+    expect(d.recent).toHaveLength(4)
+  })
+})

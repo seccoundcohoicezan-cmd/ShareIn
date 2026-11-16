@@ -9,7 +9,8 @@ import { audit } from './repo/audit'
 import { getSettings } from './repo/settings'
 import { listSubmissionsCached, listSubmissionsFresh, listSubmissionsRecent, patchSubmissions, updateSubmissions, type StoredSubmission } from './repo/submissions'
 import { autoApprove } from './settings-schema'
-import { AUTO_REVIEWER, type Settings, type Submission } from './types'
+import { AUTO_REVIEWER, type Channel, type Settings, type Submission } from './types'
+import { participantsTable } from './repo/programs'
 
 export const REJECT_REASONS = ['Angka tidak sesuai', 'Bukan dari FYP', 'Duplikat', 'Link ShareIn tidak valid'] as const
 
@@ -49,25 +50,41 @@ export async function adminList(f: Filters) {
   return { items: f.status === 'all' ? scope : scope.filter((s) => s.status === f.status), periods, counts }
 }
 
+export type ChannelStats = { total: number; tiktok: number; reels: number; pending: number; approved: number; rejected: number; today: number }
+
+const wibDay = (iso: string) => {
+  const t = new Date(iso).getTime()
+  return Number.isNaN(t) ? '' : new Date(t + 7 * 3600_000).toISOString().slice(0, 10)
+}
+
+/** Overview of every program for the admin home: totals, per program, last 7 days, latest links. */
 export async function dashboard() {
-  // Dashboard numbers: 60 s cache (cleared on every write from the web) keeps it instant.
-  const [settings, raw] = await Promise.all([getSettings(), listSubmissionsCached()])
+  // Dashboard numbers: short cache (cleared on every write from the web) keeps it instant.
+  const [settings, raw, people] = await Promise.all([getSettings(), listSubmissionsCached(), participantsTable.list()])
   const every = raw.map(strip).filter((s) => s.status !== 'void')
-  const all = every.filter((s) => s.program === 'golden')
-  const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
-  const inPeriod = all.filter((s) => s.period_id === settings.period_id)
-  const reviewedToday = (s: Submission) =>
-    s.reviewed_at && new Date(new Date(s.reviewed_at).getTime() + 7 * 3600_000).toISOString().slice(0, 10) === today
+  const today = wibDay(new Date().toISOString())
+  const empty = (): ChannelStats => ({ total: 0, tiktok: 0, reels: 0, pending: 0, approved: 0, rejected: 0, today: 0 })
+  const byChannel: Record<Channel, ChannelStats> = { golden: empty(), pelatihan: empty(), duta: empty() }
+  const all = empty()
+  const days = Array.from({ length: 7 }, (_, i) => wibDay(new Date(Date.now() - (6 - i) * 86400_000).toISOString()))
+  const daily = days.map((day) => ({ day, golden: 0, pelatihan: 0, duta: 0 }))
+  for (const s of every) {
+    const day = wibDay(s.created_at)
+    for (const c of [byChannel[s.program], all]) {
+      c.total++
+      c[s.platform]++
+      if (s.status === 'pending' || s.status === 'approved' || s.status === 'rejected') c[s.status]++
+      if (day === today) c.today++
+    }
+    const d = daily.find((x) => x.day === day)
+    if (d) d[s.program]++
+  }
   return {
     settings,
-    stats: {
-      pending: all.filter((s) => s.status === 'pending').length,
-      approvedToday: all.filter((s) => s.status === 'approved' && reviewedToday(s)).length,
-      rejected: inPeriod.filter((s) => s.status === 'rejected').length,
-      totalPeriod: inPeriod.length,
-    },
-    pendingByProgram: { pelatihan: every.filter((s) => s.program === 'pelatihan' && s.status === 'pending').length, duta: every.filter((s) => s.program === 'duta' && s.status === 'pending').length },
-    recent: [...all].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5),
+    totals: { ...all, participants: people.length },
+    byChannel,
+    daily,
+    recent: [...every].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8),
   }
 }
 
