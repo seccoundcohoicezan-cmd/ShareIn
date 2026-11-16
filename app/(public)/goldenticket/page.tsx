@@ -5,13 +5,14 @@ import { ArrowUpIcon } from '@/components/icons'
 import { RulesList } from '@/components/RulesList'
 import { CollectedFeed } from '@/components/CollectedFeed'
 import { Panel, PillLabel } from '@/components/ui'
-import { loadPublic } from '@/lib/public-data'
+import { Leaderboard } from '@/components/Leaderboard'
+import { loadGolden } from '@/lib/public-data'
 
 export const revalidate = 60
 export const metadata: Metadata = { title: 'Golden Ticket' }
 
 export default async function GoldenTicketPage() {
-  const { settings, feed } = await loadPublic()
+  const { settings, feed, leaderboard } = await loadGolden()
   return (
     <div className="space-y-5">
       <section className="px-1 pt-2">
@@ -38,6 +39,8 @@ export default async function GoldenTicketPage() {
         )}
         <Link href="/pantau" className="btn-ghost w-full sm:w-auto">Pantau setoranku</Link>
       </div>
+
+      <Leaderboard board={leaderboard} />
 
       <CollectedFeed initial={feed} />
 

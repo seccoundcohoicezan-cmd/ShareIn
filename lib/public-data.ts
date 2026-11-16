@@ -1,6 +1,7 @@
 import 'server-only'
 import { parseSettings } from './settings-schema'
-import { collectedFeed, FEED_PAGE, getProgress, type CollectedFeed } from './service'
+import { collectedFeed, FEED_PAGE, getProgress, goldenRanking, type CollectedFeed } from './service'
+import type { Leaderboard } from './leaderboard'
 import type { Channel, Program, Settings } from './types'
 import { programSummary, summarize, type ProgramSummary } from './progress'
 import { publicWinners, type PublicWinner } from './spin'
@@ -24,6 +25,16 @@ export async function loadPublic(program: Channel = 'golden'): Promise<{ setting
   } catch (e) {
     fallbackOrThrow(e, 'public data unavailable')
     return { settings: parseSettings(new Map()), feed: EMPTY_FEED }
+  }
+}
+
+export async function loadGolden(): Promise<{ settings: Settings; feed: CollectedFeed; leaderboard: Leaderboard }> {
+  try {
+    const [{ settings, feed }, leaderboard] = await Promise.all([loadPublic('golden'), goldenRanking()])
+    return { settings, feed, leaderboard }
+  } catch (e) {
+    fallbackOrThrow(e, 'golden data unavailable')
+    return { settings: parseSettings(new Map()), feed: EMPTY_FEED, leaderboard: { rows: [], participants: 0 } }
   }
 }
 

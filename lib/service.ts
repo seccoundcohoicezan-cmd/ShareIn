@@ -24,6 +24,7 @@ import { autoApprove, channelOpen } from './settings-schema'
 import { AUTO_REVIEWER, type Channel, type CheckResult, type Participant, type Platform, type Settings, type Submission } from './types'
 import { runChecks } from './validate'
 import { maskName, normalizeWhatsapp } from './identity'
+import { goldenLeaderboard, type Leaderboard } from './leaderboard'
 import type { ParsedLink } from './url'
 
 export const submissionSchema = z.object({
@@ -318,4 +319,9 @@ export async function collectedFeed(offset = 0, limit = FEED_PAGE, program: Chan
       status: s.status as CollectedItem['status'],
     })),
   }
+}
+
+/** Public Golden Ticket ranking by approved links (names masked, no WhatsApp). */
+export async function goldenRanking(): Promise<Leaderboard> {
+  return goldenLeaderboard(await listSubmissionsCached())
 }
